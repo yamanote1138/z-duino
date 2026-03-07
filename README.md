@@ -1,0 +1,150 @@
+# Z-Duino
+
+A network-controlled Z-scale model train controller. An ESP8266 (Wemos D1 Mini) drives a TB6612FNG H-bridge motor driver, serving a webapp over WiFi that lets you control your train from any browser on the local network.
+
+Discoverable via mDNS at `http://ztrain.local`.
+
+## Features
+
+- **Throttle UI** — 10-segment speed bar with colour-coded zones (red/yellow/green), smooth ramping between speed steps
+- **Direction control** — forward/reverse toggle with automatic ramp-down-switch-ramp-up when the train is moving
+- **Emergency stop** — immediate halt, bypasses ramping
+- **Safety timeout** — train stops automatically if the controller loses contact for 30 seconds
+- **Zero external dependencies** — everything served from the device itself, no internet required
+- **mDNS discovery** — no need to remember IP addresses
+
+## Hardware
+
+### Parts
+
+| Part | Purpose |
+|---|---|
+| Wemos D1 Mini (ESP8266) | WiFi microcontroller |
+| TB6612FNG breakout | H-bridge motor driver |
+| 12V DC power supply | Track power |
+| Z-scale track + locomotive | The whole point, really |
+
+### Wiring
+
+```
+Wemos D1 Mini          TB6612FNG
+─────────────          ─────────
+D1 (GPIO5)  ─────────  PWMA      (speed control)
+D2 (GPIO4)  ─────────  AIN2      (direction pin 2)
+D3 (GPIO0)  ─────────  AIN1      (direction pin 1)
+D4 (GPIO2)  ─────────  STBY      (standby — active HIGH)
+3.3V        ─────────  VCC       (logic power)
+GND         ─────────  GND       (common ground)
+
+12V Supply             TB6612FNG
+──────────             ─────────
++12V        ─────────  VM        (motor power)
+GND         ─────────  GND       (common ground)
+
+TB6612FNG              Track
+─────────              ─────
+A01         ─────────  Rail 1
+A02         ─────────  Rail 2
+```
+
+Only Motor A is used. Motor B pins are left unconnected.
+
+**Important:** Connect the Wemos GND and the 12V supply GND to the TB6612FNG's GND — they must share a common ground.
+
+## Software Prerequisites
+
+- [Arduino CLI](https://arduino.github.io/arduino-cli/)
+- ESP8266 board package (`arduino-cli core install esp8266:esp8266`)
+- Arduino libraries:
+  - `ArduinoJson` (`arduino-cli lib install ArduinoJson`)
+  - `WebSockets` (`arduino-cli lib install WebSockets`)
+- [Node.js](https://nodejs.org/) (v18+)
+- `mklittlefs` and `esptool` (included with the ESP8266 board package)
+
+## Setup
+
+1. **Clone the repo:**
+   ```bash
+   git clone https://github.com/thechad/z-duino.git
+   cd z-duino
+   ```
+
+2. **Configure WiFi credentials:**
+   ```bash
+   cp firmware/z-duino/arduino_secrets.h.example firmware/z-duino/arduino_secrets.h
+   ```
+   Edit `arduino_secrets.h` with your WiFi SSID and password. Optionally change the mDNS hostname (default: `ztrain`).
+
+3. **Install frontend dependencies:**
+   ```bash
+   cd frontend
+   npm install
+   cd ..
+   ```
+
+4. **Build and flash:**
+   ```bash
+   ./build.sh
+   ```
+   Select option **7** (Build + Upload All). This will:
+   - Build the frontend with Vite
+   - Compile the firmware with arduino-cli
+   - Flash the firmware to the Wemos
+   - Pack and flash the frontend filesystem (LittleFS)
+
+## Usage
+
+1. Power up the Wemos D1 Mini (USB or external 5V)
+2. Connect your 12V supply to the TB6612FNG
+3. Open a browser and navigate to **http://ztrain.local**
+   - If mDNS isn't working on your network, check the serial monitor (115200 baud) for the device's IP address
+4. Use the throttle:
+   - **Speed segments 1–10** — click to ramp to that speed level. Click a lit segment to ramp back down.
+   - **FWD / REV** — toggle direction. If the train is moving, it will smoothly ramp down, switch, and ramp back up.
+   - **Brake** — smooth ramp to stop
+   - **E-Stop** — immediate stop
+
+## Development
+
+For frontend development without hardware:
+
+```bash
+cd frontend
+npm run dev:all
+```
+
+This starts the Vite dev server on `http://localhost:3000` and a mock WebSocket server on port 81 that simulates the ESP8266's responses.
+
+## Build Script Options
+
+| Option | Action |
+|---|---|
+| 1 | Build All (frontend + firmware) |
+| 2 | Build Frontend only |
+| 3 | Build Firmware only |
+| 4 | Upload Firmware only |
+| 5 | Upload LittleFS only |
+| 6 | Upload All (firmware + filesystem) |
+| 7 | Build + Upload All |
+
+## WebSocket Protocol
+
+The ESP8266 runs a WebSocket server on port 81 (subprotocol `arduino`).
+
+**Client → Device:**
+```json
+{"cmd": "speed", "value": 0.0}        // 0.0 to 1.0
+{"cmd": "direction", "value": true}    // true = forward
+{"cmd": "stop"}                        // immediate stop
+{"cmd": "ping"}                        // keepalive
+```
+
+**Device → Client:**
+```json
+{"type": "status", "speed": 0.0, "direction": true, "connected": true}
+{"type": "pong"}
+```
+
+## License
+
+MIT

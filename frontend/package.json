@@ -1,0 +1,23 @@
+{
+  "name": "z-duino-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && rm -f ../build/data/assets/*.ttf",
+    "mock": "node mock-server.js",
+    "dev:all": "concurrently \"npm run mock\" \"npm run dev\""
+  },
+  "dependencies": {
+    "vue": "^3.5.13",
+    "bootstrap": "^5.3.3",
+    "@fortawesome/fontawesome-free": "^6.7.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "vite": "^6.0.7",
+    "ws": "^8.19.0",
+    "concurrently": "^9.1.0"
+  }
+}

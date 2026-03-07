@@ -1,0 +1,41 @@
+body {
+  background-color: #1a1a1a;
+  min-height: 100vh;
+}
+
+.card {
+  background-color: #2d2d2d;
+  border-color: #444;
+}
+
+.speed-segment {
+  font-weight: bold;
+  font-size: 0.85rem;
+  padding: 0.5rem 0;
+  transition: all 0.15s ease;
+  border-radius: 0 !important;
+}
+
+.speed-segment:first-child {
+  border-top-left-radius: 0.375rem !important;
+  border-bottom-left-radius: 0.375rem !important;
+}
+
+.speed-segment:last-child {
+  border-top-right-radius: 0.375rem !important;
+  border-bottom-right-radius: 0.375rem !important;
+}
+
+.speed-segment:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btn {
+  transition: all 0.2s ease;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}

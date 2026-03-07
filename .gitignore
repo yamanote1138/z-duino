@@ -1,0 +1,21 @@
+# Secrets
+arduino_secrets.h
+
+# Build artifacts
+build/
+
+# Dependencies
+node_modules/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Package manager
+package-lock.json
