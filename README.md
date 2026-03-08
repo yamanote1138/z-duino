@@ -26,6 +26,8 @@ Discoverable via mDNS at `http://ztrain.local`.
 
 ### Wiring
 
+![Z-Duino wiring diagram](docs/resources/z-duino.png)
+
 ```
 Wemos D1 Mini          TB6612FNG
 ─────────────          ─────────
