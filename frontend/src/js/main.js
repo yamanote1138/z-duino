@@ -5,7 +5,7 @@ import '@fortawesome/fontawesome-free/css/solid.min.css'
 import '../css/style.css'
 
 const RAMP_INTERVAL = 100       // ms between ramp steps
-const RAMP_TIME_PER_SEGMENT = 200 // ms per segment traversed
+const RAMP_TIME_PER_SEGMENT = 1000 // ms per segment traversed
 const DIRECTION_PAUSE = 500     // ms pause during direction change
 const RECONNECT_BASE = 1000     // base reconnect delay
 const RECONNECT_MAX = 30000     // max reconnect delay
@@ -16,6 +16,7 @@ const app = createApp({
     return {
       socket: null,
       connected: false,
+      railroadName: 'Z-Duino',
       currentSpeed: 0.0,
       currentDirection: true,
       powerLevels: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
@@ -54,6 +55,10 @@ const app = createApp({
         try {
           const msg = JSON.parse(event.data)
           if (msg.type === 'status') {
+            if (msg.name) {
+              this.railroadName = msg.name
+              document.title = msg.name
+            }
             this.currentSpeed = msg.speed
             this.currentDirection = msg.direction
           }

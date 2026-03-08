@@ -16,7 +16,7 @@ Network-controlled Z-scale model train controller. ESP8266 (Wemos D1 Mini) firmw
 
 ## WebSocket Protocol (port 81)
 Client sends JSON: `{"cmd": "speed", "value": 0.0-1.0}`, `{"cmd": "direction", "value": true/false}`, `{"cmd": "stop"}`, `{"cmd": "ping"}`
-Server responds: `{"type": "status", "speed": 0.0, "direction": true, "connected": true}`, `{"type": "pong"}`
+Server responds: `{"type": "status", "name": "...", "speed": 0.0, "direction": true, "connected": true}`, `{"type": "pong"}`
 
 ## Development
 ```bash
@@ -36,6 +36,7 @@ npm run dev:all    # Vite dev server + mock WebSocket server
 - `firmware/z-duino/arduino_secrets.h` — WiFi creds (not committed, copy from .example)
 - `frontend/src/js/main.js` — Vue 3 app with throttle logic
 - `frontend/mock-server.js` — Mock WebSocket for local dev
+- `docs/LITTLEFS.md` — LittleFS flash layout & mklittlefs parameters
 
 ## Dependencies
 - Arduino: ESP8266 board package, ArduinoJson, WebSockets

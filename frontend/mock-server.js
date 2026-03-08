@@ -8,9 +8,12 @@ let state = {
   direction: true
 };
 
+const RAILROAD_NAME = 'Mock Railroad Co.';
+
 function sendStatus(ws) {
   ws.send(JSON.stringify({
     type: 'status',
+    name: RAILROAD_NAME,
     speed: state.speed,
     direction: state.direction,
     connected: true

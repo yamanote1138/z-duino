@@ -9,12 +9,13 @@
 #include "arduino_secrets.h"
 #include "Motor.h"
 
-#define VERSION "0.1.0"
+#define VERSION "1.0.0"
 
 // WiFi credentials from arduino_secrets.h
 char wifi_ssid[] = WIFI_SSID;
 char wifi_pass[] = WIFI_PASS;
 char mdns_hostname[] = MDNS_HOSTNAME;
+char railroad_name[] = RAILROAD_NAME;
 
 // TB6612FNG pin assignments (Motor A only)
 int pwmA = D1;   // GPIO5  - PWMA
@@ -36,7 +37,7 @@ WebSocketsServer socket(81);
 Motor motor(pwmA, aIn1, aIn2);
 
 void applyMotorState() {
-  int pwmValue = (int)(currentSpeed * 1000.0);
+  int pwmValue = (int)(currentSpeed * MAX_PWM);
   if (pwmValue == 0) {
     motor.stop();
   } else if (currentDirection) {
@@ -49,6 +50,7 @@ void applyMotorState() {
 void broadcastStatus() {
   JsonDocument doc;
   doc["type"] = "status";
+  doc["name"] = railroad_name;
   doc["speed"] = currentSpeed;
   doc["direction"] = currentDirection;
   doc["connected"] = true;
@@ -106,6 +108,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
       {
         JsonDocument doc;
         doc["type"] = "status";
+        doc["name"] = railroad_name;
         doc["speed"] = currentSpeed;
         doc["direction"] = currentDirection;
         doc["connected"] = true;
@@ -136,10 +139,8 @@ void setup() {
 
   // Initialize LittleFS
   if (!LittleFS.begin()) {
-    Serial.println("LittleFS mount failed!");
-    return;
+    Serial.println("LittleFS mount failed");
   }
-  Serial.println("LittleFS mounted");
 
   // Connect to WiFi
   WiFi.begin(wifi_ssid, wifi_pass);
@@ -158,7 +159,30 @@ void setup() {
   }
 
   // HTTP server: serve frontend from LittleFS
-  server.serveStatic("/", LittleFS, "/", "max-age=86400");
+  server.on("/", HTTP_GET, []() {
+    File f = LittleFS.open("/index.html", "r");
+    if (!f) {
+      server.send(500, "text/plain", "index.html not found on LittleFS");
+      return;
+    }
+    server.streamFile(f, "text/html");
+    f.close();
+  });
+  server.onNotFound([]() {
+    String path = server.uri();
+    if (LittleFS.exists(path)) {
+      File f = LittleFS.open(path, "r");
+      String contentType = "application/octet-stream";
+      if (path.endsWith(".html")) contentType = "text/html";
+      else if (path.endsWith(".css")) contentType = "text/css";
+      else if (path.endsWith(".js")) contentType = "application/javascript";
+      else if (path.endsWith(".woff2")) contentType = "font/woff2";
+      server.streamFile(f, contentType);
+      f.close();
+    } else {
+      server.send(404, "text/plain", "Not found: " + path);
+    }
+  });
   server.begin();
   Serial.println("HTTP server started on port 80");
 

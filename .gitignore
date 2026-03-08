@@ -4,6 +4,9 @@ arduino_secrets.h
 # Build artifacts
 build/
 
+# Temp / debug scripts
+tmp/
+
 # Dependencies
 node_modules/
 

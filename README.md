@@ -55,9 +55,10 @@ Only Motor A is used. Motor B pins are left unconnected.
 
 - [Arduino CLI](https://arduino.github.io/arduino-cli/)
 - ESP8266 board package (`arduino-cli core install esp8266:esp8266`)
-- Arduino libraries:
-  - `ArduinoJson` (`arduino-cli lib install ArduinoJson`)
-  - `WebSockets` (`arduino-cli lib install WebSockets`)
+- Arduino libraries — install both with:
+  ```bash
+  arduino-cli lib install ArduinoJson WebSockets
+  ```
 - [Node.js](https://nodejs.org/) (v18+)
 - `mklittlefs` and `esptool` (included with the ESP8266 board package)
 
@@ -73,7 +74,7 @@ Only Motor A is used. Motor B pins are left unconnected.
    ```bash
    cp firmware/z-duino/arduino_secrets.h.example firmware/z-duino/arduino_secrets.h
    ```
-   Edit `arduino_secrets.h` with your WiFi SSID and password. Optionally change the mDNS hostname (default: `ztrain`).
+   Edit `arduino_secrets.h` with your WiFi SSID and password. Optionally change the mDNS hostname (default: `ztrain`) and `MAX_PWM` to tune top speed (default: `500` — about half voltage to the track, which is plenty for Z-scale).
 
 3. **Install frontend dependencies:**
    ```bash
@@ -103,6 +104,8 @@ Only Motor A is used. Motor B pins are left unconnected.
    - **FWD / REV** — toggle direction. If the train is moving, it will smoothly ramp down, switch, and ramp back up.
    - **Brake** — smooth ramp to stop
    - **E-Stop** — immediate stop
+
+> **Z-scale note:** These locomotives are tiny and light. Don't be surprised if nothing happens at low power — it's normal for a Z-scale train to sit still until 40–50% throttle, then take off suddenly once it overcomes static friction. This isn't a bug; it's just how small motors behave at low voltage. You may want to start around segment 4 and work up from there.
 
 ## Development
 
@@ -141,7 +144,7 @@ The ESP8266 runs a WebSocket server on port 81 (subprotocol `arduino`).
 
 **Device → Client:**
 ```json
-{"type": "status", "speed": 0.0, "direction": true, "connected": true}
+{"type": "status", "name": "Z-Duino", "speed": 0.0, "direction": true, "connected": true}
 {"type": "pong"}
 ```
 

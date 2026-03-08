@@ -63,6 +63,8 @@ z-duino/
 │   ├── mock-server.js           # Mock WebSocket server for local dev
 │   ├── vite.config.js           # Builds to ../build/data/ for LittleFS
 │   └── package.json
+├── docs/
+│   └── LITTLEFS.md              # LittleFS flash layout & mklittlefs parameters
 └── build.sh                     # Build + deploy script
 ```
 
@@ -88,7 +90,7 @@ The device runs a WebSocket server on port 81 with the `arduino` subprotocol.
 **Device → Client:**
 | Message | Payload |
 |---|---|
-| Status update | `{"type": "status", "speed": 0.0, "direction": true, "connected": true}` |
+| Status update | `{"type": "status", "name": "...", "speed": 0.0, "direction": true, "connected": true}` |
 | Pong | `{"type": "pong"}` |
 
 The mock server (`frontend/mock-server.js`) implements the same protocol.
