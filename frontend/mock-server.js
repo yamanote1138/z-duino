@@ -47,6 +47,18 @@ wss.on('connection', (ws) => {
           sendStatus(ws);
           break;
 
+        case 'invert':
+          console.log(`Direction invert: ${msg.value ? 'on' : 'off'}`);
+          break;
+
+        case 'led':
+          console.log(`LED: r=${msg.r} g=${msg.g} b=${msg.b}`);
+          break;
+
+        case 'led_auto':
+          console.log('LED: auto status resumed');
+          break;
+
         case 'ping':
           ws.send(JSON.stringify({ type: 'pong' }));
           break;

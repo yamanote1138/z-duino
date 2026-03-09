@@ -8,6 +8,7 @@
 
 #include "arduino_secrets.h"
 #include "Motor.h"
+#include "StatusLED.h"
 
 #define VERSION "1.0.0"
 
@@ -23,11 +24,18 @@ int aIn2 = D2;   // GPIO4  - AIN2
 int aIn1 = D3;   // GPIO0  - AIN1
 int stby = D4;   // GPIO2  - STBY
 
+// Status LED pin assignments (common cathode RGB)
+int ledR = D5;   // GPIO14 - Red cathode
+int ledG = D6;   // GPIO12 - Green cathode
+int ledB = D7;   // GPIO13 - Blue cathode
+
 // State
 float currentSpeed = 0.0;
 bool currentDirection = true; // true = forward
 unsigned long lastMessageTime = 0;
 const unsigned long SAFETY_TIMEOUT = 30000; // 30 seconds
+int connectedClients = 0;
+bool invertDirection = false;
 
 // Servers
 ESP8266WebServer server(80);
@@ -36,11 +44,23 @@ WebSocketsServer socket(81);
 // Motor
 Motor motor(pwmA, aIn1, aIn2);
 
+// Status LED
+StatusLED led(ledR, ledG, ledB);
+
+void applyLedStatus() {
+  if (connectedClients > 0) {
+    led.setState(currentDirection ? ACTIVE_FORWARD : ACTIVE_REVERSE);
+  } else {
+    led.setState(IDLE);
+  }
+}
+
 void applyMotorState() {
   int pwmValue = (int)(currentSpeed * MAX_PWM);
+  bool motorDirection = invertDirection ? !currentDirection : currentDirection;
   if (pwmValue == 0) {
     motor.stop();
-  } else if (currentDirection) {
+  } else if (motorDirection) {
     motor.forward(pwmValue);
   } else {
     motor.reverse(pwmValue);
@@ -84,11 +104,28 @@ void handleWebSocketMessage(uint8_t num, uint8_t *payload, size_t length) {
     currentDirection = doc["value"] | true;
     applyMotorState();
     broadcastStatus();
+    applyLedStatus();
   }
   else if (strcmp(cmd, "stop") == 0) {
     currentSpeed = 0.0;
     applyMotorState();
     broadcastStatus();
+  }
+  else if (strcmp(cmd, "invert") == 0) {
+    invertDirection = doc["value"] | false;
+    applyMotorState();
+    Serial.printf("Direction invert: %s\n", invertDirection ? "on" : "off");
+  }
+  else if (strcmp(cmd, "led") == 0) {
+    int r = doc["r"] | 0;
+    int g = doc["g"] | 0;
+    int b = doc["b"] | 0;
+    led.setTestColor(r, g, b);
+    Serial.printf("LED test: r=%d g=%d b=%d\n", r, g, b);
+  }
+  else if (strcmp(cmd, "led_auto") == 0) {
+    applyLedStatus();
+    Serial.println("LED: auto status resumed");
   }
   else if (strcmp(cmd, "ping") == 0) {
     String pong = "{\"type\":\"pong\"}";
@@ -100,11 +137,18 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
   switch (type) {
     case WStype_DISCONNECTED:
       Serial.printf("[%u] Disconnected\n", num);
+      connectedClients--;
+      if (connectedClients <= 0) {
+        connectedClients = 0;
+      }
+      applyLedStatus();
       break;
 
     case WStype_CONNECTED:
       Serial.printf("[%u] Connected\n", num);
       lastMessageTime = millis();
+      connectedClients++;
+      applyLedStatus();
       {
         JsonDocument doc;
         doc["type"] = "status";
@@ -143,15 +187,18 @@ void setup() {
   }
 
   // Connect to WiFi
+  led.setState(WIFI_CONNECTING);
   WiFi.begin(wifi_ssid, wifi_pass);
   Serial.printf("Connecting to %s", wifi_ssid);
   while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
+    led.update();
+    delay(50);
     Serial.print(".");
   }
   Serial.println();
   Serial.print("Connected! IP: ");
   Serial.println(WiFi.localIP());
+  led.setState(IDLE);
 
   // Start mDNS
   if (MDNS.begin(mdns_hostname)) {
@@ -198,6 +245,7 @@ void loop() {
   server.handleClient();
   socket.loop();
   MDNS.update();
+  led.update();
 
   // Safety timeout: stop motor if no messages received
   if (currentSpeed > 0.0 && (millis() - lastMessageTime > SAFETY_TIMEOUT)) {

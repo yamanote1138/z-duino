@@ -24,7 +24,21 @@ const app = createApp({
       stopFlag: false,
       reconnectDelay: RECONNECT_BASE,
       reconnectTimer: null,
-      pingTimer: null
+      pingTimer: null,
+      directionInverted: false,
+      ledTestMode: false,
+      ledBright: true,
+      activeLedColor: null,
+      ledColors: [
+        { name: 'Red',     r: 1000, g: 0,    b: 0,    css: '#dc3545', text: '#fff' },
+        { name: 'Green',   r: 0,    g: 1000, b: 0,    css: '#198754', text: '#fff' },
+        { name: 'Blue',    r: 0,    g: 0,    b: 1000, css: '#0d6efd', text: '#fff' },
+        { name: 'Yellow',  r: 1000, g: 1000, b: 0,    css: '#ffc107', text: '#000' },
+        { name: 'Cyan',    r: 0,    g: 1000, b: 1000, css: '#0dcaf0', text: '#000' },
+        { name: 'Magenta', r: 1000, g: 0,    b: 1000, css: '#d63384', text: '#fff' },
+        { name: 'White',   r: 1000, g: 1000, b: 1000, css: '#f8f9fa', text: '#000' },
+        { name: 'Off',     r: 0,    g: 0,    b: 0,    css: '#212529', text: '#6c757d' }
+      ]
     }
   },
 
@@ -54,6 +68,7 @@ const app = createApp({
       this.socket.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data)
+          console.log('RX:', msg)
           if (msg.type === 'status') {
             if (msg.name) {
               this.railroadName = msg.name
@@ -93,7 +108,11 @@ const app = createApp({
 
     send(obj) {
       if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-        this.socket.send(JSON.stringify(obj))
+        const json = JSON.stringify(obj)
+        console.log('TX:', json)
+        this.socket.send(json)
+      } else {
+        console.warn('TX failed (not connected):', obj)
       }
     },
 
@@ -204,6 +223,47 @@ const app = createApp({
 
     brake() {
       this.rampTo(0)
+    },
+
+    toggleInvert() {
+      this.directionInverted = !this.directionInverted
+      this.send({ cmd: 'invert', value: this.directionInverted })
+      console.log('Direction inverted:', this.directionInverted)
+    },
+
+    toggleLedTest() {
+      this.ledTestMode = !this.ledTestMode
+      console.log('LED test mode:', this.ledTestMode ? 'ON' : 'OFF')
+      if (!this.ledTestMode) {
+        this.activeLedColor = null
+        this.send({ cmd: 'led_auto' })
+      }
+    },
+
+    setLed(color) {
+      this.activeLedColor = color.name
+      this.sendLed(color)
+    },
+
+    toggleBright() {
+      this.ledBright = !this.ledBright
+      console.log('Brightness:', this.ledBright ? 'BRIGHT' : 'DIM')
+      if (this.activeLedColor) {
+        const color = this.ledColors.find(c => c.name === this.activeLedColor)
+        if (color) this.sendLed(color)
+      }
+    },
+
+    sendLed(color) {
+      const scale = this.ledBright ? 1.0 : 0.25
+      const payload = {
+        cmd: 'led',
+        r: Math.round(color.r * scale),
+        g: Math.round(color.g * scale),
+        b: Math.round(color.b * scale)
+      }
+      console.log(`LED: ${color.name} (${this.ledBright ? 'bright' : 'dim'}) →`, payload)
+      this.send(payload)
     },
 
     emergencyStop() {
