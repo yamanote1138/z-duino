@@ -25,7 +25,7 @@ const app = createApp({
       reconnectDelay: RECONNECT_BASE,
       reconnectTimer: null,
       pingTimer: null,
-      directionInverted: false,
+      directionInverted: localStorage.getItem('directionInverted') === 'true',
       ledTestMode: false,
       ledBright: true,
       activeLedColor: null,
@@ -53,6 +53,9 @@ const app = createApp({
         this.connected = true
         this.reconnectDelay = RECONNECT_BASE
         this.startPing()
+        if (this.directionInverted) {
+          this.send({ cmd: 'invert', value: true })
+        }
       }
 
       this.socket.onclose = () => {
@@ -227,6 +230,7 @@ const app = createApp({
 
     toggleInvert() {
       this.directionInverted = !this.directionInverted
+      localStorage.setItem('directionInverted', this.directionInverted)
       this.send({ cmd: 'invert', value: this.directionInverted })
       console.log('Direction inverted:', this.directionInverted)
     },
