@@ -10,7 +10,7 @@
 #include "Motor.h"
 #include "StatusLED.h"
 
-#define VERSION "1.0.0"
+#define VERSION "1.1.0"
 
 // WiFi credentials from arduino_secrets.h
 char wifi_ssid[] = WIFI_SSID;
@@ -110,6 +110,7 @@ void handleWebSocketMessage(uint8_t num, uint8_t *payload, size_t length) {
     currentSpeed = 0.0;
     applyMotorState();
     broadcastStatus();
+    led.blinkEmergencyStop();
   }
   else if (strcmp(cmd, "invert") == 0) {
     invertDirection = doc["value"] | false;

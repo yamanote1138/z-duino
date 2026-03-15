@@ -8,7 +8,8 @@ enum LEDState {
   IDLE,
   ACTIVE_FORWARD,
   ACTIVE_REVERSE,
-  LED_TEST
+  LED_TEST,
+  EMERGENCY_STOP_BLINK
 };
 
 class StatusLED {
@@ -16,6 +17,7 @@ class StatusLED {
     StatusLED(int pinR, int pinG, int pinB);
     void setState(LEDState state);
     void setTestColor(int r, int g, int b);
+    void blinkEmergencyStop();
     void update();
 
   private:
@@ -24,6 +26,9 @@ class StatusLED {
     int _pinG;
     int _pinB;
     LEDState _state;
+    LEDState _previousState;
+    int _blinkCount;
+    unsigned long _blinkStartTime;
 };
 
 #endif
