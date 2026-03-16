@@ -5,19 +5,23 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && rm -f ../build/data/assets/*.ttf",
-    "mock": "node mock-server.js",
+    "build": "vite build",
+    "mock": "tsx mock-server.ts",
     "dev:all": "concurrently \"npm run mock\" \"npm run dev\""
   },
   "dependencies": {
+    "@nuxt/ui": "^4.5.1",
+    "tailwindcss": "^4.2.1",
     "vue": "^3.5.13",
-    "bootstrap": "^5.3.3",
-    "@fortawesome/fontawesome-free": "^6.7.2"
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@iconify-json/mdi": "^1.2.3",
     "@vitejs/plugin-vue": "^5.2.1",
+    "concurrently": "^9.1.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
     "vite": "^6.0.7",
-    "ws": "^8.19.0",
-    "concurrently": "^9.1.0"
+    "ws": "^8.19.0"
   }
 }

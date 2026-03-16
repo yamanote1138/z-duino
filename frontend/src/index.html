@@ -1,120 +1,12 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Z-Duino</title>
-  <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-  <div id="app">
-    <div class="container py-4">
-      <div class="row justify-content-center">
-        <div class="col-12 col-md-8 col-lg-6">
-          <div class="card bg-dark border-secondary">
-
-            <div class="card-header d-flex justify-content-between align-items-center">
-              <h4 class="mb-0">
-                <i class="fas fa-train"></i> {{ railroadName }}
-              </h4>
-              <span class="badge badge-lg"
-                    v-bind:class="{ 'bg-success': connected, 'bg-danger': !connected }">
-                {{ connected ? 'Connected' : 'Disconnected' }}
-              </span>
-            </div>
-
-            <div class="card-body">
-
-              <!-- Throttle Controls -->
-              <div v-if="!ledTestMode">
-                <!-- Speed Bar -->
-                <div class="mb-3">
-                  <label class="form-label text-muted small">Speed</label>
-                  <div class="btn-group w-100" role="group">
-                    <button v-for="(level, index) in powerLevels"
-                            v-bind:key="index"
-                            type="button"
-                            class="btn btn-sm speed-segment"
-                            v-bind:class="getSegmentClass(index)"
-                            v-on:click="setSpeed(level, index)"
-                            v-bind:disabled="!connected">
-                      {{ index + 1 }}
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Controls -->
-                <div class="d-flex gap-2">
-                  <button class="btn btn-primary flex-fill"
-                          v-on:click="toggleDirection()"
-                          v-bind:disabled="!connected">
-                    <i class="fas" v-bind:class="currentDirection ? 'fa-arrow-right' : 'fa-arrow-left'"></i>
-                    {{ currentDirection ? 'FWD' : 'REV' }}
-                  </button>
-                  <button class="btn btn-secondary flex-fill"
-                          v-on:click="brake()"
-                          v-bind:disabled="!connected || currentSpeed === 0">
-                    <i class="fas fa-stop"></i> Brake
-                  </button>
-                  <button class="btn btn-danger flex-fill"
-                          v-on:click="emergencyStop()"
-                          v-bind:disabled="!connected">
-                    <i class="fas fa-exclamation-triangle"></i> E-Stop
-                  </button>
-                </div>
-              </div>
-
-              <!-- LED Test Panel -->
-              <div v-if="ledTestMode">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <span class="text-muted small">LED Test</span>
-                  <button class="btn btn-sm"
-                          v-bind:class="ledBright ? 'btn-warning' : 'btn-outline-secondary'"
-                          v-on:click="toggleBright()"
-                          v-bind:disabled="!connected">
-                    <i class="fas" v-bind:class="ledBright ? 'fa-sun' : 'fa-moon'"></i>
-                    {{ ledBright ? 'Bright' : 'Dim' }}
-                  </button>
-                </div>
-                <div class="d-flex flex-wrap gap-1">
-                  <button v-for="c in ledColors" v-bind:key="c.name"
-                          class="btn btn-sm flex-fill"
-                          v-bind:style="{
-                            backgroundColor: c.css,
-                            color: c.text,
-                            border: activeLedColor === c.name ? '2px solid #fff' : '1px solid #555',
-                            minWidth: '60px',
-                            fontWeight: activeLedColor === c.name ? 'bold' : 'normal'
-                          }"
-                          v-on:click="setLed(c)"
-                          v-bind:disabled="!connected">
-                    {{ c.name }}
-                  </button>
-                </div>
-              </div>
-
-            </div>
-
-            <div class="card-footer border-secondary d-flex justify-content-center gap-2">
-              <button class="btn btn-sm"
-                      v-bind:class="directionInverted ? 'btn-info' : 'btn-outline-secondary'"
-                      v-on:click="toggleInvert()">
-                <i class="fas fa-exchange-alt"></i>
-                {{ directionInverted ? 'Dir Inverted' : 'Invert Dir' }}
-              </button>
-              <button class="btn btn-sm btn-outline-secondary"
-                      v-on:click="toggleLedTest()">
-                <i class="fas" v-bind:class="ledTestMode ? 'fa-train' : 'fa-lightbulb'"></i>
-                {{ ledTestMode ? 'Back to Throttle' : 'LED Test' }}
-              </button>
-            </div>
-
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script type="module" src="/js/main.js"></script>
+  <div id="app" class="isolate"></div>
+  <script type="module" src="/main.ts"></script>
 </body>
 </html>
