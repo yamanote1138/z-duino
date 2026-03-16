@@ -14,16 +14,9 @@ export default defineConfig({
     vue(),
     ui()
   ],
-  root: 'src',
-  publicDir: 'public',
   build: {
     outDir: resolve(__dirname, '../build/data'),
-    emptyOutDir: true,
-    rollupOptions: {
-      input: {
-        main: resolve(__dirname, 'src/index.html')
-      }
-    }
+    emptyOutDir: true
   },
   server: {
     port: 3000
