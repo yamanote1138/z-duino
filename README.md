@@ -8,7 +8,9 @@ Discoverable via mDNS at `http://ztrain.local`.
 
 - **Throttle UI** — 10-segment speed bar with colour-coded zones (red/yellow/green), smooth ramping between speed steps
 - **Direction control** — forward/reverse toggle with automatic ramp-down-switch-ramp-up when the train is moving
-- **Emergency stop** — immediate halt, bypasses ramping
+- **Direction invert** — swap forward/reverse polarity to match your track wiring (persisted in browser)
+- **Emergency stop** — immediate halt, bypasses ramping, magenta LED blink
+- **Status LED** — RGB LED indicates connection and motor state; supports manual colour control via LED test panel
 - **Safety timeout** — train stops automatically if the controller loses contact for 30 seconds
 - **Zero external dependencies** — everything served from the device itself, no internet required
 - **mDNS discovery** — no need to remember IP addresses
@@ -21,6 +23,7 @@ Discoverable via mDNS at `http://ztrain.local`.
 |---|---|
 | Wemos D1 Mini (ESP8266) | WiFi microcontroller |
 | TB6612FNG breakout | H-bridge motor driver |
+| 5mm RGB LED (common cathode) | Status indicator (see [wiring](docs/status-led-wiring.md)) |
 | 12V DC power supply | Track power |
 | Z-scale track + locomotive | The whole point, really |
 
@@ -51,18 +54,53 @@ A02         ─────────  Rail 2
 
 Only Motor A is used. Motor B pins are left unconnected.
 
+**Status LED** — see [docs/status-led-wiring.md](docs/status-led-wiring.md) for full wiring, resistor values, and pinout. Summary: D5=Red (220Ω), D6=Green (100Ω), D7=Blue (100Ω), GND=Cathode.
+
 **Important:** Connect the Wemos GND and the 12V supply GND to the TB6612FNG's GND — they must share a common ground.
 
 ## Software Prerequisites
 
-- [Arduino CLI](https://arduino.github.io/arduino-cli/)
-- ESP8266 board package (`arduino-cli core install esp8266:esp8266`)
-- Arduino libraries — install both with:
-  ```bash
-  arduino-cli lib install ArduinoJson WebSockets
-  ```
-- [Node.js](https://nodejs.org/) (v18+)
-- `mklittlefs` and `esptool` (included with the ESP8266 board package)
+### macOS Setup
+
+1. **Arduino CLI** (via Homebrew):
+   ```bash
+   brew install arduino-cli
+   ```
+
+2. **ESP8266 board package** — add the board manager URL, then install:
+   ```bash
+   arduino-cli config init  # creates ~/Library/Arduino15/arduino-cli.yaml
+   arduino-cli config add board_manager.additional_urls \
+     http://arduino.esp8266.com/stable/package_esp8266com_index.json
+   arduino-cli core update-index
+   arduino-cli core install esp8266:esp8266
+   ```
+   This installs the board definitions, toolchain, `mklittlefs`, and `esptool` under:
+   ```
+   ~/Library/Arduino15/packages/esp8266/
+   ```
+
+3. **Arduino libraries:**
+   ```bash
+   arduino-cli lib install ArduinoJson WebSockets
+   ```
+   Libraries install to `~/Arduino/libraries/`.
+
+4. **Node.js** (v18+) — via [nvm](https://github.com/nvm-sh/nvm) or [nodejs.org](https://nodejs.org/):
+   ```bash
+   nvm install 20
+   ```
+
+### Verify Installation
+
+```bash
+arduino-cli version          # should print version info
+arduino-cli core list        # should show esp8266:esp8266
+arduino-cli lib list         # should show ArduinoJson and WebSockets
+node --version               # v18+ required
+```
+
+`mklittlefs` and `esptool` don't need to be on your PATH — `build.sh` finds them automatically inside `~/Library/Arduino15/`.
 
 ## Setup
 
@@ -138,10 +176,13 @@ The ESP8266 runs a WebSocket server on port 81 (subprotocol `arduino`).
 
 **Client → Device:**
 ```json
-{"cmd": "speed", "value": 0.0}        // 0.0 to 1.0
-{"cmd": "direction", "value": true}    // true = forward
-{"cmd": "stop"}                        // immediate stop
-{"cmd": "ping"}                        // keepalive
+{"cmd": "speed", "value": 0.0}                    // 0.0 to 1.0
+{"cmd": "direction", "value": true}                // true = forward
+{"cmd": "stop"}                                    // immediate stop
+{"cmd": "ping"}                                    // keepalive
+{"cmd": "invert", "value": true}                   // motor direction invert
+{"cmd": "led", "r": 0, "g": 0, "b": 1000}         // LED test mode (0–1000 per channel)
+{"cmd": "led_auto"}                                // resume status LED behaviour
 ```
 
 **Device → Client:**

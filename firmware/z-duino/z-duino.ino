@@ -10,7 +10,7 @@
 #include "Motor.h"
 #include "StatusLED.h"
 
-#define VERSION "1.1.0"
+#define VERSION "2.0.0"
 
 // WiFi credentials from arduino_secrets.h
 char wifi_ssid[] = WIFI_SSID;

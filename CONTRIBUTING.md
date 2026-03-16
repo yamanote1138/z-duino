@@ -54,26 +54,33 @@ z-duino/
 ├── firmware/z-duino/
 │   ├── z-duino.ino              # Main sketch (WiFi, mDNS, HTTP, WebSocket)
 │   ├── Motor.h / Motor.cpp      # TB6612FNG motor driver abstraction
+│   ├── StatusLED.h / StatusLED.cpp  # RGB status LED abstraction
 │   └── arduino_secrets.h.example
 ├── frontend/
 │   ├── src/
-│   │   ├── index.html           # Vue 3 app (inline templates, no SFC)
-│   │   ├── js/main.js           # App logic, WebSocket, ramping
-│   │   └── css/style.css        # Dark theme styles
-│   ├── mock-server.js           # Mock WebSocket server for local dev
-│   ├── vite.config.js           # Builds to ../build/data/ for LittleFS
+│   │   ├── App.vue              # Root component
+│   │   ├── main.ts              # Entry point
+│   │   ├── main.css             # Tailwind CSS imports
+│   │   ├── components/          # Vue SFCs (SpeedController, LedTestPanel, etc.)
+│   │   └── composables/
+│   │       └── useTrainController.ts  # Core logic (WebSocket, ramping, state)
+│   ├── index.html
+│   ├── mock-server.ts           # Mock WebSocket server for local dev
+│   ├── vite.config.ts           # Builds to ../build/data/ for LittleFS
+│   ├── tsconfig.json
 │   └── package.json
 ├── docs/
-│   └── LITTLEFS.md              # LittleFS flash layout & mklittlefs parameters
+│   ├── LITTLEFS.md              # LittleFS flash layout & mklittlefs parameters
+│   └── status-led-wiring.md     # RGB LED wiring & resistor values
 └── build.sh                     # Build + deploy script
 ```
 
 ### Key Design Decisions
 
-- **Vue 3 Options API with inline templates** — no single-file components. The HTML lives in `index.html` with Vue directives. This keeps the build simple and the output small enough for LittleFS (~616KB).
+- **Vue 3 Composition API with SFCs** — TypeScript throughout, `<script setup>` syntax. UI built with Nuxt UI components and Tailwind CSS v4. Icons via `@iconify-json/mdi`.
+- **Singleton composable** — `useTrainController.ts` holds all state and WebSocket logic in a single composable, shared across components.
 - **Client-side ramping** — speed transitions are interpolated in the browser and sent as individual WebSocket messages. The ESP8266 just applies whatever speed it receives.
 - **20kHz PWM** — above audible range for Z-scale motors. Set via `analogWriteFreq(20000)` with a 0–1000 range.
-- **Font Awesome solid only** — we strip TTF files and brand/regular icon sets post-build to keep the LittleFS image small.
 
 ### WebSocket Protocol
 
@@ -86,6 +93,9 @@ The device runs a WebSocket server on port 81 with the `arduino` subprotocol.
 | Set direction | `{"cmd": "direction", "value": true}` (true=fwd) |
 | Stop | `{"cmd": "stop"}` |
 | Keepalive | `{"cmd": "ping"}` |
+| Direction invert | `{"cmd": "invert", "value": true}` |
+| LED test mode | `{"cmd": "led", "r": 0, "g": 0, "b": 1000}` (0–1000) |
+| Resume status LED | `{"cmd": "led_auto"}` |
 
 **Device → Client:**
 | Message | Payload |
@@ -93,7 +103,7 @@ The device runs a WebSocket server on port 81 with the `arduino` subprotocol.
 | Status update | `{"type": "status", "name": "...", "speed": 0.0, "direction": true, "connected": true}` |
 | Pong | `{"type": "pong"}` |
 
-The mock server (`frontend/mock-server.js`) implements the same protocol.
+The mock server (`frontend/mock-server.ts`) implements the same protocol.
 
 ### Submitting Changes
 
