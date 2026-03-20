@@ -22,3 +22,6 @@ Thumbs.db
 
 # Package manager
 package-lock.json
+
+# Build artifacts
+*.d.ts
