@@ -11,6 +11,16 @@
       <UIcon :name="ledTestMode ? 'i-mdi-gauge' : 'i-mdi-led-on'" />
       {{ ledTestMode ? 'Back to Throttle' : 'LED Test' }}
     </UButton>
+    <UButton
+      size="sm"
+      :color="partyMode ? 'warning' : 'neutral'"
+      :variant="partyMode ? 'solid' : 'outline'"
+      :disabled="!connected"
+      @click="togglePartyMode()"
+    >
+      <UIcon :name="partyMode ? 'i-mdi-stop' : 'i-mdi-party-popper'" class="shrink-0" />
+      <span class="whitespace-nowrap">{{ partyMode ? 'Stop Party' : 'Party Mode' }}</span>
+    </UButton>
   </div>
 </template>
 
@@ -19,5 +29,5 @@ import { useTrainController } from '../composables/useTrainController'
 import DirectionInvert from './DirectionInvert.vue'
 import DebugModal from './DebugModal.vue'
 
-const { ledTestMode, toggleLedTest } = useTrainController()
+const { connected, ledTestMode, toggleLedTest, partyMode, togglePartyMode } = useTrainController()
 </script>

@@ -74,8 +74,10 @@ const directionInverted = ref(localStorage.getItem('directionInverted') === 'tru
 const ledTestMode = ref(false)
 const ledBright = ref(true)
 const activeLedColor = ref<string | null>(null)
+const partyMode = ref(false)
 
 let rampTimer: ReturnType<typeof setInterval> | null = null
+let partyTimer: ReturnType<typeof setTimeout> | null = null
 let reconnectDelay = RECONNECT_BASE
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let pingTimer: ReturnType<typeof setInterval> | null = null
@@ -278,6 +280,14 @@ function toggleInvert() {
 // ── LED test panel ──
 
 function toggleLedTest() {
+  // Kill party mode if active
+  if (partyMode.value) {
+    partyMode.value = false
+    if (partyTimer) {
+      clearTimeout(partyTimer)
+      partyTimer = null
+    }
+  }
   ledTestMode.value = !ledTestMode.value
   console.log('LED test mode:', ledTestMode.value ? 'ON' : 'OFF')
   if (!ledTestMode.value) {
@@ -312,6 +322,35 @@ function sendLed(color: LedColor) {
   send(payload)
 }
 
+// ── Party mode ──
+
+const partyColors = ledColors.filter(c => c.name !== 'Off')
+
+function partyTick() {
+  if (!partyMode.value) return
+  const color = partyColors[Math.floor(Math.random() * partyColors.length)]
+  activeLedColor.value = color.name
+  sendLed(color)
+  // Random interval 100–500ms for that "bopping along" feel
+  const delay = 100 + Math.floor(Math.random() * 400)
+  partyTimer = setTimeout(partyTick, delay)
+}
+
+function togglePartyMode() {
+  partyMode.value = !partyMode.value
+  if (partyMode.value) {
+    partyTick()
+  } else {
+    if (partyTimer) {
+      clearTimeout(partyTimer)
+      partyTimer = null
+    }
+    activeLedColor.value = null
+    ledTestMode.value = false
+    send({ cmd: 'led_auto' })
+  }
+}
+
 // ── Debug ──
 
 const WS_READY_STATES = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'] as const
@@ -334,6 +373,7 @@ function getDebugInfo(): { label: string; value: string }[] {
     { label: 'Direction Inverted', value: String(directionInverted.value) },
     { label: 'Ramping', value: String(rampTimer !== null) },
     { label: 'LED Test Mode', value: String(ledTestMode.value) },
+    { label: 'Party Mode', value: String(partyMode.value) },
     { label: 'LED Brightness', value: ledBright.value ? 'Bright' : 'Dim' },
     { label: 'Active LED Color', value: activeLedColor.value ?? 'none' },
     { label: 'Ping Interval', value: `${PING_INTERVAL}ms` },
@@ -373,6 +413,9 @@ export function useTrainController() {
     toggleLedTest,
     setLed,
     toggleBright,
+
+    partyMode,
+    togglePartyMode,
 
     getDebugInfo
   }
