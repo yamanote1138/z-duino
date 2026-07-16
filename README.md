@@ -1,8 +1,21 @@
 # Z-Duino
 
+[![CI](https://github.com/yamanote1138/z-duino/actions/workflows/ci.yml/badge.svg)](https://github.com/yamanote1138/z-duino/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](#license)
+![ESP8266](https://img.shields.io/badge/ESP8266-Arduino-00979D?logo=arduino&logoColor=white)
+![Vue 3](https://img.shields.io/badge/Vue-3-4FC08D?logo=vuedotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)
+![Nuxt UI](https://img.shields.io/badge/Nuxt_UI-4-00DC82?logo=nuxtdotjs&logoColor=white)
+
 A network-controlled Z-scale model train controller. An ESP8266 (Wemos D1 Mini) drives a TB6612FNG H-bridge motor driver, serving a webapp over WiFi that lets you control your train from any browser on the local network.
 
 Discoverable via mDNS at `http://ztrain.local`.
+
+## Screenshot
+
+![Z-Duino throttle UI](docs/resources/screenshot.png)
 
 ## Features
 
@@ -17,46 +30,7 @@ Discoverable via mDNS at `http://ztrain.local`.
 
 ## Hardware
 
-### Parts
-
-| Part | Purpose |
-|---|---|
-| Wemos D1 Mini (ESP8266) | WiFi microcontroller |
-| TB6612FNG breakout | H-bridge motor driver |
-| 5mm RGB LED (common cathode) | Status indicator (see [wiring](docs/status-led-wiring.md)) |
-| 12V DC power supply | Track power |
-| Z-scale track + locomotive | The whole point, really |
-
-### Wiring
-
-![Z-Duino wiring diagram](docs/resources/z-duino.png)
-
-```
-Wemos D1 Mini          TB6612FNG
-─────────────          ─────────
-D1 (GPIO5)  ─────────  PWMA      (speed control)
-D2 (GPIO4)  ─────────  AIN2      (direction pin 2)
-D3 (GPIO0)  ─────────  AIN1      (direction pin 1)
-D4 (GPIO2)  ─────────  STBY      (standby — active HIGH)
-3.3V        ─────────  VCC       (logic power)
-GND         ─────────  GND       (common ground)
-
-12V Supply             TB6612FNG
-──────────             ─────────
-+12V        ─────────  VM        (motor power)
-GND         ─────────  GND       (common ground)
-
-TB6612FNG              Track
-─────────              ─────
-A01         ─────────  Rail 1
-A02         ─────────  Rail 2
-```
-
-Only Motor A is used. Motor B pins are left unconnected.
-
-**Status LED** — see [docs/status-led-wiring.md](docs/status-led-wiring.md) for full wiring, resistor values, and pinout. Summary: D5=Red (220Ω), D6=Green (100Ω), D7=Blue (100Ω), GND=Cathode.
-
-**Important:** Connect the Wemos GND and the 12V supply GND to the TB6612FNG's GND — they must share a common ground.
+Wemos D1 Mini (ESP8266) → TB6612FNG H-bridge → track, plus an RGB status LED. Full parts list, wiring diagram, and pinout live in **[docs/HARDWARE.md](docs/HARDWARE.md)**.
 
 ## Software Prerequisites
 
@@ -106,7 +80,7 @@ node --version               # v18+ required
 
 1. **Clone the repo:**
    ```bash
-   git clone https://github.com/thechad/z-duino.git
+   git clone https://github.com/yamanote1138/z-duino.git
    cd z-duino
    ```
 
