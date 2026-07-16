@@ -20,8 +20,5 @@ node_modules/
 .DS_Store
 Thumbs.db
 
-# Package manager
-package-lock.json
-
 # Build artifacts
 *.d.ts
