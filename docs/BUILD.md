@@ -22,8 +22,8 @@ That's it — the ESP8266 platform, toolchain, `mklittlefs`, `esptool`, and the 
 ### Verify Installation
 
 ```bash
-pio --version                # should print version info
-node --version                # v18+ required
+pio --version   # should print version info
+node --version  # v18+ required
 ```
 
 ## Setup
@@ -38,7 +38,7 @@ node --version                # v18+ required
    ```bash
    cp secrets.ini.example secrets.ini
    ```
-   Edit `secrets.ini` with your WiFi SSID and password. Optionally change the mDNS hostname (default: `ztrain`) and `MAX_PWM` to tune top speed (default: `500` — about half voltage to the track, which is plenty for Z-scale). These are plain PlatformIO `build_flags` (`-D WIFI_SSID=\"...\"` etc.) merged in via `extra_configs` in `platformio.ini` — `secrets.ini` is gitignored, so nothing here ever gets committed.
+   Edit `secrets.ini` with your WiFi SSID and password. Optionally change the mDNS hostname (default: `ztrain`) and `MAX_PWM` to tune top speed (default: `500` — about half voltage to the track, which is plenty for Z-scale). These are plain PlatformIO `build_flags` (`-D WIFI_SSID='"..."'` etc. — note the single-quote wrapping, required so values with spaces survive PlatformIO's flag tokenizer) merged in via `extra_configs` in `platformio.ini` — `secrets.ini` is gitignored, so nothing here ever gets committed.
 
 3. **Install frontend dependencies:**
    ```bash

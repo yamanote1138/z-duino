@@ -4,7 +4,7 @@ How the ESP8266 filesystem works on the Wemos D1 Mini with the 4M2M flash layout
 
 ## Flash Partition Layout
 
-The FQBN option `eesz=4M2M` selects `eagle.flash.4m2m.ld`, which defines:
+`platformio.ini` sets `board_build.ldscript = eagle.flash.4m2m.ld` (the same linker script the Arduino IDE's `eesz=4M2M` board-menu option selects), which defines:
 
 | Symbol | Value | Meaning |
 |---|---|---|
@@ -102,14 +102,14 @@ The `mklittlefs` binary bundled with the ESP8266 Arduino core (v0.2.3) bundles i
 
 ## Other Flash Layouts
 
-If you change the flash size option (e.g. `4M1M`, `4M3M`), the linker script and therefore all the values above will change. Always derive the mklittlefs parameters from the linker script for your selected layout:
+If you change `board_build.ldscript` in `platformio.ini` (e.g. to `eagle.flash.4m1m.ld` or `eagle.flash.4m3m.ld`), the values above will change accordingly. Always derive the mklittlefs parameters from the linker script for your selected layout:
 
 ```bash
-# Find your linker script
-arduino-cli compile --show-properties ... | grep flash_ld
+# Find the linker script PlatformIO is actually using
+find ~/.platformio/packages/framework-arduinoespressif8266/tools/sdk/ld -iname "*<your ldscript>*"
 
 # Then check the values
 grep '_FS_' <path_to_linker_script>
 ```
 
-Or just print `FS_PHYS_SIZE` and `FS_PHYS_BLOCK` from the firmware at runtime — the definitive source of truth.
+Or just print `FS_PHYS_SIZE` and `FS_PHYS_BLOCK` from the firmware at runtime — the definitive source of truth. (PlatformIO itself does exactly this automatically for `pio run -t buildfs`/`uploadfs` — see above.)

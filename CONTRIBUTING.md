@@ -84,26 +84,7 @@ z-duino/
 
 ### WebSocket Protocol
 
-The device runs a WebSocket server on port 81 with the `arduino` subprotocol.
-
-**Client → Device:**
-| Command | Payload |
-|---|---|
-| Set speed | `{"cmd": "speed", "value": 0.0}` (0.0–1.0) |
-| Set direction | `{"cmd": "direction", "value": true}` (true=fwd) |
-| Stop | `{"cmd": "stop"}` |
-| Keepalive | `{"cmd": "ping"}` |
-| Direction invert | `{"cmd": "invert", "value": true}` |
-| LED test mode | `{"cmd": "led", "r": 0, "g": 0, "b": 1000}` (0–1000) |
-| Resume status LED | `{"cmd": "led_auto"}` |
-
-**Device → Client:**
-| Message | Payload |
-|---|---|
-| Status update | `{"type": "status", "name": "...", "speed": 0.0, "direction": true, "connected": true}` |
-| Pong | `{"type": "pong"}` |
-
-The mock server (`frontend/mock-server.ts`) implements the same protocol.
+See **[docs/PROTOCOL.md](docs/PROTOCOL.md)** for the full spec. The mock server (`frontend/mock-server.ts`) implements the same protocol.
 
 ### Submitting Changes
 
