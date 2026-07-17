@@ -8,6 +8,8 @@
 
 #include "Motor.h"
 #include "StatusLED.h"
+#include <MotorLogic.h>
+#include <Command.h>
 
 #define VERSION "2.3.0"
 
@@ -55,14 +57,17 @@ void applyLedStatus() {
 }
 
 void applyMotorState() {
-  int pwmValue = (int)(currentSpeed * MAX_PWM);
-  bool motorDirection = invertDirection ? !currentDirection : currentDirection;
-  if (pwmValue == 0) {
-    motor.stop();
-  } else if (motorDirection) {
-    motor.forward(pwmValue);
-  } else {
-    motor.reverse(pwmValue);
+  MotorDecision decision = decideMotorState(currentSpeed, MAX_PWM, currentDirection, invertDirection);
+  switch (decision.action) {
+    case MOTOR_STOP:
+      motor.stop();
+      break;
+    case MOTOR_FORWARD:
+      motor.forward(decision.pwm);
+      break;
+    case MOTOR_REVERSE:
+      motor.reverse(decision.pwm);
+      break;
   }
 }
 
@@ -87,54 +92,58 @@ void broadcastStatus() {
 void handleWebSocketMessage(uint8_t num, uint8_t *payload, size_t length) {
   lastMessageTime = millis();
 
-  JsonDocument doc;
-  DeserializationError error = deserializeJson(doc, payload, length);
-  if (error) {
-    Serial.print("JSON parse error: ");
-    Serial.println(error.c_str());
-    return;
-  }
+  Command cmd = parseCommand((const char*)payload, length);
 
-  const char* cmd = doc["cmd"];
-  if (!cmd) return;
+  switch (cmd.type) {
+    case CMD_SPEED:
+      currentSpeed = cmd.speed;
+      applyMotorState();
+      broadcastStatus();
+      break;
 
-  if (strcmp(cmd, "speed") == 0) {
-    float value = doc["value"] | 0.0f;
-    currentSpeed = constrain(value, 0.0f, 1.0f);
-    applyMotorState();
-    broadcastStatus();
-  }
-  else if (strcmp(cmd, "direction") == 0) {
-    currentDirection = doc["value"] | true;
-    applyMotorState();
-    broadcastStatus();
-    applyLedStatus();
-  }
-  else if (strcmp(cmd, "stop") == 0) {
-    currentSpeed = 0.0;
-    applyMotorState();
-    broadcastStatus();
-    led.blinkEmergencyStop();
-  }
-  else if (strcmp(cmd, "invert") == 0) {
-    invertDirection = doc["value"] | false;
-    applyMotorState();
-    Serial.printf("Direction invert: %s\n", invertDirection ? "on" : "off");
-  }
-  else if (strcmp(cmd, "led") == 0) {
-    int r = doc["r"] | 0;
-    int g = doc["g"] | 0;
-    int b = doc["b"] | 0;
-    led.setTestColor(r, g, b);
-    Serial.printf("LED test: r=%d g=%d b=%d\n", r, g, b);
-  }
-  else if (strcmp(cmd, "led_auto") == 0) {
-    applyLedStatus();
-    Serial.println("LED: auto status resumed");
-  }
-  else if (strcmp(cmd, "ping") == 0) {
-    String pong = "{\"type\":\"pong\"}";
-    socket.sendTXT(num, pong);
+    case CMD_DIRECTION:
+      currentDirection = cmd.boolValue;
+      applyMotorState();
+      broadcastStatus();
+      applyLedStatus();
+      break;
+
+    case CMD_STOP:
+      currentSpeed = 0.0;
+      applyMotorState();
+      broadcastStatus();
+      led.blinkEmergencyStop();
+      break;
+
+    case CMD_INVERT:
+      invertDirection = cmd.boolValue;
+      applyMotorState();
+      Serial.printf("Direction invert: %s\n", invertDirection ? "on" : "off");
+      break;
+
+    case CMD_LED:
+      led.setTestColor(cmd.ledR, cmd.ledG, cmd.ledB);
+      Serial.printf("LED test: r=%d g=%d b=%d\n", cmd.ledR, cmd.ledG, cmd.ledB);
+      break;
+
+    case CMD_LED_AUTO:
+      applyLedStatus();
+      Serial.println("LED: auto status resumed");
+      break;
+
+    case CMD_PING: {
+      String pong = "{\"type\":\"pong\"}";
+      socket.sendTXT(num, pong);
+      break;
+    }
+
+    case CMD_INVALID_JSON:
+      Serial.println("JSON parse error");
+      break;
+
+    case CMD_UNKNOWN:
+    default:
+      break;
   }
 }
 
