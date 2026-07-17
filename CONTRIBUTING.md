@@ -43,12 +43,35 @@ Open `http://localhost:3000` in your browser. The throttle UI is fully functiona
    ./build.sh    # select option 7 (Build + Upload All)
    ```
 
+### Testing
+
+**Firmware** — the hardware-independent logic (motor state decisions, LED timing math, WebSocket command parsing) lives in `lib/` and is unit-tested on PlatformIO's `native` platform, no device required:
+```bash
+pio test -e native
+```
+Code that touches actual hardware I/O (`Motor`, `StatusLED`'s pin writes, WiFi/sockets) isn't unit-tested this way — verify those manually against real hardware.
+
+**Frontend** — `useTrainController.ts` (via a fake WebSocket) and a couple of component smoke tests, using Vitest:
+```bash
+cd frontend
+npm test          # single run
+npm run test:watch  # watch mode
+```
+
 ### Project Structure
 
 ```
 z-duino/
-├── platformio.ini               # PlatformIO project config (board, ldscript, lib_deps)
+├── platformio.ini               # PlatformIO project config (board, ldscript, lib_deps, native test env)
 ├── secrets.ini.example          # WiFi creds template — copy to secrets.ini (gitignored)
+├── lib/                         # Hardware-independent logic, shared by firmware + native tests
+│   ├── MotorLogic/               # Motor forward/reverse/stop decision
+│   ├── LedTiming/                 # StatusLED breathing/blink timing math
+│   └── Command/                   # WebSocket JSON command parsing
+├── test/                        # PlatformIO native (Unity) tests for lib/
+│   ├── test_motor_logic/
+│   ├── test_led_timing/
+│   └── test_command/
 ├── firmware/z-duino/
 │   ├── z-duino.ino              # Main sketch (WiFi, mDNS, HTTP, WebSocket)
 │   ├── Motor.h / Motor.cpp      # TB6612FNG motor driver abstraction
@@ -61,9 +84,11 @@ z-duino/
 │   │   ├── components/          # Vue SFCs (SpeedController, LedTestPanel, etc.)
 │   │   └── composables/
 │   │       └── useTrainController.ts  # Core logic (WebSocket, ramping, state)
+│   ├── test/                    # Vitest suites (composable + component smoke tests)
 │   ├── index.html
 │   ├── mock-server.ts           # Mock WebSocket server for local dev
 │   ├── vite.config.ts           # Builds to ../build/data/ for LittleFS
+│   ├── vitest.config.ts
 │   ├── tsconfig.json
 │   └── package.json
 ├── docs/
@@ -91,7 +116,7 @@ See **[docs/PROTOCOL.md](docs/PROTOCOL.md)** for the full spec. The mock server 
 1. Fork the repo
 2. Create a feature branch (`git checkout -b my-feature`)
 3. Make your changes
-4. Test against the mock server (`npm run dev:all`)
+4. Test against the mock server (`npm run dev:all`), and run `pio test -e native` / `npm test` if you touched anything covered above
 5. Open a pull request
 
 Keep PRs focused — one feature or fix per PR.

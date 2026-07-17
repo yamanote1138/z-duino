@@ -20,6 +20,7 @@ jobs:
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - run: npm test
       - run: npm run build
 
   firmware:
@@ -35,3 +36,5 @@ jobs:
         run: cp secrets.ini.example secrets.ini
       - name: Compile
         run: pio run
+      - name: Run native unit tests
+        run: pio test -e native

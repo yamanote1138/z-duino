@@ -31,9 +31,17 @@ npm run dev:all    # Vite dev server + mock WebSocket server
 ./build.sh         # Interactive menu — option 7 builds + uploads everything
 ```
 
+## Testing
+```bash
+pio test -e native   # Firmware: hardware-free unit tests for lib/ (MotorLogic, LedTiming, Command)
+cd frontend && npm test   # Frontend: Vitest — useTrainController.ts + component smoke tests
+```
+Both run in CI. Code touching real hardware I/O (pins, WiFi/sockets) isn't unit-tested this way — verify manually against real hardware.
+
 ## Key Files
-- `platformio.ini` — PlatformIO project config (board, ldscript, lib_deps, secrets)
+- `platformio.ini` — PlatformIO project config (board, ldscript, lib_deps, secrets, native test env)
 - `secrets.ini` — WiFi creds & build-time config (not committed, copy from `secrets.ini.example`)
+- `lib/MotorLogic/`, `lib/LedTiming/`, `lib/Command/` — hardware-independent logic, unit-tested via `pio test -e native`
 - `firmware/z-duino/z-duino.ino` — Main sketch
 - `firmware/z-duino/Motor.h/.cpp` — Motor abstraction
 - `firmware/z-duino/StatusLED.h/.cpp` — Status LED abstraction
