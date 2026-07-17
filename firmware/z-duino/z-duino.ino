@@ -11,7 +11,15 @@
 #include <MotorLogic.h>
 #include <Command.h>
 
-#define VERSION "2.3.0"
+#define VERSION "2.4.0"
+
+// analogWrite on ESP8266 is software PWM sharing one hardware timer across
+// all 4 active channels (motor + R/G/B status LED). Above ~40kHz the
+// interrupt load starts contending with the WiFi/WebSocket stack, risking
+// jitter and dropped connections.
+#if PWM_FREQ > 40000
+#error "PWM_FREQ exceeds the 40kHz safe ceiling for this board's shared software-PWM timer"
+#endif
 
 // WiFi credentials from secrets.ini
 char wifi_ssid[] = WIFI_SSID;
@@ -186,8 +194,8 @@ void setup() {
   pinMode(stby, OUTPUT);
   digitalWrite(stby, HIGH);
 
-  // PWM config: 20kHz (above audible range), 0-1000 range
-  analogWriteFreq(20000);
+  // PWM config: frequency from secrets.ini (above audible range), 0-1000 range
+  analogWriteFreq(PWM_FREQ);
   analogWriteRange(1000);
 
   // Initialize LittleFS
