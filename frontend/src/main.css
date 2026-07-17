@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Speed bar segment styling */
 .speed-segment {
   font-weight: bold;

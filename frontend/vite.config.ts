@@ -12,7 +12,7 @@ export default defineConfig({
   },
   plugins: [
     vue(),
-    ui()
+    ui({ colorMode: false })
   ],
   build: {
     outDir: resolve(__dirname, '../build/data'),
