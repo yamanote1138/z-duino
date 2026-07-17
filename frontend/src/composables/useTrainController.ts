@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 // WebSocket protocol types
 interface OutgoingSpeed { cmd: 'speed'; value: number }
@@ -48,6 +48,8 @@ const DIRECTION_PAUSE = 500
 const RECONNECT_BASE = 1000
 const RECONNECT_MAX = 30000
 const PING_INTERVAL = 10000
+const SUPPLY_VOLTAGE = 12
+const TRACK_VOLTAGE_DANGER_THRESHOLD = 10
 
 export const powerLevels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 
@@ -75,6 +77,9 @@ const ledTestMode = ref(false)
 const ledBright = ref(true)
 const activeLedColor = ref<string | null>(null)
 const partyMode = ref(false)
+
+const trackVoltage = computed(() => SUPPLY_VOLTAGE * currentSpeed.value)
+const trackVoltageDanger = computed(() => trackVoltage.value > TRACK_VOLTAGE_DANGER_THRESHOLD)
 
 let rampTimer: ReturnType<typeof setInterval> | null = null
 let partyTimer: ReturnType<typeof setTimeout> | null = null
@@ -350,7 +355,6 @@ const WS_READY_STATES = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'] as const
 function getDebugInfo(): { label: string; value: string; danger?: boolean }[] {
   const wsUrl = socket.value ? socket.value.url : `ws://${location.hostname || 'localhost'}:81/`
   const wsState = socket.value ? WS_READY_STATES[socket.value.readyState] : 'N/A'
-  const trackVoltage = 12 * currentSpeed.value
 
   return [
     { label: 'App Version', value: __APP_VERSION__ },
@@ -360,8 +364,8 @@ function getDebugInfo(): { label: string; value: string; danger?: boolean }[] {
     { label: 'WebSocket State', value: wsState },
     { label: 'Reconnect Delay', value: `${reconnectDelay}ms` },
     { label: 'Current Speed', value: currentSpeed.value === 0 ? 'stopped' : `${Math.round(currentSpeed.value * 100)}%` },
-    { label: 'Supply Voltage', value: '12V' },
-    { label: 'Track Voltage', value: `${trackVoltage.toFixed(1)}V`, danger: trackVoltage > 10 },
+    { label: 'Supply Voltage', value: `${SUPPLY_VOLTAGE}V` },
+    { label: 'Track Voltage', value: `${trackVoltage.value.toFixed(1)}V`, danger: trackVoltageDanger.value },
     { label: 'Direction', value: currentDirection.value ? 'FWD' : 'REV' },
     { label: 'Direction Inverted', value: String(directionInverted.value) },
     { label: 'Ramping', value: String(rampTimer !== null) },
@@ -391,6 +395,8 @@ export function useTrainController() {
     currentSpeed,
     currentDirection,
     directionInverted,
+    trackVoltage,
+    trackVoltageDanger,
     ledTestMode,
     ledBright,
     activeLedColor,
