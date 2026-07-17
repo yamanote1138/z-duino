@@ -29,6 +29,9 @@ class StatusLED {
     LEDState _previousState;
     int _blinkCount;
     unsigned long _blinkStartTime;
+    int _testR;
+    int _testG;
+    int _testB;
 };
 
 #endif

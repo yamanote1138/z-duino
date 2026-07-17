@@ -5,13 +5,9 @@
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) v18+
-- [Arduino CLI](https://arduino.github.io/arduino-cli/) (for firmware work)
-- ESP8266 board package: `arduino-cli core install esp8266:esp8266`
-- Arduino libraries:
-  ```bash
-  arduino-cli lib install ArduinoJson
-  arduino-cli lib install WebSockets
-  ```
+- [PlatformIO Core](https://docs.platformio.org/en/latest/core/installation/index.html) (for firmware work): `brew install platformio`
+
+Firmware dependencies (`espressif8266` platform, `ArduinoJson`, `WebSockets`) are declared in `platformio.ini` and resolved automatically by PlatformIO on first build — no manual install step needed. See [docs/BUILD.md](docs/BUILD.md) for the full setup walkthrough.
 
 ### Frontend Development
 
@@ -33,9 +29,9 @@ Open `http://localhost:3000` in your browser. The throttle UI is fully functiona
 
 1. Copy the secrets template:
    ```bash
-   cp firmware/z-duino/arduino_secrets.h.example firmware/z-duino/arduino_secrets.h
+   cp secrets.ini.example secrets.ini
    ```
-2. Edit `firmware/z-duino/arduino_secrets.h` with your WiFi credentials.
+2. Edit `secrets.ini` with your WiFi credentials. These are PlatformIO `build_flags` merged in via `extra_configs` — gitignored, never committed.
 
 3. Compile:
    ```bash
@@ -47,15 +43,39 @@ Open `http://localhost:3000` in your browser. The throttle UI is fully functiona
    ./build.sh    # select option 7 (Build + Upload All)
    ```
 
+### Testing
+
+**Firmware** — the hardware-independent logic (motor state decisions, LED timing math, WebSocket command parsing) lives in `lib/` and is unit-tested on PlatformIO's `native` platform, no device required:
+```bash
+pio test -e native
+```
+Code that touches actual hardware I/O (`Motor`, `StatusLED`'s pin writes, WiFi/sockets) isn't unit-tested this way — verify those manually against real hardware.
+
+**Frontend** — `useTrainController.ts` (via a fake WebSocket) and a couple of component smoke tests, using Vitest:
+```bash
+cd frontend
+npm test          # single run
+npm run test:watch  # watch mode
+```
+
 ### Project Structure
 
 ```
 z-duino/
+├── platformio.ini               # PlatformIO project config (board, ldscript, lib_deps, native test env)
+├── secrets.ini.example          # WiFi creds template — copy to secrets.ini (gitignored)
+├── lib/                         # Hardware-independent logic, shared by firmware + native tests
+│   ├── MotorLogic/               # Motor forward/reverse/stop decision
+│   ├── LedTiming/                 # StatusLED breathing/blink timing math
+│   └── Command/                   # WebSocket JSON command parsing
+├── test/                        # PlatformIO native (Unity) tests for lib/
+│   ├── test_motor_logic/
+│   ├── test_led_timing/
+│   └── test_command/
 ├── firmware/z-duino/
 │   ├── z-duino.ino              # Main sketch (WiFi, mDNS, HTTP, WebSocket)
 │   ├── Motor.h / Motor.cpp      # TB6612FNG motor driver abstraction
-│   ├── StatusLED.h / StatusLED.cpp  # RGB status LED abstraction
-│   └── arduino_secrets.h.example
+│   └── StatusLED.h / StatusLED.cpp  # RGB status LED abstraction
 ├── frontend/
 │   ├── src/
 │   │   ├── App.vue              # Root component
@@ -64,12 +84,17 @@ z-duino/
 │   │   ├── components/          # Vue SFCs (SpeedController, LedTestPanel, etc.)
 │   │   └── composables/
 │   │       └── useTrainController.ts  # Core logic (WebSocket, ramping, state)
+│   ├── test/                    # Vitest suites (composable + component smoke tests)
 │   ├── index.html
 │   ├── mock-server.ts           # Mock WebSocket server for local dev
 │   ├── vite.config.ts           # Builds to ../build/data/ for LittleFS
+│   ├── vitest.config.ts
 │   ├── tsconfig.json
 │   └── package.json
 ├── docs/
+│   ├── BUILD.md                 # Full software prerequisites & build script reference
+│   ├── HARDWARE.md              # Parts list & wiring diagram
+│   ├── PROTOCOL.md              # Full WebSocket protocol spec
 │   ├── LITTLEFS.md              # LittleFS flash layout & mklittlefs parameters
 │   └── status-led-wiring.md     # RGB LED wiring & resistor values
 └── build.sh                     # Build + deploy script
@@ -84,33 +109,14 @@ z-duino/
 
 ### WebSocket Protocol
 
-The device runs a WebSocket server on port 81 with the `arduino` subprotocol.
-
-**Client → Device:**
-| Command | Payload |
-|---|---|
-| Set speed | `{"cmd": "speed", "value": 0.0}` (0.0–1.0) |
-| Set direction | `{"cmd": "direction", "value": true}` (true=fwd) |
-| Stop | `{"cmd": "stop"}` |
-| Keepalive | `{"cmd": "ping"}` |
-| Direction invert | `{"cmd": "invert", "value": true}` |
-| LED test mode | `{"cmd": "led", "r": 0, "g": 0, "b": 1000}` (0–1000) |
-| Resume status LED | `{"cmd": "led_auto"}` |
-
-**Device → Client:**
-| Message | Payload |
-|---|---|
-| Status update | `{"type": "status", "name": "...", "speed": 0.0, "direction": true, "connected": true}` |
-| Pong | `{"type": "pong"}` |
-
-The mock server (`frontend/mock-server.ts`) implements the same protocol.
+See **[docs/PROTOCOL.md](docs/PROTOCOL.md)** for the full spec. The mock server (`frontend/mock-server.ts`) implements the same protocol.
 
 ### Submitting Changes
 
 1. Fork the repo
 2. Create a feature branch (`git checkout -b my-feature`)
 3. Make your changes
-4. Test against the mock server (`npm run dev:all`)
+4. Test against the mock server (`npm run dev:all`), and run `pio test -e native` / `npm test` if you touched anything covered above
 5. Open a pull request
 
 Keep PRs focused — one feature or fix per PR.

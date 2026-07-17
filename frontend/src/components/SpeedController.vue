@@ -55,8 +55,7 @@
 </template>
 
 <script setup lang="ts">
-import { useTrainController } from '../composables/useTrainController'
-import { powerLevels } from '../composables/useTrainController'
+import { useTrainController, powerLevels } from '../composables/useTrainController'
 
 const {
   connected,

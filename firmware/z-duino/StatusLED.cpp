@@ -1,8 +1,10 @@
 #include "StatusLED.h"
+#include <LedTiming.h>
 
 StatusLED::StatusLED(int pinR, int pinG, int pinB)
   : _pinR(pinR), _pinG(pinG), _pinB(pinB), _state(WIFI_CONNECTING),
-    _previousState(IDLE), _blinkCount(0), _blinkStartTime(0)
+    _previousState(IDLE), _blinkCount(0), _blinkStartTime(0),
+    _testR(0), _testG(0), _testB(0)
 {
   pinMode(_pinR, OUTPUT);
   pinMode(_pinG, OUTPUT);
@@ -36,14 +38,22 @@ void StatusLED::setState(LEDState state) {
     case ACTIVE_REVERSE:
       setColor(1000, 0, 0);   // Red
       break;
+    case LED_TEST:
+      setColor(_testR, _testG, _testB);
+      break;
     case EMERGENCY_STOP_BLINK:
       // Handled in update()
+      break;
+    default:
       break;
   }
 }
 
 void StatusLED::setTestColor(int r, int g, int b) {
   _state = LED_TEST;
+  _testR = r;
+  _testG = g;
+  _testB = b;
   setColor(r, g, b);
 }
 
@@ -57,9 +67,7 @@ void StatusLED::blinkEmergencyStop() {
 void StatusLED::update() {
   if (_state == WIFI_CONNECTING) {
     // Sine-based breathing on red channel, ~2s cycle
-    float phase = (millis() % 2000) / 2000.0f * 2.0f * PI;
-    int brightness = (int)((sin(phase - PI / 2.0f) + 1.0f) / 2.0f * 1000.0f);
-    setColor(brightness, 0, 0);
+    setColor(breathingBrightness(millis()), 0, 0);
   }
   else if (_state == EMERGENCY_STOP_BLINK) {
     // Blink magenta 4 times: 150ms on, 150ms off per blink
@@ -69,11 +77,8 @@ void StatusLED::update() {
     const unsigned long BLINK_CYCLE = BLINK_ON + BLINK_OFF;
     const int TOTAL_BLINKS = 4;
 
-    unsigned long cycleTime = elapsed % BLINK_CYCLE;
-    int currentBlink = elapsed / BLINK_CYCLE;
-
-    if (currentBlink < TOTAL_BLINKS) {
-      if (cycleTime < BLINK_ON) {
+    if (!isBlinkSequenceDone(elapsed, BLINK_CYCLE, TOTAL_BLINKS)) {
+      if (isBlinkFrameOn(elapsed, BLINK_ON, BLINK_OFF)) {
         setColor(1000, 0, 1000);  // Magenta ON
       } else {
         setColor(0, 0, 0);        // OFF

@@ -1,8 +1,10 @@
 # Secrets
+secrets.ini
 arduino_secrets.h
 
 # Build artifacts
 build/
+.pio/
 
 # Temp / debug scripts
 tmp/
