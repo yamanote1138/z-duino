@@ -347,9 +347,10 @@ function togglePartyMode() {
 
 const WS_READY_STATES = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'] as const
 
-function getDebugInfo(): { label: string; value: string }[] {
+function getDebugInfo(): { label: string; value: string; danger?: boolean }[] {
   const wsUrl = socket.value ? socket.value.url : `ws://${location.hostname || 'localhost'}:81/`
   const wsState = socket.value ? WS_READY_STATES[socket.value.readyState] : 'N/A'
+  const trackVoltage = 12 * currentSpeed.value
 
   return [
     { label: 'App Version', value: __APP_VERSION__ },
@@ -360,7 +361,7 @@ function getDebugInfo(): { label: string; value: string }[] {
     { label: 'Reconnect Delay', value: `${reconnectDelay}ms` },
     { label: 'Current Speed', value: currentSpeed.value === 0 ? 'stopped' : `${Math.round(currentSpeed.value * 100)}%` },
     { label: 'Supply Voltage', value: '12V' },
-    { label: 'Track Voltage', value: `${(12 * currentSpeed.value).toFixed(1)}V` },
+    { label: 'Track Voltage', value: `${trackVoltage.toFixed(1)}V`, danger: trackVoltage > 10 },
     { label: 'Direction', value: currentDirection.value ? 'FWD' : 'REV' },
     { label: 'Direction Inverted', value: String(directionInverted.value) },
     { label: 'Ramping', value: String(rampTimer !== null) },
