@@ -11,7 +11,7 @@
 #include <MotorLogic.h>
 #include <Command.h>
 
-#define VERSION "2.3.0"
+#define VERSION "2.4.0"
 
 // analogWrite on ESP8266 is software PWM sharing one hardware timer across
 // all 4 active channels (motor + R/G/B status LED). Above ~40kHz the
