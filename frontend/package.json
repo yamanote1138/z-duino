@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "mock": "tsx mock-server.ts",
-    "dev:all": "concurrently \"npm run mock\" \"npm run dev\""
+    "dev:all": "concurrently \"npm run mock\" \"npm run dev\"",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@nuxt/ui": "^4.5.1",
@@ -18,10 +20,13 @@
   "devDependencies": {
     "@iconify-json/mdi": "^1.2.3",
     "@vitejs/plugin-vue": "^5.2.1",
+    "@vue/test-utils": "^2.4.11",
     "concurrently": "^10.0.3",
+    "happy-dom": "^20.10.6",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "^6.0.7",
+    "vitest": "^4.1.10",
     "ws": "^8.19.0"
   }
 }
