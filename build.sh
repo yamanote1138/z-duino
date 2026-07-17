@@ -9,12 +9,9 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 # Config
-FQBN="esp8266:esp8266:d1_mini:xtal=80,vt=flash,exception=disabled,ssl=all,eesz=4M2M,ip=lm2f,dbg=Disabled,lvl=None____,wipe=none,baud=921600"
-SKETCH_DIR="firmware/z-duino"
 FRONTEND_DIR="frontend"
 BUILD_DIR="build"
 DATA_DIR="$BUILD_DIR/data"
-ARDUINO_DATA=$(arduino-cli config get directories.data 2>/dev/null)
 
 info()    { echo -e "${CYAN}[INFO]${NC} $1"; }
 success() { echo -e "${GREEN}[OK]${NC} $1"; }
@@ -22,16 +19,9 @@ warn()    { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error()   { echo -e "${RED}[ERROR]${NC} $1"; }
 
 check_deps() {
-  local missing=()
-  if ! command -v arduino-cli &>/dev/null; then
-    error "arduino-cli not found. See: https://arduino.github.io/arduino-cli/"
-    exit 1
-  fi
-  arduino-cli lib list 2>/dev/null | grep -q "ArduinoJson" || missing+=("ArduinoJson")
-  arduino-cli lib list 2>/dev/null | grep -q "WebSockets"  || missing+=("WebSockets")
-  if [ ${#missing[@]} -gt 0 ]; then
-    error "Missing Arduino libraries: ${missing[*]}"
-    info "Install with: arduino-cli lib install ${missing[*]}"
+  if ! command -v pio &>/dev/null; then
+    error "PlatformIO not found. Install with: brew install platformio"
+    info "See: https://docs.platformio.org/en/latest/core/installation/index.html"
     exit 1
   fi
 }
@@ -78,15 +68,15 @@ build_frontend() {
 build_firmware() {
   check_deps
   info "Compiling firmware..."
-  mkdir -p "$BUILD_DIR"
-  arduino-cli compile --fqbn "$FQBN" --output-dir "$BUILD_DIR" "$SKETCH_DIR"
+  pio run
   success "Firmware compiled"
 }
 
 upload_firmware() {
+  check_deps
   detect_port || return 1
   info "Uploading firmware..."
-  if ! arduino-cli upload --fqbn "$FQBN" --port "$SELECTED_PORT" --input-dir "$BUILD_DIR" "$SKETCH_DIR"; then
+  if ! pio run -t upload --upload-port "$SELECTED_PORT"; then
     error "Firmware upload failed. Check the connection and try again."
     return 1
   fi
@@ -94,6 +84,7 @@ upload_firmware() {
 }
 
 upload_littlefs() {
+  check_deps
   detect_port || return 1
 
   if [ ! -d "$DATA_DIR" ]; then
@@ -101,34 +92,11 @@ upload_littlefs() {
     return 1
   fi
 
-  info "Packing LittleFS image..."
-
-  # Find mklittlefs via arduino-cli's data directory
-  MKLITTLEFS=$(find "$ARDUINO_DATA" -name "mklittlefs" -type f 2>/dev/null | head -1)
-  if [ -z "$MKLITTLEFS" ]; then
-    error "mklittlefs not found. Install the ESP8266 board package:"
-    info "  arduino-cli core install esp8266:esp8266"
+  info "Packing and flashing LittleFS image..."
+  if ! pio run -t uploadfs --upload-port "$SELECTED_PORT"; then
+    error "LittleFS upload failed. Check the connection and try again."
     return 1
   fi
-
-  # 4M2M layout: 2MB filesystem at offset 0x200000
-  # Block size MUST be 8192 to match eagle.flash.4m2m.ld (_FS_block = 0x2000)
-  # Size = FS_PHYS_SIZE = _FS_end - _FS_start = 0x1FA000 = 2072576 = 253 blocks × 8192
-  "$MKLITTLEFS" -c "$DATA_DIR" -b 8192 -p 256 -s 2072576 "$BUILD_DIR/littlefs.bin"
-  success "LittleFS image created"
-
-  # Find esptool via arduino-cli's data directory
-  ESPTOOL=$(find "$ARDUINO_DATA" -name "esptool" -not -name "*.py" -type f 2>/dev/null | head -1)
-  if [ -z "$ESPTOOL" ]; then
-    ESPTOOL=$(which esptool 2>/dev/null || which esptool.py 2>/dev/null || true)
-  fi
-  if [ -z "$ESPTOOL" ]; then
-    error "esptool not found."
-    return 1
-  fi
-
-  info "Flashing LittleFS to ESP8266..."
-  "$ESPTOOL" --chip esp8266 --port "$SELECTED_PORT" --baud 460800 write-flash 0x200000 "$BUILD_DIR/littlefs.bin"
   success "LittleFS uploaded"
 }
 

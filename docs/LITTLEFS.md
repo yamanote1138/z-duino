@@ -26,7 +26,11 @@ The runtime block count:
 block_count = 2,072,576 / 8,192 = 253 (exact — no remainder)
 ```
 
-## mklittlefs Parameters
+## PlatformIO Handles This Automatically
+
+As of the PlatformIO migration, `pio run -t buildfs` / `-t uploadfs` parse `_FS_START`, `_FS_END`, `_FS_BLOCK`, and `_FS_PAGE` directly out of whichever `board_build.ldscript` is configured in `platformio.ini` (currently `eagle.flash.4m2m.ld`), and pass the derived values to `mklittlefs` internally. There's no separate size constant to keep in sync — the ldscript is the single source of truth. The manual invocation below is kept for reference (e.g. if you ever need to pack an image outside of PlatformIO), but day-to-day you shouldn't need to run it by hand.
+
+## mklittlefs Parameters (Reference)
 
 The `mklittlefs` tool packs a directory into a LittleFS image. The parameters **must** match the runtime configuration exactly:
 

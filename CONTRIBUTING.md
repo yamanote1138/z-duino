@@ -5,13 +5,9 @@
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) v18+
-- [Arduino CLI](https://arduino.github.io/arduino-cli/) (for firmware work)
-- ESP8266 board package: `arduino-cli core install esp8266:esp8266`
-- Arduino libraries:
-  ```bash
-  arduino-cli lib install ArduinoJson
-  arduino-cli lib install WebSockets
-  ```
+- [PlatformIO Core](https://docs.platformio.org/en/latest/core/installation/index.html) (for firmware work): `brew install platformio`
+
+Firmware dependencies (`espressif8266` platform, `ArduinoJson`, `WebSockets`) are declared in `platformio.ini` and resolved automatically by PlatformIO on first build — no manual install step needed. See [docs/BUILD.md](docs/BUILD.md) for the full setup walkthrough.
 
 ### Frontend Development
 
@@ -51,6 +47,7 @@ Open `http://localhost:3000` in your browser. The throttle UI is fully functiona
 
 ```
 z-duino/
+├── platformio.ini               # PlatformIO project config (board, ldscript, lib_deps)
 ├── firmware/z-duino/
 │   ├── z-duino.ino              # Main sketch (WiFi, mDNS, HTTP, WebSocket)
 │   ├── Motor.h / Motor.cpp      # TB6612FNG motor driver abstraction
@@ -70,6 +67,9 @@ z-duino/
 │   ├── tsconfig.json
 │   └── package.json
 ├── docs/
+│   ├── BUILD.md                 # Full software prerequisites & build script reference
+│   ├── HARDWARE.md              # Parts list & wiring diagram
+│   ├── PROTOCOL.md              # Full WebSocket protocol spec
 │   ├── LITTLEFS.md              # LittleFS flash layout & mklittlefs parameters
 │   └── status-led-wiring.md     # RGB LED wiring & resistor values
 └── build.sh                     # Build + deploy script
