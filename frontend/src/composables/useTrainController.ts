@@ -182,52 +182,45 @@ function setSpeed(clickedLevel: number, clickedIndex: number) {
   rampTo(targetSpeed)
 }
 
-function rampTo(targetSpeed: number) {
-  stopFlag.value = false
-  if (rampTimer) {
-    clearInterval(rampTimer)
-    rampTimer = null
-  }
-
-  const startSpeed = currentSpeed.value
-  const distance = Math.abs(targetSpeed - startSpeed)
-  const segmentsCrossed = Math.round(distance / 0.1)
-  const duration = Math.max(segmentsCrossed * RAMP_TIME_PER_SEGMENT, 200)
-  const totalSteps = Math.max(Math.ceil(duration / RAMP_INTERVAL), 5)
-
-  let step = 0
-
-  rampTimer = setInterval(() => {
-    if (stopFlag.value) {
-      clearInterval(rampTimer!)
-      rampTimer = null
-      return
-    }
-
-    step++
-    const progress = Math.min(step / totalSteps, 1.0)
-    const speed = startSpeed + (targetSpeed - startSpeed) * progress
-
-    currentSpeed.value = Math.round(speed * 1000) / 1000
-    send({ cmd: 'speed', value: currentSpeed.value })
-
-    if (step >= totalSteps) {
-      clearInterval(rampTimer!)
-      rampTimer = null
-      currentSpeed.value = targetSpeed
-      send({ cmd: 'speed', value: currentSpeed.value })
-    }
-  }, RAMP_INTERVAL)
-}
-
-function waitForRampComplete(): Promise<void> {
+function rampTo(targetSpeed: number): Promise<void> {
   return new Promise(resolve => {
-    const check = setInterval(() => {
-      if (!rampTimer) {
-        clearInterval(check)
+    stopFlag.value = false
+    if (rampTimer) {
+      clearInterval(rampTimer)
+      rampTimer = null
+    }
+
+    const startSpeed = currentSpeed.value
+    const distance = Math.abs(targetSpeed - startSpeed)
+    const segmentsCrossed = Math.round(distance / 0.1)
+    const duration = Math.max(segmentsCrossed * RAMP_TIME_PER_SEGMENT, 200)
+    const totalSteps = Math.max(Math.ceil(duration / RAMP_INTERVAL), 5)
+
+    let step = 0
+
+    rampTimer = setInterval(() => {
+      if (stopFlag.value) {
+        clearInterval(rampTimer!)
+        rampTimer = null
+        resolve()
+        return
+      }
+
+      step++
+      const progress = Math.min(step / totalSteps, 1.0)
+      const speed = startSpeed + (targetSpeed - startSpeed) * progress
+
+      currentSpeed.value = Math.round(speed * 1000) / 1000
+      send({ cmd: 'speed', value: currentSpeed.value })
+
+      if (step >= totalSteps) {
+        clearInterval(rampTimer!)
+        rampTimer = null
+        currentSpeed.value = targetSpeed
+        send({ cmd: 'speed', value: currentSpeed.value })
         resolve()
       }
-    }, 50)
+    }, RAMP_INTERVAL)
   })
 }
 
@@ -241,9 +234,8 @@ async function toggleDirection() {
     send({ cmd: 'direction', value: currentDirection.value })
   } else {
     const previousSpeed = currentSpeed.value
-    rampTo(0)
+    await rampTo(0)
 
-    await waitForRampComplete()
     await sleep(DIRECTION_PAUSE)
 
     currentDirection.value = !currentDirection.value
