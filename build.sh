@@ -65,6 +65,21 @@ build_frontend() {
   success "Frontend built → $DATA_DIR/"
 }
 
+frontend_needs_build() {
+  [ ! -f "$DATA_DIR/index.html" ] && return 0
+  find "$FRONTEND_DIR/src" "$FRONTEND_DIR/public" "$FRONTEND_DIR/index.html" \
+       "$FRONTEND_DIR/vite.config.ts" "$FRONTEND_DIR/package.json" "$FRONTEND_DIR/package-lock.json" \
+       -type f -newer "$DATA_DIR/index.html" 2>/dev/null | grep -q .
+}
+
+build_frontend_if_needed() {
+  if frontend_needs_build; then
+    build_frontend
+  else
+    info "Frontend unchanged, skipping build ($DATA_DIR/ is up to date)"
+  fi
+}
+
 build_firmware() {
   check_deps
   info "Compiling firmware..."
@@ -118,13 +133,13 @@ read -rp "Select option [7]: " option
 option=${option:-7}
 
 case $option in
-  1) build_frontend; build_firmware ;;
+  1) build_frontend_if_needed; build_firmware ;;
   2) build_frontend ;;
   3) build_firmware ;;
   4) upload_firmware ;;
   5) upload_littlefs ;;
   6) upload_firmware; upload_littlefs ;;
-  7) build_frontend; build_firmware; upload_firmware; upload_littlefs ;;
+  7) build_frontend_if_needed; build_firmware; upload_firmware; upload_littlefs ;;
   *) error "Invalid option" ;;
 esac
 

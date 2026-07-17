@@ -29,9 +29,9 @@ Open `http://localhost:3000` in your browser. The throttle UI is fully functiona
 
 1. Copy the secrets template:
    ```bash
-   cp firmware/z-duino/arduino_secrets.h.example firmware/z-duino/arduino_secrets.h
+   cp secrets.ini.example secrets.ini
    ```
-2. Edit `firmware/z-duino/arduino_secrets.h` with your WiFi credentials.
+2. Edit `secrets.ini` with your WiFi credentials. These are PlatformIO `build_flags` merged in via `extra_configs` — gitignored, never committed.
 
 3. Compile:
    ```bash
@@ -48,11 +48,11 @@ Open `http://localhost:3000` in your browser. The throttle UI is fully functiona
 ```
 z-duino/
 ├── platformio.ini               # PlatformIO project config (board, ldscript, lib_deps)
+├── secrets.ini.example          # WiFi creds template — copy to secrets.ini (gitignored)
 ├── firmware/z-duino/
 │   ├── z-duino.ino              # Main sketch (WiFi, mDNS, HTTP, WebSocket)
 │   ├── Motor.h / Motor.cpp      # TB6612FNG motor driver abstraction
-│   ├── StatusLED.h / StatusLED.cpp  # RGB status LED abstraction
-│   └── arduino_secrets.h.example
+│   └── StatusLED.h / StatusLED.cpp  # RGB status LED abstraction
 ├── frontend/
 │   ├── src/
 │   │   ├── App.vue              # Root component

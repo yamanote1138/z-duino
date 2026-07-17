@@ -40,8 +40,8 @@ Wemos D1 Mini (ESP8266) → TB6612FNG H-bridge → track, plus an RGB status LED
    ```bash
    git clone https://github.com/yamanote1138/z-duino.git
    cd z-duino
-   cp firmware/z-duino/arduino_secrets.h.example firmware/z-duino/arduino_secrets.h
-   # edit arduino_secrets.h with your WiFi SSID/password
+   cp secrets.ini.example secrets.ini
+   # edit secrets.ini with your WiFi SSID/password
    ```
 3. Install frontend dependencies and build + flash everything:
    ```bash

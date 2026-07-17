@@ -36,9 +36,9 @@ node --version                # v18+ required
 
 2. **Configure WiFi credentials:**
    ```bash
-   cp firmware/z-duino/arduino_secrets.h.example firmware/z-duino/arduino_secrets.h
+   cp secrets.ini.example secrets.ini
    ```
-   Edit `arduino_secrets.h` with your WiFi SSID and password. Optionally change the mDNS hostname (default: `ztrain`) and `MAX_PWM` to tune top speed (default: `500` — about half voltage to the track, which is plenty for Z-scale).
+   Edit `secrets.ini` with your WiFi SSID and password. Optionally change the mDNS hostname (default: `ztrain`) and `MAX_PWM` to tune top speed (default: `500` — about half voltage to the track, which is plenty for Z-scale). These are plain PlatformIO `build_flags` (`-D WIFI_SSID=\"...\"` etc.) merged in via `extra_configs` in `platformio.ini` — `secrets.ini` is gitignored, so nothing here ever gets committed.
 
 3. **Install frontend dependencies:**
    ```bash
@@ -70,6 +70,8 @@ node --version                # v18+ required
 | 7 | Build + Upload All |
 
 Under the hood, `build.sh` wraps:
+- **Build Frontend** (option 2) → `npm run build`, always runs unconditionally
+- **Build All / Build + Upload All** (options 1, 7) → skip the frontend build automatically if nothing under `frontend/` (source, `public/`, `package.json`/`package-lock.json`, `vite.config.ts`) is newer than the existing `build/data/`, since PlatformIO's own incremental firmware compile already makes re-running `pio run` on unchanged firmware near-instant — only the frontend build previously had no such skip
 - **Build Firmware** → `pio run`
 - **Upload Firmware** → `pio run -t upload`
 - **Upload LittleFS** → `pio run -t uploadfs` (packs `build/data/` into a LittleFS image sized from `platformio.ini`'s `board_build.ldscript`, then flashes it — see [LITTLEFS.md](LITTLEFS.md) for the partition math)

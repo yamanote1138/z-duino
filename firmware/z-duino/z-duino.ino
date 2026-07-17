@@ -6,7 +6,6 @@
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 
-#include "arduino_secrets.h"
 #include "Motor.h"
 #include "StatusLED.h"
 

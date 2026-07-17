@@ -1,4 +1,5 @@
 # Secrets
+secrets.ini
 arduino_secrets.h
 
 # Build artifacts

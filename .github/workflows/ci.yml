@@ -32,6 +32,6 @@ jobs:
       - name: Install PlatformIO
         run: pip install -U platformio
       - name: Create secrets stub
-        run: cp firmware/z-duino/arduino_secrets.h.example firmware/z-duino/arduino_secrets.h
+        run: cp secrets.ini.example secrets.ini
       - name: Compile
         run: pio run

@@ -32,10 +32,11 @@ npm run dev:all    # Vite dev server + mock WebSocket server
 ```
 
 ## Key Files
+- `platformio.ini` — PlatformIO project config (board, ldscript, lib_deps, secrets)
+- `secrets.ini` — WiFi creds & build-time config (not committed, copy from `secrets.ini.example`)
 - `firmware/z-duino/z-duino.ino` — Main sketch
 - `firmware/z-duino/Motor.h/.cpp` — Motor abstraction
 - `firmware/z-duino/StatusLED.h/.cpp` — Status LED abstraction
-- `firmware/z-duino/arduino_secrets.h` — WiFi creds (not committed, copy from .example)
 - `frontend/src/App.vue` — Root Vue component
 - `frontend/src/composables/useTrainController.ts` — Core controller logic (WebSocket, ramping, state)
 - `frontend/src/components/` — Vue SFCs (SpeedController, LedTestPanel, DebugModal, etc.)
@@ -43,5 +44,5 @@ npm run dev:all    # Vite dev server + mock WebSocket server
 - `docs/LITTLEFS.md` — LittleFS flash layout & mklittlefs parameters
 
 ## Dependencies
-- Arduino: ESP8266 board package, ArduinoJson, WebSockets
+- Firmware (PlatformIO, `espressif8266` platform): ArduinoJson, WebSockets — declared in `platformio.ini`, resolved automatically
 - Node: Vue 3, Vite, Nuxt UI, Tailwind CSS v4, TypeScript
