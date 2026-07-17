@@ -11,7 +11,7 @@
 
 #define VERSION "2.3.0"
 
-// WiFi credentials from arduino_secrets.h
+// WiFi credentials from secrets.ini
 char wifi_ssid[] = WIFI_SSID;
 char wifi_pass[] = WIFI_PASS;
 char mdns_hostname[] = MDNS_HOSTNAME;
@@ -66,7 +66,7 @@ void applyMotorState() {
   }
 }
 
-void broadcastStatus() {
+String buildStatusJson() {
   JsonDocument doc;
   doc["type"] = "status";
   doc["name"] = railroad_name;
@@ -76,6 +76,11 @@ void broadcastStatus() {
 
   String json;
   serializeJson(doc, json);
+  return json;
+}
+
+void broadcastStatus() {
+  String json = buildStatusJson();
   socket.broadcastTXT(json);
 }
 
@@ -150,21 +155,16 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
       connectedClients++;
       applyLedStatus();
       {
-        JsonDocument doc;
-        doc["type"] = "status";
-        doc["name"] = railroad_name;
-        doc["speed"] = currentSpeed;
-        doc["direction"] = currentDirection;
-        doc["connected"] = true;
-
-        String json;
-        serializeJson(doc, json);
+        String json = buildStatusJson();
         socket.sendTXT(num, json);
       }
       break;
 
     case WStype_TEXT:
       handleWebSocketMessage(num, payload, length);
+      break;
+
+    default:
       break;
   }
 }

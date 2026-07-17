@@ -2,7 +2,8 @@
 
 StatusLED::StatusLED(int pinR, int pinG, int pinB)
   : _pinR(pinR), _pinG(pinG), _pinB(pinB), _state(WIFI_CONNECTING),
-    _previousState(IDLE), _blinkCount(0), _blinkStartTime(0)
+    _previousState(IDLE), _blinkCount(0), _blinkStartTime(0),
+    _testR(0), _testG(0), _testB(0)
 {
   pinMode(_pinR, OUTPUT);
   pinMode(_pinG, OUTPUT);
@@ -36,14 +37,22 @@ void StatusLED::setState(LEDState state) {
     case ACTIVE_REVERSE:
       setColor(1000, 0, 0);   // Red
       break;
+    case LED_TEST:
+      setColor(_testR, _testG, _testB);
+      break;
     case EMERGENCY_STOP_BLINK:
       // Handled in update()
+      break;
+    default:
       break;
   }
 }
 
 void StatusLED::setTestColor(int r, int g, int b) {
   _state = LED_TEST;
+  _testR = r;
+  _testG = g;
+  _testB = b;
   setColor(r, g, b);
 }
 
