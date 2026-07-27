@@ -4,7 +4,7 @@
     <div class="mb-3">
       <div class="flex justify-between text-sm text-neutral-400 mb-1">
         <span><span class="font-bold">Speed:</span> {{ currentSpeed === 0 ? 'stopped' : Math.round(currentSpeed * 100) + '%' }}</span>
-        <span><span class="font-bold">Track:</span> {{ (12 * currentSpeed).toFixed(1) }}V</span>
+        <span :class="trackVoltageDanger ? 'font-bold text-red-500' : ''"><span class="font-bold">Track:</span> {{ trackVoltage.toFixed(1) }}V</span>
       </div>
       <div class="flex w-full">
         <button
@@ -61,6 +61,8 @@ const {
   connected,
   currentSpeed,
   currentDirection,
+  trackVoltage,
+  trackVoltageDanger,
   getSegmentClass,
   setSpeed,
   toggleDirection,

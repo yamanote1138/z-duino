@@ -19,7 +19,7 @@
             :class="i % 2 === 0 ? 'bg-neutral-800/50' : ''"
           >
             <td class="px-3 py-1.5 font-medium text-neutral-400 whitespace-nowrap">{{ row.label }}</td>
-            <td class="px-3 py-1.5 text-white break-all">{{ row.value }}</td>
+            <td class="px-3 py-1.5 break-all" :class="row.danger ? 'font-bold text-red-500' : 'text-white'">{{ row.value }}</td>
           </tr>
         </tbody>
       </table>
@@ -34,7 +34,7 @@ import { useTrainController } from '../composables/useTrainController'
 const { getDebugInfo } = useTrainController()
 
 const isOpen = ref(false)
-const rows = ref<{ label: string; value: string }[]>([])
+const rows = ref<{ label: string; value: string; danger?: boolean }[]>([])
 
 function open() {
   rows.value = getDebugInfo()

@@ -38,7 +38,7 @@ node --version  # v18+ required
    ```bash
    cp secrets.ini.example secrets.ini
    ```
-   Edit `secrets.ini` with your WiFi SSID and password. Optionally change the mDNS hostname (default: `ztrain`) and `MAX_PWM` to tune top speed (default: `500` — about half voltage to the track, which is plenty for Z-scale). These are plain PlatformIO `build_flags` (`-D WIFI_SSID='"..."'` etc. — note the single-quote wrapping, required so values with spaces survive PlatformIO's flag tokenizer) merged in via `extra_configs` in `platformio.ini` — `secrets.ini` is gitignored, so nothing here ever gets committed.
+   Edit `secrets.ini` with your WiFi SSID and password. Optionally change the mDNS hostname (default: `ztrain`), `MAX_PWM` to tune top speed (default: `1000` — full voltage to the track), and `PWM_FREQ` to tune the motor's PWM switching frequency in Hz (default: `20000` — above the audible range, so the motor doesn't whine). `analogWrite` on the ESP8266 is software PWM sharing one hardware timer across all 4 active channels (motor + R/G/B status LED), so pushing `PWM_FREQ` too high risks starving the WiFi/WebSocket stack — the build fails outright above `40000` as a safety ceiling. These are plain PlatformIO `build_flags` (`-D WIFI_SSID='"..."'` etc. — note the single-quote wrapping, required so values with spaces survive PlatformIO's flag tokenizer) merged in via `extra_configs` in `platformio.ini` — `secrets.ini` is gitignored, so nothing here ever gets committed.
 
 3. **Install frontend dependencies:**
    ```bash
