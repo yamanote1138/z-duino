@@ -14,7 +14,7 @@
           class="speed-segment flex-1"
           :class="getSegmentClass(index)"
           :disabled="!connected"
-          @click="setSpeed(level, index)"
+          @click="setSpeed(level)"
         >
           {{ index + 1 }}
         </button>

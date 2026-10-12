@@ -32,29 +32,45 @@ afterEach(() => {
 
 describe('speed segments', () => {
   it('ramps up to a higher segment', async () => {
-    tc.setSpeed(0.1, 0)
+    tc.setSpeed(0.1)
     await vi.advanceTimersByTimeAsync(1000)
     expect(tc.currentSpeed.value).toBeCloseTo(0.1)
   })
 
-  it('clicking an already-lit segment ramps back down one level', async () => {
-    tc.setSpeed(0.2, 1)
+  it('clicking a lower segment ramps down to exactly that level', async () => {
+    // ramp is 1s per 10%
+    tc.setSpeed(0.9)
+    await vi.advanceTimersByTimeAsync(10000)
+    expect(tc.currentSpeed.value).toBeCloseTo(0.9)
+
+    tc.setSpeed(0.5)
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(tc.currentSpeed.value).toBeCloseTo(0.5)
+  })
+
+  it('clicking the level being passed through mid-ramp pins the train there', async () => {
+    tc.setSpeed(0.9)
+    await vi.advanceTimersByTimeAsync(3000)
+    const passing = tc.currentSpeed.value
+    expect(passing).toBeGreaterThan(0.2)
+    expect(passing).toBeLessThan(0.9)
+
+    tc.setSpeed(passing)
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(tc.currentSpeed.value).toBeCloseTo(passing)
+  })
+
+  it('clicking the segment matching the current speed does nothing', async () => {
+    tc.setSpeed(0.2)
     await vi.advanceTimersByTimeAsync(2000)
     expect(tc.currentSpeed.value).toBeCloseTo(0.2)
 
-    tc.setSpeed(0.2, 1)
+    const socket = FakeWebSocket.instances[0]
+    const sentBefore = socket.sent.length
+    tc.setSpeed(0.2)
     await vi.advanceTimersByTimeAsync(2000)
-    expect(tc.currentSpeed.value).toBeCloseTo(0.1)
-  })
-
-  it('clicking segment 0 when lit ramps all the way down to 0', async () => {
-    tc.setSpeed(0.1, 0)
-    await vi.advanceTimersByTimeAsync(1000)
-    expect(tc.currentSpeed.value).toBeCloseTo(0.1)
-
-    tc.setSpeed(0.1, 0)
-    await vi.advanceTimersByTimeAsync(1000)
-    expect(tc.currentSpeed.value).toBeCloseTo(0)
+    expect(tc.currentSpeed.value).toBeCloseTo(0.2)
+    expect(socket.sent.length).toBe(sentBefore)
   })
 
   it('getSegmentClass colors zones red/yellow/green by speed', () => {
@@ -76,7 +92,7 @@ describe('toggleDirection', () => {
   })
 
   it('ramps to zero, pauses, flips direction, then ramps back up (fire-and-forget)', async () => {
-    tc.setSpeed(0.2, 1)
+    tc.setSpeed(0.2)
     await vi.advanceTimersByTimeAsync(2000)
     expect(tc.currentSpeed.value).toBeCloseTo(0.2)
 
