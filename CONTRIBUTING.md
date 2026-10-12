@@ -105,7 +105,7 @@ z-duino/
 - **Vue 3 Composition API with SFCs** — TypeScript throughout, `<script setup>` syntax. UI built with Nuxt UI components and Tailwind CSS v4. Icons via `@iconify-json/mdi`.
 - **Singleton composable** — `useTrainController.ts` holds all state and WebSocket logic in a single composable, shared across components.
 - **Client-side ramping** — speed transitions are interpolated in the browser and sent as individual WebSocket messages. The ESP8266 just applies whatever speed it receives.
-- **20kHz PWM** — above audible range for Z-scale motors. Set via `analogWriteFreq(20000)` with a 0–1000 range.
+- **Configurable PWM** — `PWM_FREQ` (default 20kHz, above the audible range for Z-scale motors) is set in `secrets.ini` and applied via `analogWriteFreq(PWM_FREQ)` with a 0–1000 range. The firmware refuses to build above 40kHz, since `analogWrite` is software PWM sharing one timer with the WiFi/WebSocket stack.
 
 ### WebSocket Protocol
 

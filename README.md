@@ -5,8 +5,8 @@
 ![ESP8266](https://img.shields.io/badge/ESP8266-Arduino-00979D?logo=arduino&logoColor=white)
 ![PlatformIO](https://img.shields.io/badge/PlatformIO-Core-FF7F00?logo=platformio&logoColor=white)
 ![Vue 3](https://img.shields.io/badge/Vue-3-4FC08D?logo=vuedotjs&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
-![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)
 ![Nuxt UI](https://img.shields.io/badge/Nuxt_UI-4-00DC82?logo=nuxtdotjs&logoColor=white)
 
@@ -24,7 +24,10 @@ Discoverable via mDNS at `http://ztrain.local`.
 - **Direction control** — forward/reverse toggle with automatic ramp-down-switch-ramp-up when the train is moving
 - **Direction invert** — swap forward/reverse polarity to match your track wiring (persisted in browser)
 - **Emergency stop** — immediate halt, bypasses ramping, magenta LED blink
+- **Track voltage readout** — live track voltage next to the speed display, turning red above 10V as a warning for Z-scale motors
 - **Status LED** — RGB LED indicates connection and motor state; supports manual colour control via LED test panel
+- **Party mode** — cycles the status LED through random colours
+- **Configurable PWM** — tune top speed (`MAX_PWM`) and motor PWM frequency (`PWM_FREQ`) at build time via `secrets.ini`
 - **Safety timeout** — train stops automatically if the controller loses contact for 30 seconds
 - **Zero external dependencies** — everything served from the device itself, no internet required
 - **mDNS discovery** — no need to remember IP addresses
@@ -43,6 +46,7 @@ Wemos D1 Mini (ESP8266) → TB6612FNG H-bridge → track, plus an RGB status LED
    cp secrets.ini.example secrets.ini
    # edit secrets.ini with your WiFi SSID/password
    ```
+   `secrets.ini` also sets the mDNS hostname, railroad name, `MAX_PWM` (top speed, 0–1000, default `1000`) and `PWM_FREQ` (motor PWM frequency in Hz, default `20000`, build fails above `40000`). These are baked in at build time, so changing them means re-flashing the firmware. See [docs/BUILD.md](docs/BUILD.md#setup) for details.
 3. Install frontend dependencies and build + flash everything:
    ```bash
    cd frontend && npm install && cd ..
