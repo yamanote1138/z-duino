@@ -177,14 +177,12 @@ function getSegmentClass(index: number): string {
   return 'bg-neutral-700 text-neutral-400 opacity-50'
 }
 
-function setSpeed(clickedLevel: number, clickedIndex: number) {
-  let targetSpeed: number
-  if (currentSpeed.value >= clickedLevel) {
-    targetSpeed = clickedIndex === 0 ? 0 : powerLevels[clickedIndex - 1]
-  } else {
-    targetSpeed = clickedLevel
-  }
-  rampTo(targetSpeed)
+function setSpeed(level: number) {
+  // Already steady at this level: nothing to do. (Mid-ramp we still ramp, so a click
+  // on the level being passed through pins the train there instead of being ignored.)
+  // currentSpeed is rounded to 3 decimals while ramping, so compare with a tolerance.
+  if (rampTimer === null && Math.abs(currentSpeed.value - level) < 0.0005) return
+  rampTo(level)
 }
 
 function rampTo(targetSpeed: number): Promise<void> {
