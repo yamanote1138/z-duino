@@ -196,3 +196,60 @@ describe('reconnect backoff', () => {
     expect(getDebugValue('Reconnect Delay')).toBe('1000ms')
   })
 })
+
+describe('party mode', () => {
+  const ledFrames = (socket: (typeof FakeWebSocket.instances)[number]) =>
+    socket.sent.map(m => JSON.parse(m)).filter(m => m.cmd === 'led')
+
+  it('streams beat-synced LED frames, not just one colour per tick', async () => {
+    const socket = FakeWebSocket.instances[0]
+    tc.togglePartyMode()
+    await vi.advanceTimersByTimeAsync(1000)
+    const frames = ledFrames(socket)
+    expect(tc.partyMode.value).toBe(true)
+    expect(frames.length).toBeGreaterThan(5)
+    // pulsing: brightest and dimmest frames differ substantially
+    const levels = frames.map(f => Math.max(f.r, f.g, f.b))
+    expect(Math.max(...levels)).toBeGreaterThan(Math.min(...levels) * 3)
+  })
+
+  it('never sends two identical frames in a row', async () => {
+    const socket = FakeWebSocket.instances[0]
+    tc.togglePartyMode()
+    await vi.advanceTimersByTimeAsync(3000)
+    const frames = ledFrames(socket).map(f => `${f.r},${f.g},${f.b}`)
+    frames.slice(1).forEach((f, i) => expect(f).not.toBe(frames[i]))
+  })
+
+  it('stops streaming and resumes the status LED when toggled off', async () => {
+    const socket = FakeWebSocket.instances[0]
+    tc.togglePartyMode()
+    await vi.advanceTimersByTimeAsync(500)
+    tc.togglePartyMode()
+    const sentAtStop = socket.sent.length
+    expect(socket.lastSent()).toEqual({ cmd: 'led_auto' })
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(socket.sent.length).toBe(sentAtStop)
+    expect(tc.partyMode.value).toBe(false)
+  })
+
+  it('opening the LED test panel kills party mode', async () => {
+    const socket = FakeWebSocket.instances[0]
+    tc.togglePartyMode()
+    await vi.advanceTimersByTimeAsync(200)
+    tc.toggleLedTest()
+    const sentAfter = socket.sent.length
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(tc.partyMode.value).toBe(false)
+    expect(socket.sent.length).toBe(sentAfter)
+  })
+
+  it('respects dim brightness', async () => {
+    const socket = FakeWebSocket.instances[0]
+    tc.toggleBright() // -> dim
+    tc.togglePartyMode()
+    await vi.advanceTimersByTimeAsync(2000)
+    const peak = Math.max(...ledFrames(socket).flatMap(f => [f.r, f.g, f.b]))
+    expect(peak).toBeLessThanOrEqual(250)
+  })
+})

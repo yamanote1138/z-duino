@@ -26,7 +26,7 @@ Discoverable via mDNS at `http://ztrain.local`.
 - **Emergency stop** — immediate halt, bypasses ramping, magenta LED blink
 - **Track voltage readout** — live track voltage next to the speed display, turning red above 10V as a warning for Z-scale motors
 - **Status LED** — RGB LED indicates connection and motor state; supports manual colour control via LED test panel
-- **Party mode** — cycles the status LED through random colours
+- **Party mode** — techno light show on the status LED: 128 BPM kick pulses, off-beat hi-hat sparkle, a new colour every bar, and a 16th-note fill every fourth bar
 - **Configurable PWM** — tune top speed (`MAX_PWM`) and motor PWM frequency (`PWM_FREQ`) at build time via `secrets.ini`
 - **Safety timeout** — train stops automatically if the controller loses contact for 30 seconds
 - **Zero external dependencies** — everything served from the device itself, no internet required

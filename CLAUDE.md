@@ -5,7 +5,7 @@ Network-controlled Z-scale model train controller. ESP8266 (Wemos D1 Mini) firmw
 
 ## Architecture
 - **Firmware** (`firmware/z-duino/`) — Arduino sketch for ESP8266. Motor control via TB6612FNG H-bridge. WebSocket server on port 81 for real-time commands.
-- **Frontend** (`frontend/`) — Vue 3 + Vite + Nuxt UI + Tailwind CSS v4 + TypeScript. Throttle UI with 10-segment speed bar, smooth ramping, direction toggle, direction invert, party mode (random colour cycling on the status LED). Built to `build/data/` for LittleFS.
+- **Frontend** (`frontend/`) — Vue 3 + Vite + Nuxt UI + Tailwind CSS v4 + TypeScript. Throttle UI with 10-segment speed bar, smooth ramping, direction toggle, direction invert, party mode (beat-synced techno light show on the status LED, logic in `partyBeat.ts`). Built to `build/data/` for LittleFS.
 - **Build** (`build.sh`) — Interactive script: compiles firmware, builds frontend, flashes both to ESP8266.
 
 ## Hardware
@@ -47,6 +47,7 @@ Both run in CI. Code touching real hardware I/O (pins, WiFi/sockets) isn't unit-
 - `firmware/z-duino/StatusLED.h/.cpp` — Status LED abstraction
 - `frontend/src/App.vue` — Root Vue component
 - `frontend/src/composables/useTrainController.ts` — Core controller logic (WebSocket, ramping, state)
+- `frontend/src/composables/partyBeat.ts` — Pure party-mode beat engine (BPM → RGB frames), unit-tested
 - `frontend/src/components/` — Vue SFCs (SpeedController, LedTestPanel, DebugModal, etc.)
 - `frontend/mock-server.ts` — Mock WebSocket for local dev
 - `docs/LITTLEFS.md` — LittleFS flash layout & mklittlefs parameters
