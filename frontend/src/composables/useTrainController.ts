@@ -1,4 +1,5 @@
 import { computed, ref } from 'vue'
+import { createPartyBeat } from './partyBeat'
 
 // WebSocket protocol types
 interface OutgoingSpeed { cmd: 'speed'; value: number }
@@ -48,6 +49,7 @@ const DIRECTION_PAUSE = 500
 const RECONNECT_BASE = 1000
 const RECONNECT_MAX = 30000
 const PING_INTERVAL = 10000
+const PARTY_FRAME_INTERVAL = 50 // ~20 fps of LED updates over the WebSocket
 const SUPPLY_VOLTAGE = 12
 const TRACK_VOLTAGE_DANGER_THRESHOLD = 10
 
@@ -82,7 +84,8 @@ const trackVoltage = computed(() => SUPPLY_VOLTAGE * currentSpeed.value)
 const trackVoltageDanger = computed(() => trackVoltage.value > TRACK_VOLTAGE_DANGER_THRESHOLD)
 
 let rampTimer: ReturnType<typeof setInterval> | null = null
-let partyTimer: ReturnType<typeof setTimeout> | null = null
+let partyTimer: ReturnType<typeof setInterval> | null = null
+let lastPartyFrame = ''
 let reconnectDelay = RECONNECT_BASE
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let pingTimer: ReturnType<typeof setInterval> | null = null
@@ -276,13 +279,7 @@ function toggleInvert() {
 
 function toggleLedTest() {
   // Kill party mode if active
-  if (partyMode.value) {
-    partyMode.value = false
-    if (partyTimer) {
-      clearTimeout(partyTimer)
-      partyTimer = null
-    }
-  }
+  if (partyMode.value) stopParty()
   ledTestMode.value = !ledTestMode.value
   console.log('LED test mode:', ledTestMode.value ? 'ON' : 'OFF')
   if (!ledTestMode.value) {
@@ -305,41 +302,53 @@ function toggleBright() {
   }
 }
 
-function sendLed(color: LedColor) {
+function ledPayload(r: number, g: number, b: number): OutgoingLed {
   const scale = ledBright.value ? 1.0 : 0.25
-  const payload: OutgoingLed = {
-    cmd: 'led',
-    r: Math.round(color.r * scale),
-    g: Math.round(color.g * scale),
-    b: Math.round(color.b * scale)
-  }
+  return { cmd: 'led', r: Math.round(r * scale), g: Math.round(g * scale), b: Math.round(b * scale) }
+}
+
+function sendLed(color: LedColor) {
+  const payload = ledPayload(color.r, color.g, color.b)
   console.log(`LED: ${color.name} (${ledBright.value ? 'bright' : 'dim'}) →`, payload)
   send(payload)
 }
 
 // ── Party mode ──
+// Techno-style light show: kick pulses, off-beat hats, colour change per bar.
+// The beat logic lives in partyBeat.ts; here we just drive it on a timer.
 
 const partyColors = ledColors.filter(c => c.name !== 'Off')
 
-function partyTick() {
-  if (!partyMode.value) return
-  const color = partyColors[Math.floor(Math.random() * partyColors.length)]
-  activeLedColor.value = color.name
-  sendLed(color)
-  // Random interval 100–500ms for that "bopping along" feel
-  const delay = 100 + Math.floor(Math.random() * 400)
-  partyTimer = setTimeout(partyTick, delay)
+function stopParty() {
+  partyMode.value = false
+  if (partyTimer) {
+    clearInterval(partyTimer)
+    partyTimer = null
+  }
+}
+
+function startParty() {
+  const beat = createPartyBeat({ colors: partyColors })
+  const startedAt = Date.now()
+  lastPartyFrame = ''
+  partyTimer = setInterval(() => {
+    if (!connected.value) return
+    const { r, g, b } = beat.frame(Date.now() - startedAt)
+    const payload = ledPayload(r, g, b)
+    const key = `${payload.r},${payload.g},${payload.b}`
+    if (key === lastPartyFrame) return // don't spam the ESP8266 with identical frames
+    lastPartyFrame = key
+    send(payload)
+  }, PARTY_FRAME_INTERVAL)
 }
 
 function togglePartyMode() {
   partyMode.value = !partyMode.value
   if (partyMode.value) {
-    partyTick()
+    activeLedColor.value = null
+    startParty()
   } else {
-    if (partyTimer) {
-      clearTimeout(partyTimer)
-      partyTimer = null
-    }
+    stopParty()
     activeLedColor.value = null
     ledTestMode.value = false
     send({ cmd: 'led_auto' })
