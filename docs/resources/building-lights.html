@@ -1,0 +1,460 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Z-Duino Building Lights</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: one reading column, figures and tables scroll sideways inside their own boxes.
+     Palette: blueprint ink and paper, with window-glow amber as the single accent. */
+  :root {
+    --bg: #eef1f4;
+    --surface: #ffffff;
+    --ink: #14202b;
+    --muted: #55636f;
+    --line: #c8d1da;
+    --trunk: #aab6c2;
+    --accent: #a85a00;
+    --glow: #f2a516;
+    --w5v: #c23b22;
+    --wdata: #12805a;
+    --code-bg: #e4e9ee;
+    --display: "Barlow Condensed", "Arial Narrow", sans-serif;
+    --body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1620; --surface: #142230; --ink: #e5edf4; --muted: #9db0c0; --line: #2a3b4c;
+      --trunk: #3b5064; --accent: #f2b13d; --glow: #ffc24a; --w5v: #ff7a66; --wdata: #4cd39b;
+      --code-bg: #101c28; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1620; --surface: #142230; --ink: #e5edf4; --muted: #9db0c0; --line: #2a3b4c;
+    --trunk: #3b5064; --accent: #f2b13d; --glow: #ffc24a; --w5v: #ff7a66; --wdata: #4cd39b;
+    --code-bg: #101c28; color-scheme: dark;
+  }
+
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 400 16px/1.6 var(--body);
+    padding-block: 40px 72px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  main { max-width: 920px; margin: 0 auto; display: flex; flex-direction: column; gap: 48px; }
+  section { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+  .eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+  h1 { font: 700 clamp(44px, 9vw, 76px)/.95 var(--display); letter-spacing: .01em; text-transform: uppercase; margin: 10px 0 18px; text-wrap: balance; }
+  h2 { font: 700 30px/1.1 var(--display); letter-spacing: .02em; text-transform: uppercase; margin: 0; text-wrap: balance; }
+  h3 { font: 600 17px/1.3 var(--body); margin: 8px 0 0; }
+  p { margin: 0; max-width: 68ch; }
+  .lede { font-size: 19px; line-height: 1.55; max-width: 62ch; }
+  .muted { color: var(--muted); }
+  code, .mono { font-family: var(--mono); font-size: .88em; }
+  p code, li code, td code { background: var(--code-bg); padding: 1px 5px; border-radius: 3px; }
+
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0; border-top: 2px solid var(--ink); border-bottom: 1px solid var(--line); margin-top: 8px; }
+  .facts div { padding: 14px 16px 14px 0; min-width: 0; }
+  .facts dt { font: 500 11px/1.2 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 4px; }
+  .facts dd { margin: 0; font: 600 20px/1.25 var(--display); letter-spacing: .02em; }
+  .status { font: 400 13px/1.5 var(--mono); color: var(--muted); margin-top: 14px; }
+  .status b { color: var(--ink); font-weight: 500; }
+
+  figure { margin: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .fig-scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+  .fig-scroll svg { display: block; width: 100%; min-width: 720px; height: auto; color: var(--ink); }
+  .fig-scroll svg.wide { min-width: 860px; }
+  figcaption { font-size: 14px; color: var(--muted); max-width: 74ch; }
+
+  /* diagram marks */
+  .d-ink { stroke: currentColor; fill: none; stroke-width: 1.6; }
+  .d-box { stroke: currentColor; fill: var(--surface); stroke-width: 1.6; }
+  .d-solid { stroke: currentColor; fill: currentColor; stroke-width: 1.2; }
+  .d-t { fill: currentColor; font: 500 12px var(--mono); }
+  .d-ts { fill: var(--muted); font: 400 10.5px var(--mono); }
+  .d-tb { fill: currentColor; font: 700 15px var(--display); letter-spacing: .04em; }
+  .d-glow { fill: var(--glow); }
+  .d-dot { fill: currentColor; }
+  .d-dotted { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 5; opacity: .6; fill: none; }
+  .d-plug { fill: var(--surface); stroke: var(--accent); stroke-width: 1.8; }
+  .cable { stroke: var(--trunk); stroke-width: 7; fill: none; stroke-linejoin: round; stroke-linecap: round; }
+  .w5 { stroke: var(--w5v); fill: none; stroke-width: 2.2; }
+  .wd { stroke: var(--wdata); fill: none; stroke-width: 2.2; }
+  .wg { stroke: currentColor; fill: none; stroke-width: 2.2; }
+  .dot5 { fill: var(--w5v); }
+  .dotd { fill: var(--wdata); }
+  .mk-data { fill: var(--wdata); }
+  .t-acc { fill: var(--accent); }
+  .t-d { fill: var(--wdata); }
+  .key { display: flex; flex-wrap: wrap; gap: 6px 20px; font: 400 13px var(--mono); color: var(--muted); }
+  .key i { display: inline-block; width: 22px; height: 0; border-top: 3px solid; vertical-align: middle; margin-right: 6px; }
+  .key i.cab { border-top-width: 6px; border-top-color: var(--trunk); border-radius: 3px; }
+  .key i.plug { width: 7px; height: 14px; border: 2px solid var(--accent); border-radius: 2px; vertical-align: middle; }
+
+  /* tables */
+  .tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 15px; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  th { font: 500 11px/1.2 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); background: transparent; border-bottom: 2px solid var(--ink); white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr.pick td { background: color-mix(in srgb, var(--glow) 13%, var(--surface)); }
+  .tag { display: inline-block; font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; padding: 3px 6px; border: 1px solid var(--accent); color: var(--accent); border-radius: 3px; white-space: nowrap; }
+
+  pre { margin: 0; background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; overflow-x: auto; font: 400 13px/1.6 var(--mono); }
+  ul.plain { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; max-width: 70ch; }
+  ol.plain { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 10px; max-width: 70ch; }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+  .two > div { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<main>
+  <header>
+    <div class="eyebrow">Z-Duino &middot; design proposal</div>
+    <h1>Building Lights</h1>
+    <p class="lede">Four tiny addressable LEDs, one per building, controlled individually from the Z-Duino web UI. They share a single data pin, run off the D1 Mini's USB 5V, and need no extra boards. Every building unplugs from the chain.</p>
+    <dl class="facts">
+      <div><dt>Lights</dt><dd>4 RGB pixels</dd></div>
+      <div><dt>MCU pins used</dt><dd>1 (D8)</dd></div>
+      <div><dt>Buildings</dt><dd>All detachable</dd></div>
+      <div><dt>Extra boards</dt><dd>None</dd></div>
+    </dl>
+    <p class="status"><b>Branch</b> feature/building-lights &middot; <b>Status</b> design agreed, no firmware or UI changes yet</p>
+  </header>
+
+  <section>
+    <h2>The layout</h2>
+    <p>The controller sits in the main building, in the middle of the row. Pixels are daisy-chained, so the data goes out to the far end first (building 4) and then comes back toward building 1. Each hop between buildings is its own 3-wire cable (5V, data, GND) with a plug at each end. The main building keeps its status LED, which already lights its windows, so it gets no pixel.</p>
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 780 320" role="img" aria-label="Plan view of the layout, drawn to scale. Four hop cables run from the main building to building 4, then back to building 3, 2 and 1. Each building has an in and an out pigtail that plugs into the hop cables below the baseboard.">
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-data" d="M0 0L10 5L0 10z"/></marker>
+            <radialGradient id="glow"><stop offset="0" style="stop-color:var(--glow);stop-opacity:.6"/><stop offset="1" style="stop-color:var(--glow);stop-opacity:0"/></radialGradient>
+            <g id="pair"><rect class="d-solid" x="-6" y="0" width="6" height="12"/><rect class="d-box" x="0" y="0" width="6" height="12"/></g>
+          </defs>
+
+          <text class="d-ts" x="70" y="72">Centre-to-centre spacing, drawn to scale (14 px per inch)</text>
+          <line class="d-ink" x1="70" y1="104" x2="686" y2="104"/>
+          <g class="d-ink">
+            <line x1="70" y1="98" x2="70" y2="110"/><line x1="154" y1="98" x2="154" y2="110"/><line x1="294" y1="98" x2="294" y2="110"/><line x1="434" y1="98" x2="434" y2="110"/><line x1="686" y1="98" x2="686" y2="110"/>
+          </g>
+          <g class="d-t" text-anchor="middle">
+            <text x="112" y="94">6&#8243;</text><text x="224" y="94">10&#8243;</text><text x="364" y="94">10&#8243;</text><text x="560" y="94">18&#8243;</text>
+          </g>
+
+          <!-- buildings, top-down -->
+          <g>
+            <rect class="d-box" x="48" y="124" width="44" height="56" rx="2"/>
+            <rect class="d-box" x="132" y="124" width="44" height="56" rx="2"/>
+            <rect class="d-box" x="272" y="124" width="44" height="56" rx="2"/>
+            <rect class="d-box" x="664" y="124" width="44" height="56" rx="2"/>
+            <rect class="d-box" x="398" y="124" width="72" height="56" rx="2"/>
+          </g>
+          <g>
+            <circle cx="70" cy="134" r="15" fill="url(#glow)"/><rect class="d-glow" x="66" y="130" width="8" height="8" rx="1"/>
+            <circle cx="154" cy="134" r="15" fill="url(#glow)"/><rect class="d-glow" x="150" y="130" width="8" height="8" rx="1"/>
+            <circle cx="294" cy="134" r="15" fill="url(#glow)"/><rect class="d-glow" x="290" y="130" width="8" height="8" rx="1"/>
+            <circle cx="686" cy="134" r="15" fill="url(#glow)"/><rect class="d-glow" x="682" y="130" width="8" height="8" rx="1"/>
+          </g>
+          <g class="d-tb" text-anchor="middle">
+            <text x="70" y="160">B1</text><text x="154" y="160">B2</text><text x="294" y="160">B3</text><text x="686" y="160">B4</text>
+          </g>
+          <g class="d-ts" text-anchor="middle">
+            <text x="70" y="174">pixel 3</text><text x="154" y="174">pixel 2</text><text x="294" y="174">pixel 1</text><text x="686" y="174">pixel 0</text>
+          </g>
+          <text class="d-tb" x="434" y="150" text-anchor="middle">MAIN</text>
+          <text class="d-ts" x="434" y="166" text-anchor="middle">D1 Mini + status LED</text>
+
+          <!-- baseboard and pigtails -->
+          <line class="d-dotted" x1="30" y1="204" x2="750" y2="204"/>
+          <text class="d-ts" x="470" y="198">baseboard &middot; connectors below</text>
+          <g class="d-ink">
+            <line x1="446" y1="180" x2="446" y2="232"/>
+            <line x1="678" y1="180" x2="678" y2="232"/><line x1="694" y1="180" x2="694" y2="232"/>
+            <line x1="302" y1="180" x2="302" y2="232"/><line x1="286" y1="180" x2="286" y2="232"/>
+            <line x1="162" y1="180" x2="162" y2="232"/><line x1="146" y1="180" x2="146" y2="232"/>
+            <line x1="78" y1="180" x2="78" y2="232"/>
+          </g>
+
+          <!-- hop cables -->
+          <g class="cable">
+            <path d="M446 244 V272 H678 V244"/>
+            <path d="M694 244 V300 H302 V244"/>
+            <path d="M286 244 V300 H162 V244"/>
+            <path d="M146 244 V300 H78 V244"/>
+          </g>
+          <g class="wd">
+            <path d="M446 244 V272 H678 V248" marker-end="url(#ah)"/>
+            <path d="M694 244 V300 H302 V248" marker-end="url(#ah)"/>
+            <path d="M286 244 V300 H162 V248" marker-end="url(#ah)"/>
+            <path d="M146 244 V300 H78 V248" marker-end="url(#ah)"/>
+          </g>
+
+          <!-- mated connector pairs (8) -->
+          <use href="#pair" x="446" y="232"/>
+          <use href="#pair" x="678" y="232"/><use href="#pair" x="694" y="232"/>
+          <use href="#pair" x="302" y="232"/><use href="#pair" x="286" y="232"/>
+          <use href="#pair" x="162" y="232"/><use href="#pair" x="146" y="232"/>
+          <use href="#pair" x="78" y="232"/>
+          <text class="d-ts t-acc" x="460" y="244">from the D1 Mini: 5V, GND, D8</text>
+
+          <g class="d-t t-d" text-anchor="middle">
+            <text x="562" y="265">18&#8243;</text>
+            <text x="498" y="293">28&#8243; &middot; passes the main building</text>
+            <text x="224" y="293">10&#8243;</text>
+            <text x="112" y="293">6&#8243;</text>
+          </g>
+        </svg>
+      </div>
+      <div class="key"><span><i class="cab"></i>hop cable: 5V + data + GND</span><span><i style="border-color:var(--wdata)"></i>data direction</span><span>filled/hollow pair = one mated 3-pin plug</span></div>
+      <figcaption>Each building has two short pigtails that drop through a small hole in the baseboard, and the connectors live underneath. Eight mated pairs in total. The longest single hop is 28&#8243;, well inside what a re-shaping pixel chain handles. Which building gets which pixel number is one constant in firmware, so a wiring change never touches the UI.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>How it's wired</h2>
+    <p>Three wires leave the D1 Mini: 5V, GND and D8. A diode, a resistor and a capacitor sit inline near the board. From there, 5V, data and GND travel together through every plug and pixel.</p>
+    <figure>
+      <div class="fig-scroll">
+        <svg class="wide" viewBox="0 0 920 310" role="img" aria-label="Schematic. D1 Mini 5V passes through a 1N4001 diode to a 5V rail with a 220 microfarad capacitor to ground. D8 passes through a 330 ohm resistor to pixel 0, which chains to pixels 1, 2 and 3. Eight mated plugs sit on the rails between the D1 Mini and each pixel.">
+          <defs>
+            <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-data" d="M0 0L10 5L0 10z"/></marker>
+          </defs>
+
+          <!-- D1 Mini -->
+          <rect class="d-box" x="16" y="40" width="100" height="250" rx="6"/>
+          <text class="d-tb" x="66" y="64" text-anchor="middle">D1 MINI</text>
+          <text class="d-ts" x="66" y="280" text-anchor="middle">powered by USB</text>
+          <g class="d-t" text-anchor="end"><text x="106" y="104">5V</text><text x="106" y="179">D8</text><text x="106" y="254">GND</text></g>
+          <g class="d-dot"><circle cx="116" cy="100" r="3.5"/><circle cx="116" cy="175" r="3.5"/><circle cx="116" cy="250" r="3.5"/></g>
+
+          <!-- rails -->
+          <g class="w5">
+            <line x1="116" y1="100" x2="140" y2="100"/><line x1="162" y1="100" x2="904" y2="100"/>
+            <line x1="352" y1="100" x2="352" y2="128"/><line x1="512" y1="100" x2="512" y2="128"/><line x1="672" y1="100" x2="672" y2="128"/><line x1="832" y1="100" x2="832" y2="128"/>
+          </g>
+          <g class="wg">
+            <line x1="116" y1="250" x2="904" y2="250"/>
+            <line x1="352" y1="218" x2="352" y2="250"/><line x1="512" y1="218" x2="512" y2="250"/><line x1="672" y1="218" x2="672" y2="250"/><line x1="832" y1="218" x2="832" y2="250"/>
+          </g>
+
+          <!-- diode -->
+          <polygon class="d-box" points="140,90 140,110 160,100"/>
+          <line class="d-ink" x1="162" y1="90" x2="162" y2="110"/>
+          <text class="d-t" x="151" y="80" text-anchor="middle">1N4001</text>
+          <text class="d-ts" x="120" y="128">4.9V</text>
+          <text class="d-ts" x="168" y="128">&#8776;4.3V</text>
+
+          <!-- capacitor across the rails -->
+          <line class="w5" x1="215" y1="100" x2="215" y2="140"/>
+          <line class="d-ink" x1="205" y1="140" x2="225" y2="140"/><line class="d-ink" x1="205" y1="148" x2="225" y2="148"/>
+          <line class="wg" x1="215" y1="148" x2="215" y2="250"/>
+          <text class="d-t" x="229" y="148">220&#181;F</text>
+          <g><circle class="dot5" cx="215" cy="100" r="3.5"/><circle class="d-dot" cx="215" cy="250" r="3.5"/></g>
+
+          <!-- data: resistor, then through the plugs into pixel 0 -->
+          <line class="wd" x1="116" y1="175" x2="132" y2="175"/>
+          <rect class="d-box" x="132" y="169" width="40" height="12" rx="1"/>
+          <text class="d-t" x="152" y="160" text-anchor="middle">330&#937;</text>
+          <line class="wd" x1="172" y1="175" x2="335" y2="175" marker-end="url(#ah2)"/>
+          <g class="wd">
+            <line x1="424" y1="175" x2="495" y2="175" marker-end="url(#ah2)"/>
+            <line x1="584" y1="175" x2="655" y2="175" marker-end="url(#ah2)"/>
+            <line x1="744" y1="175" x2="815" y2="175" marker-end="url(#ah2)"/>
+          </g>
+
+          <!-- pixels -->
+          <g>
+            <rect class="d-box" x="338" y="128" width="86" height="90" rx="3"/>
+            <rect class="d-box" x="498" y="128" width="86" height="90" rx="3"/>
+            <rect class="d-box" x="658" y="128" width="86" height="90" rx="3"/>
+            <rect class="d-box" x="818" y="128" width="86" height="90" rx="3"/>
+          </g>
+          <g class="d-tb" text-anchor="middle"><text x="381" y="170">#0 &middot; B4</text><text x="541" y="170">#1 &middot; B3</text><text x="701" y="170">#2 &middot; B2</text><text x="861" y="170">#3 &middot; B1</text></g>
+          <g class="d-ts" text-anchor="middle"><text x="352" y="146">VDD</text><text x="512" y="146">VDD</text><text x="672" y="146">VDD</text><text x="832" y="146">VDD</text><text x="352" y="210">GND</text><text x="512" y="210">GND</text><text x="672" y="210">GND</text><text x="832" y="210">GND</text></g>
+          <g class="d-ts"><text x="342" y="191">DIN</text><text x="502" y="191">DIN</text><text x="662" y="191">DIN</text><text x="822" y="191">DIN</text></g>
+          <g class="d-ts" text-anchor="end"><text x="420" y="191">DOUT</text><text x="580" y="191">DOUT</text><text x="740" y="191">DOUT</text><text x="900" y="191">DOUT</text></g>
+          <g><circle class="dot5" cx="352" cy="100" r="3.5"/><circle class="dot5" cx="512" cy="100" r="3.5"/><circle class="dot5" cx="672" cy="100" r="3.5"/><circle class="dot5" cx="832" cy="100" r="3.5"/>
+             <circle class="d-dot" cx="352" cy="250" r="3.5"/><circle class="d-dot" cx="512" cy="250" r="3.5"/><circle class="d-dot" cx="672" cy="250" r="3.5"/><circle class="d-dot" cx="832" cy="250" r="3.5"/></g>
+
+          <!-- plugs: three contacts each -->
+          <g>
+            <rect class="d-plug" x="258" y="88" width="8" height="174" rx="2"/><rect class="d-plug" x="318" y="88" width="8" height="174" rx="2"/>
+            <rect class="d-plug" x="428" y="88" width="8" height="174" rx="2"/><rect class="d-plug" x="478" y="88" width="8" height="174" rx="2"/>
+            <rect class="d-plug" x="588" y="88" width="8" height="174" rx="2"/><rect class="d-plug" x="638" y="88" width="8" height="174" rx="2"/>
+            <rect class="d-plug" x="748" y="88" width="8" height="174" rx="2"/><rect class="d-plug" x="798" y="88" width="8" height="174" rx="2"/>
+          </g>
+          <g class="dot5"><circle cx="262" cy="100" r="2.6"/><circle cx="322" cy="100" r="2.6"/><circle cx="432" cy="100" r="2.6"/><circle cx="482" cy="100" r="2.6"/><circle cx="592" cy="100" r="2.6"/><circle cx="642" cy="100" r="2.6"/><circle cx="752" cy="100" r="2.6"/><circle cx="802" cy="100" r="2.6"/></g>
+          <g class="dotd"><circle cx="262" cy="175" r="2.6"/><circle cx="322" cy="175" r="2.6"/><circle cx="432" cy="175" r="2.6"/><circle cx="482" cy="175" r="2.6"/><circle cx="592" cy="175" r="2.6"/><circle cx="642" cy="175" r="2.6"/><circle cx="752" cy="175" r="2.6"/><circle cx="802" cy="175" r="2.6"/></g>
+          <g class="d-dot"><circle cx="262" cy="250" r="2.6"/><circle cx="322" cy="250" r="2.6"/><circle cx="432" cy="250" r="2.6"/><circle cx="482" cy="250" r="2.6"/><circle cx="592" cy="250" r="2.6"/><circle cx="642" cy="250" r="2.6"/><circle cx="752" cy="250" r="2.6"/><circle cx="802" cy="250" r="2.6"/></g>
+
+          <g class="d-t t-d" text-anchor="middle"><text x="292" y="166">18&#8243;</text><text x="457" y="166">28&#8243;</text><text x="617" y="166">10&#8243;</text><text x="777" y="166">6&#8243;</text></g>
+          <text class="d-ts" x="904" y="274" text-anchor="end">last DOUT unconnected</text>
+          <text class="d-ts" x="16" y="302">Crossings without a dot are not connected.</text>
+        </svg>
+      </div>
+      <div class="key"><span><i style="border-color:var(--w5v)"></i>5V (from USB)</span><span><i style="border-color:var(--ink)"></i>GND</span><span><i style="border-color:var(--wdata)"></i>data, one direction</span><span><i class="plug"></i>mated 3-pin plug</span></div>
+      <figcaption>Each plug carries all three conductors. The wire lengths over the data line are the physical hop lengths from the layout plan. Each hop has a plug at both ends (a pigtail pair on the building and the cable end), which is where the eight pairs come from.</figcaption>
+    </figure>
+    <div class="two">
+      <div>
+        <h3>Diode</h3>
+        <p>An addressable pixel reads a "1" at 70% of its supply voltage. At 5V that is 3.5V, which a 3.3V pin only just misses. Dropping the pixel supply to about 4.3V lowers the threshold to about 3.0V, so the D1 Mini's output clears it with margin.</p>
+      </div>
+      <div>
+        <h3>Resistor and capacitor</h3>
+        <p>The 330&#937; resistor protects the first pixel's input from spikes. The 220&#181;F capacitor absorbs the surge when pixels switch on, which keeps WiFi and the motor PWM from seeing a dip on the USB rail.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Detachable buildings</h2>
+    <p>Your JST-SYP 2.5&nbsp;mm 3-pin pairs are wire-to-wire pigtails, which suits this exactly. The gender convention is what makes removal painless:</p>
+    <ul class="plain">
+      <li>Each building's <b>IN pigtail is male</b> and its <b>OUT pigtail is female</b>. The D1 Mini's OUT pigtail is female too.</li>
+      <li>Each hop cable is <b>male at the upstream end</b> and <b>female at the downstream end</b>.</li>
+      <li>Pin order is the same on every connector: <b>1 = 5V (red), 2 = data (green), 3 = GND (black)</b>.</li>
+    </ul>
+    <p><b>To remove a building mid-chain:</b> unplug its IN and OUT pigtails. The hop cable that fed it now ends in a female socket, and the next one starts with a male plug, so the two plug straight into each other and the rest of the lights keep working. Removing B4 works the same way (hop 1 mates with hop 2). Removing B1, the last in the chain, needs nothing at all.</p>
+    <div class="two">
+      <div>
+        <h3>Building the cables</h3>
+        <p>Pigtail leads are usually thicker (around 22&nbsp;AWG) than the thin hop wire. Solder them together, heat-shrink each joint, and stagger the three joints so they cannot touch. Buzz out every finished cable with a multimeter before connecting any pixel.</p>
+      </div>
+      <div>
+        <h3>At the pixel</h3>
+        <p>The IN and OUT pigtails share the VDD and GND pads, so two wires land on each of those pads. Tin the pads first and check that your breakout has room.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Pin budget</h2>
+    <p>Every digital pin on the D1 Mini is now accounted for. D8 was the only usable free output. A0 is free but input-only, and the track voltage readout is computed from the throttle (<code>SUPPLY_VOLTAGE * currentSpeed</code>), not measured.</p>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Pin</th><th>GPIO</th><th>Used for</th></tr></thead>
+        <tbody>
+          <tr><td class="num">D1</td><td class="num">5</td><td>PWMA (motor speed)</td></tr>
+          <tr><td class="num">D2</td><td class="num">4</td><td>AIN2</td></tr>
+          <tr><td class="num">D3</td><td class="num">0</td><td>AIN1</td></tr>
+          <tr><td class="num">D4</td><td class="num">2</td><td>STBY</td></tr>
+          <tr><td class="num">D5 / D6 / D7</td><td class="num">14 / 12 / 13</td><td>Status LED red / green / blue (unchanged)</td></tr>
+          <tr class="pick"><td class="num">D8</td><td class="num">15</td><td><b>Building light data</b> <span class="tag">new</span></td></tr>
+          <tr class="pick"><td class="num">5V, GND</td><td class="num">&mdash;</td><td><b>Building light power</b> <span class="tag">new</span> (USB side only, never the 12V track supply)</td></tr>
+          <tr><td class="num">D0, A0</td><td class="num">16, ADC</td><td class="muted">Free. D0 has no PWM, A0 is input-only.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Parts list</h2>
+    <p>Everything is a standard hobby part, and you already own the connectors. Prices are rough and vary by seller. Expect roughly $20&ndash;35 in total, mostly the pixels and wire.</p>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Qty</th><th>Part</th><th>Why this one</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="num">6</td><td><b>WS2812B-2020 RGB pixel</b>, pre-mounted on a tiny breakout or pre-wired</td><td>Smallest common addressable pixel. Four needed, two spares.</td><td>Hand-soldering the bare 2&times;2&nbsp;mm part is miserable. A SK6812 Mini-E (3.5&times;3.5&nbsp;mm) works identically and is easier to solder. Pick a breakout with room for two wires on the VDD and GND pads.</td></tr>
+          <tr><td class="num">9 pairs</td><td><b>JST-SYP 2.5&nbsp;mm 3-pin, male and female</b> <span class="tag">on hand</span></td><td>8 mated pairs needed (see the layout), plus 1 spare.</td><td>Wire-to-wire pigtails. Use one pin order everywhere.</td></tr>
+          <tr><td class="num">1</td><td><b>1N4001 diode</b></td><td>Drops about 0.6V so the pixels accept 3.3V data.</td><td>A 1N4148 also works.</td></tr>
+          <tr><td class="num">1</td><td><b>330&#937; resistor</b>, &frac14;&nbsp;W</td><td>Series protection on the data line.</td><td></td></tr>
+          <tr><td class="num">1</td><td><b>220&#181;F electrolytic capacitor</b>, 10V or higher</td><td>Smooths the pixel power-on surge.</td><td>470&#181;F is fine too. Mind the polarity stripe.</td></tr>
+          <tr><td class="num">3 spools</td><td><b>28&ndash;30&nbsp;AWG silicone wire</b>: red, black, green or yellow, about 10&nbsp;ft each</td><td>Thin and flexible enough to hide in scenery. Red 5V, black GND, green data.</td><td>The four hops need 62&#8243; (about 5&nbsp;ft) of each colour. The rest is routing slack.</td></tr>
+          <tr><td class="num">1</td><td><b>Heat-shrink tubing</b>, 1&ndash;2&nbsp;mm assortment</td><td>Insulates every solder joint on the pixels and cables.</td><td>Plenty needed. There are around 70 joints in total.</td></tr>
+          <tr><td class="num">1</td><td><b>Aluminium foil tape</b> or matte black paint</td><td>Lines the four building interiors so light stays at the windows.</td><td>Z-scale plastic is thin and glows through the walls otherwise.</td></tr>
+          <tr><td class="num">1</td><td><b>Tracing paper or frosted tape</b></td><td>Diffuses the pixel behind window openings.</td><td></td></tr>
+          <tr><td class="num">4</td><td><b>100nF ceramic capacitor</b> <span class="tag">optional</span></td><td>One per pixel for clean switching.</td><td>Skip if your breakouts already include one.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="two">
+      <div><h3>Tools</h3><p>Fine-tip soldering iron, flux, helping hands or a PCB holder, wire strippers, and a multimeter. Check for about 4.3V after the diode before connecting any pixel, and continuity-test every hop cable.</p></div>
+      <div><h3>Already on hand</h3><p>D1 Mini with USB power and the JST-SYP connectors. The firmware library (Adafruit NeoPixel) installs through PlatformIO, so there is nothing to buy for software.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Why not something else</h2>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Option</th><th>Pins</th><th>Wires to buildings</th><th>Verdict</th></tr></thead>
+        <tbody>
+          <tr class="pick"><td><b>Addressable pixel chain</b></td><td class="num">1</td><td class="num">3 per hop</td><td>Per-building colour and brightness, no extra board.</td></tr>
+          <tr><td>4 discrete LEDs on GPIO</td><td class="num">4</td><td class="num">5&ndash;9</td><td>Only D0 and D8 are free, so this does not fit.</td></tr>
+          <tr><td>PCA9685 PWM driver</td><td class="num">2 (I2C)</td><td class="num">5&ndash;9</td><td>Adds a board and still needs two free pins.</td></tr>
+          <tr><td>74HC595 shift register</td><td class="num">3</td><td class="num">5&ndash;9</td><td>On/off only, with no per-building dimming.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Software plan</h2>
+    <p>The change follows the existing structure: hardware-independent logic in <code>lib/</code> with native tests, a thin hardware wrapper in the sketch, and a new panel in the web UI. Lights are independent of throttle and direction. The status LED code is untouched.</p>
+    <h3>Protocol additions</h3>
+<pre>// client to firmware (id = building 0-3, B1 = 0 ... B4 = 3; every field except id is optional)
+{"cmd": "light", "id": 2, "on": true, "r": 255, "g": 150, "b": 50, "brightness": 0.6}
+{"cmd": "lights_off"}
+
+// firmware to client: status gains a lights array
+{"type": "status", ..., "lights": [{"on": true, "r": 255, "g": 150, "b": 50, "brightness": 0.6}, ...]}</pre>
+    <p>Brightness 0&ndash;1 from the UI maps onto a firmware cap (default 25% of the pixel's full output), so no slider position can overdrive a pixel or the USB supply. The default colour is a warm tungsten (255, 150, 50).</p>
+    <h3>Files</h3>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Area</th><th>Change</th></tr></thead>
+        <tbody>
+          <tr><td><code>platformio.ini</code></td><td>Add Adafruit NeoPixel to <code>lib_deps</code>; define <code>LIGHT_PIN</code> (D8) and <code>LIGHT_COUNT</code> (4).</td></tr>
+          <tr><td><code>lib/LightLogic/</code></td><td>New. Per-building state, brightness cap, building-to-pixel map, colour scaling. Native unit tests.</td></tr>
+          <tr><td><code>lib/Command/</code></td><td>Parse <code>light</code> and <code>lights_off</code>. Native unit tests.</td></tr>
+          <tr><td><code>firmware/z-duino/Lights.h/.cpp</code></td><td>New. NeoPixel wrapper that pushes a frame only when state changes.</td></tr>
+          <tr><td><code>firmware/z-duino/z-duino.ino</code></td><td>Clear the pixels first thing in <code>setup()</code>, dispatch the new commands, add <code>lights</code> to the status message.</td></tr>
+          <tr><td><code>frontend/src/components/LightsPanel.vue</code></td><td>New. One row per building: name, on/off toggle, brightness slider, colour swatch.</td></tr>
+          <tr><td><code>useTrainController.ts</code>, <code>mock-server.ts</code></td><td>Lights state, send helpers, and mock server support so <code>npm run dev:all</code> works without hardware.</td></tr>
+          <tr><td><code>docs/</code></td><td>Update <code>HARDWARE.md</code> and <code>PROTOCOL.md</code>; add a wiring page for the lights.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">Verification: <code>pio test -e native</code> and <code>npm test</code> cover the logic and components. The pixel output itself needs checking on the real layout.</p>
+  </section>
+
+  <section>
+    <h2>Risks and fixes</h2>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Risk</th><th>Fix</th></tr></thead>
+        <tbody>
+          <tr><td>D8 (GPIO15) must be low at boot</td><td>The D1 Mini pulls it down already, and the pixel input idles low through the 330&#937; resistor. No change needed.</td></tr>
+          <tr><td>Pixels flash random colours at power-up</td><td>Firmware clears them first in <code>setup()</code>. The capacitor smooths the rail.</td></tr>
+          <tr><td>Pixel updates briefly disable interrupts (about 30&micro;s per pixel) while the motor PWM is software-timed</td><td>Update only on a change, never on a timer. If glitches ever show, move data to RX (GPIO3) with NeoPixelBus's DMA method.</td></tr>
+          <tr><td>USB current budget</td><td>At the 25% cap, four pixels draw about 60mA at most, on top of the D1 Mini's WiFi peaks. A normal USB port covers it.</td></tr>
+          <tr><td>Mated connectors are a place for intermittent contact</td><td>Seat each plug fully. If a pixel flickers or drops out, reseat the plugs upstream of it first. At about 60mA the contact resistance is not a power problem.</td></tr>
+          <tr><td>Wrong pin order on a hand-made cable</td><td>Same order on every connector (5V, data, GND). Continuity-test each cable before it goes near a pixel.</td></tr>
+          <tr><td>Light bleeding through thin plastic walls</td><td>Foil tape or black paint inside each building, windows left clear.</td></tr>
+          <tr><td>Pixels wired in the wrong order</td><td>One building-to-pixel constant in firmware. No rewiring needed.</td></tr>
+          <tr><td>Lighting 5V connected to the 12V track side</td><td>Keep the lighting on USB 5V only. The only link to the track side is the existing shared ground.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Open decisions</h2>
+    <p class="muted">Decided: no pixel in the main building (the status LED stays), every building detachable with the JST-SYP pigtails.</p>
+    <ol class="plain">
+      <li><b>Remember light state across reboots.</b> A debounced write to LittleFS would restore the lights after a power cycle. Recommended, but it adds a small amount of flash wear and a settings file.</li>
+      <li><b>Default brightness cap.</b> 25% is a starting guess. Real window brightness on your layout will tell us.</li>
+      <li><b>Effects.</b> Flicker, TV glow or a day/night fade are easy once the pixels work. Left for a later pass.</li>
+    </ol>
+  </section>
+</main>
+
+</body></html>

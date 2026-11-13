@@ -2,6 +2,8 @@
 
 Individually controlled lights for four Z-scale buildings, using four addressable RGB pixels on a single data pin. Every building is detachable. Status: design agreed, no firmware or UI changes yet.
 
+A rendered version with scale layout and schematic diagrams, a full parts list and the software plan is in [resources/building-lights.html](resources/building-lights.html). Open it in a browser (it loads fonts from Google Fonts and falls back to system fonts offline). This Markdown file is the short form; the HTML has more detail, so keep the two in step if the design changes.
+
 ## Approach
 
 - One WS2812B-2020 pixel per building, daisy-chained on **D8 (GPIO15)**.
