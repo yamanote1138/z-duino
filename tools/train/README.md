@@ -40,6 +40,7 @@ All scripts need Node 22+ (global `WebSocket`). Set `TRAIN_HOST` to the controll
 |---|---|
 | `laps.mjs` | Timed laps with no sensor: `node laps.mjs <1-5> [30\|35\|40]`. Also `node laps.mjs nudge <fwd\|back> <seconds>` for hand positioning at 10%. |
 | `creep-stop.mjs` | Creep forward at 10% and stop when the nose breaks the beam. Start with the nose a couple of inches short of the beam. |
+| `tail-stop.mjs` | Single solid loco: from the mark (nose in the beam), creep forward at 10% and stop when the tail clears the beam. |
 | `tail-nose.mjs` | From the mark: creep forward and stop on the tail, wait 4 s, creep back and stop on the nose. |
 | `loops-tail.mjs` | Leave, do one loop, and on the second loop stop with the tail on the beam. |
 | `signal-show.mjs` | Three loops with the controller LED as a signal. Red, yellow, green go, purple at each pass (or `--party` for the beat show), yellow while slowing, red when parked, then blue. Ends parked on the nose. |
