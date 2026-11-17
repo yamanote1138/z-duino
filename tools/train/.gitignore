@@ -1,0 +1,4 @@
+# Output written by the scripts and PlatformIO
+*.csv
+speedtrap_results.json
+sensor/.pio/
