@@ -23,7 +23,7 @@ Without one, position is dead-reckoning (speed x time), which lands within about
 
 ## Sensor firmware
 
-`sensor/` is a small PlatformIO project that prints one `analogRead(A0)` per line at 115200 baud, about 50 per second.
+`sensor/` is a small PlatformIO project that prints `<A0 reading>,<microseconds>` per line at 115200 baud, about 50 per second. The timestamp is the sensor's own clock, so the scripts that want precise timing (`learn-loco.mjs`) are not at the mercy of USB arrival times. The other scripts read only the first number.
 
 ```bash
 cd tools/train/sensor
@@ -44,6 +44,7 @@ All scripts need Node 22+ (global `WebSocket`). Set `TRAIN_HOST` to the controll
 | `loops-tail.mjs` | Leave, do one loop, and on the second loop stop with the tail on the beam. |
 | `signal-show.mjs` | Three loops with the controller LED as a signal. Red, yellow, green go, purple at each pass (or `--party` for the beat show), yellow while slowing, red when parked, then blue. Ends parked on the nose. |
 | `speed-trap.mjs` | Times the train past the beam at several throttle settings and reports speed in scale mph, plus the loop length. |
+| `learn-loco.mjs` | Learns a new locomotive on its own: finds it, measures its length and speed table, and learns how it stops. Writes `loco_profile.json`. Uses `lib/beam.mjs`. `--resume` and `--stages=find,length,speeds,stops` run parts of it. |
 | `read-a0.py` | Bench helper: `python3 -I read-a0.py 3` prints min, max and mean of A0 over 3 s. Port is hard-coded at the top. |
 
 The scripts are deliberately standalone, so the sensor and connection helpers repeat across files.
@@ -73,6 +74,22 @@ The scripts are deliberately standalone, so the sensor and connection helpers re
 
 Throttle is not linear at the low end: 15% to 20% gains more speed per step than 20% to 40%.
 
+### Locomotive profile (single solid loco, from `learn-loco.mjs`)
+
+Solid body with no windows, 2.89" (73 mm) long. The beam reads about 160 to 230 while it is in front of the sensor, and the edges are sharp (about 0.35 s nose to tail at 8 in/s).
+
+| Throttle | Speed | At 1:220 |
+|---|---|---|
+| 8% | 1.76 in/s | 22 mph |
+| 10% | 2.31 in/s | 29 mph |
+| 12% | 2.91 in/s | 36 mph |
+| 15% | 3.75 in/s | 47 mph |
+| 20% | 5.39 in/s | 67 mph |
+| 25% | 6.72 in/s | 84 mph |
+| 30% | 8.23 in/s | 103 mph |
+
+Fit over the whole range: `v = -0.62 + 29.55 x throttle` (in/s). It never stalled down to 8% and carries on less than about 0.15" after a stop at 8%, 12% and 22% throttle. The tools cap the target speed at 9 in/s as a derailment guard.
+
 `laps.mjs` carries calibration constants fitted when the loop was assumed to be 158.5". The fit absorbed the error, so its timed laps still land close, but its in/s figures are not true speeds.
 
 ## Controller behaviour these scripts rely on
@@ -81,3 +98,11 @@ Throttle is not linear at the low end: 15% to 20% gains more speed per step than
 - `stop` blinks the status LED magenta four times. The signal show uses `speed 0` for its final stop to avoid hiding the red.
 - The `direction` command resets the LED to its status colour, so set LED colours after it.
 - With no client connected the status LED is blue. Disconnecting returns it there.
+
+## Motor care
+
+Stopping or reversing a locomotive at any significant speed is hard on the motor.
+
+- Cut the throttle to zero only at creep speed, about 2.5 in/s or less. From anything faster, ramp down the way the web UI does (1 s per 0.1 of throttle).
+- Never change direction while moving. Stop, pause, then reverse.
+- `stop` (the controller's emergency stop) is for aborts and Ctrl-C only.

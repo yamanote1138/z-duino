@@ -2,3 +2,5 @@
 *.csv
 speedtrap_results.json
 sensor/.pio/
+learn_run.log
+loco_profile.json

@@ -18,7 +18,7 @@ while time.time() < end:
         time.sleep(0.01)
 os.close(fd)
 for line in buf.split(b"\n")[1:-1]:
-    try: vals.append(int(line.strip()))
+    try: vals.append(int(line.strip().split(b",")[0]))
     except ValueError: pass
 if vals:
     print(f"n={len(vals)} min={min(vals)} max={max(vals)} mean={statistics.mean(vals):.0f}")
