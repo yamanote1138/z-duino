@@ -1,6 +1,6 @@
 {
   "name": "z-duino-frontend",
-  "version": "2.5.1",
+  "version": "2.5.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,21 +12,26 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@nuxt/ui": "^4.11.3",
-    "tailwindcss": "^4.2.1",
-    "vue": "^3.5.43",
+    "@nuxt/ui": "^4.12.2",
+    "tailwindcss": "^4.3.5",
+    "vue": "^3.5.45",
     "vue-router": "^5.4.0"
   },
   "devDependencies": {
     "@iconify-json/mdi": "^1.2.3",
     "@vitejs/plugin-vue": "^6.0.10",
-    "@vue/test-utils": "^2.5.1",
-    "concurrently": "^10.0.6",
-    "happy-dom": "^21.0.1",
+    "@vue/test-utils": "^2.6.0",
+    "concurrently": "^10.0.7",
+    "happy-dom": "^21.0.4",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "vite": "^8.3.4",
+    "vite": "^8.3.8",
     "vitest": "^5.1.0",
     "ws": "^8.22.0"
+  },
+  "overrides": {
+    "esbuild": "^0.28.1",
+    "glob": "^14.0.2",
+    "minimatch": "^11.0.1"
   }
 }
