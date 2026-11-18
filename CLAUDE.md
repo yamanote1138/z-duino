@@ -38,6 +38,18 @@ cd frontend && npm test   # Frontend: Vitest — useTrainController.ts + compone
 ```
 Both run in CI. Code touching real hardware I/O (pins, WiFi/sockets) isn't unit-tested this way — verify manually against real hardware.
 
+## Dependency Updates
+Dependabot version updates (weekly, via `.github/dependabot.yml`) plus security alerts/updates (repo setting) are both on. Don't merge Dependabot PRs one at a time — they fight over `package-lock.json`. Instead:
+1. Let the PRs pile up, then check `npm audit` and open alerts (`gh api repos/{owner}/{repo}/dependabot/alerts`) for anything else to pick up.
+2. On a dated branch (e.g. `deps/security-fixes-2026-11-18`), bump the deps in `frontend/` to the latest compatible versions. Never use `npm audit fix --force` — it suggests major downgrades.
+3. For vulnerable transitive deps with no fixed parent release, add an `overrides` entry in `frontend/package.json`.
+4. Bump the patch version in `frontend/package.json`, `package-lock.json`, and `VERSION` in `firmware/z-duino/z-duino.ino`.
+5. Run `npm test` and `npm run build`, then open one rollup PR titled `vX.Y.Z: dependency updates` listing the advisories fixed and the PRs superseded.
+6. Once CI (`frontend` + `firmware`) is green, squash-merge it, then comment `@dependabot close` on each superseded PR (close any that don't respond by hand).
+7. Tag and publish a GitHub release `vX.Y.Z` with notes in the same format as earlier releases (Highlights / Upgrading / Full diff).
+
+Advisories with no patched release (e.g. picomatch GHSA-fc5q-39xc-vjpf as of v2.5.2) just stay open until upstream ships a fix.
+
 ## Key Files
 - `platformio.ini` — PlatformIO project config (board, ldscript, lib_deps, secrets, native test env)
 - `secrets.ini` — WiFi creds & build-time config (not committed, copy from `secrets.ini.example`)
