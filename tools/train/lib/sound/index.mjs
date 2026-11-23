@@ -128,9 +128,16 @@ export class SoundLibrary {
     this._slots.set(slot, s);
     const run = () => {
       if (!s.want) return;
-      const c = this.choose(selector, opts);
+      const c = this.choose(selector, opts), startedAt = Date.now();
       s.handle = this._start(c);
-      s.handle.done.then(() => { if (s.want && this._slots.get(slot) === s) run(); });
+      s.handle.done.then(() => {
+        if (!(s.want && this._slots.get(slot) === s)) return;
+        // An engine whose clips end at once (the silent one) would restart in a microtask loop that starves every timer:
+        // if it ended early, wait out the clip's length before the next round.
+        if (Date.now() - startedAt >= 10) return run();
+        const t = setTimeout(() => { this._timers.delete(t); run(); }, Math.max(50, c.duration || 1000));
+        t.unref?.(); this._timers.add(t);
+      });
     };
     run();
     if (old) { old.want = false; const h = old.handle; if (h) { const t = setTimeout(() => { this._timers.delete(t); h.stop(); }, 90); this._timers.add(t); } }   // short overlap hides the join

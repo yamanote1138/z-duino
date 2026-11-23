@@ -130,3 +130,15 @@ test("engines are swappable: a custom object works, an unknown name is refused",
   assert.equal(calls.length, 1);
   assert.throws(() => new SoundLibrary({ engine: "wat" }), /unknown sound engine "wat"/);
 });
+
+test("a loop on an engine whose clips end instantly does not starve the event loop (the silent engine)", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "loop-"));
+  writeFileSync(join(dir, "pack.json"), JSON.stringify({ format: "z-sounds/1", name: "t", sounds: { "motion.run": { file: "a.wav", loop: true, durationMs: 300 } } }));
+  writeFileSync(join(dir, "a.wav"), Buffer.alloc(64));
+  const lib = new SoundLibrary({ packs: [dir], engine: "null" });
+  lib.loop("m", "motion.run");
+  let ticks = 0; const iv = setInterval(() => ticks++, 10);
+  await new Promise((r) => setTimeout(r, 120));
+  clearInterval(iv); lib.stopAll();
+  assert.ok(ticks >= 5, `timers only fired ${ticks} times: the loop starved the event loop`);
+});
