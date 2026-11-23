@@ -11,15 +11,25 @@ Without one, position is dead-reckoning (speed x time), which lands within about
 | Part | Notes |
 |---|---|
 | Arduino Uno R4 Minima | reads the sensor, USB to the Mac (`/dev/cu.usbmodem…`) |
-| Green 5 mm LED + 220 Ω | the light source, across 5V and GND |
-| Photoresistor + 10 kΩ | divider from 5V; the midpoint goes to **A0** |
-| 2 mini breadboards (17 columns) | one for the LED, one for the photoresistor, on opposite sides of the track |
+| Clear 5 mm 940 nm IR LED + 220 Ω | the emitter (from the Allecin 60-piece IR kit), across 5V and GND, about 16 mA |
+| Black 3 mm IR dome + 22 kΩ | the receiver, behaves as a phototransistor; the node goes to **A0** |
+| 2 mini breadboards (17 columns) | one for the emitter, one for the receiver, on opposite sides of the track |
 
-**Circuit.** `5V → photoresistor → node → 10 kΩ → GND`, with `A0` on the node. Separately, `5V → 220 Ω → LED → GND`. A clear beam reads **high** (about 983 to 988 of 1023) and a blocked beam reads low. Two wires carry 5V and GND from the sensor board to the LED board.
+**Circuit.** Emitter: `5V → 220 Ω → clear LED (long leg to the resistor) → GND`. Receiver: `5V → black dome (long leg) → short leg → node → 22 kΩ → GND`, with `A0` on the node. A clear beam reads **high** (about 340 of 1023 at the current spacing; it once sat at 187 for a while with nothing in the way) and a blocked beam reads low (about 30 to 75 for the solid loco depending on aim, since some light gets round it; about 12 with the emitter off). The 940 nm light is invisible, and room light adds almost nothing (about 11 counts). Two wires carry 5V and GND from the receiver board, under the track, to the emitter board. The 22 kΩ replaced a 10 kΩ to raise the signal after the pair was moved apart.
 
-**Placement.** The LED and photoresistor sit just outside the rails, directly across from each other, at the **exit end of the train house**. Keep them as close to the track as practical and at the same height. A mini breadboard's two halves are not connected across the centre channel, so check that A0 and the photoresistor share a half and a column.
+**Placement.** The emitter and receiver sit just outside the rails, directly across from each other, at the **exit end of the train house**, far enough from the track that the loco does not touch them. Spacing, aim and the resistor all change the clear level, so re-measure after any move (see Beam levels). A mini breadboard's two halves are not connected across the centre channel, so check that A0, the dome's short leg and the resistor share a column.
 
-**Beam height.** The scripts were tuned with the beam at window height on a Japanese commuter EMU: windows read about 850 to 975, the solid end walls and the joins drop below about 650, and a fully blocked beam reads about 170 to 560 depending on which part of the nose is in it.
+**Beam height.** The beam crosses the solid body of the single loco. An earlier photoresistor setup was tuned at window height on a Japanese commuter EMU (windows 850 to 975, walls and joins below about 650); the IR pair has not been tested with that train.
+
+## Beam levels
+
+No script hard-codes a reading. `lib/levels.mjs` scales every threshold (clear plateau, nose drop, trip, wall, solid-pass limit) from two numbers in `sensor_levels.json`:
+
+```json
+{ "clear": 340, "blocked": 73 }
+```
+
+`clear` is the open beam, `blocked` is the solid loco in the beam. Update both after moving or re-aiming the sensor (read them with `python3 -I read-a0.py 3`), or override with `BEAM_CLEAR` and `BEAM_BLOCKED` in the environment. The fractions are the old photoresistor thresholds re-expressed on the same scale, so behaviour matches what the scripts were tuned for.
 
 ## Sensor firmware
 
@@ -30,31 +40,58 @@ cd tools/train/sensor
 pio run -t upload        # add upload_port to platformio.ini if it picks the wrong port
 ```
 
-The scripts open the port with `stty` (macOS syntax) and default to `/dev/cu.usbmodem1101`. Override with `SENSOR_PORT`.
+The scripts open the port with `stty` (macOS syntax). The Arduino must be plugged straight into the Mac: through a hub with a USB-C to USB-A adapter it only got power and never enumerated.
 
 ## Scripts
 
-All scripts need Node 22+ (global `WebSocket`). Set `TRAIN_HOST` to the controller's IP; mDNS (`ztrain.local`) was unreliable for WebSocket connections. Most scripts take `--dry`, which checks the sensor and does not move the train. All of them send `stop` on Ctrl-C.
+All scripts need Node 22+ (global `WebSocket`). The controller's address and the sensor's serial port are found automatically (`lib/config.mjs`: `ztrain.local` resolved to an IP, and the only `/dev/cu.usbmodem*`); set `TRAIN_HOST` or `SENSOR_PORT` to override. Both change (DHCP, which USB port). Most scripts take `--dry`, which checks the sensor and does not move the train. All of them send `stop` on Ctrl-C.
 
 | Script | What it does |
 |---|---|
 | `laps.mjs` | Timed laps with no sensor: `node laps.mjs <1-5> [30\|35\|40]`. Also `node laps.mjs nudge <fwd\|back> <seconds>` for hand positioning at 10%. |
-| `creep-stop.mjs` | Creep forward at 10% and stop when the nose breaks the beam. Start with the nose a couple of inches short of the beam. |
+| `creep-stop.mjs` | Creep forward at 10% and stop when the nose breaks the beam. Start with the nose a few inches short of the beam; it gives up after 8 s (`--max=<seconds>` for longer; a full lap at creep is about 56 s). This puts the train on "the mark". |
 | `tail-stop.mjs` | Single solid loco: from the mark (nose in the beam), creep forward at 10% and stop when the tail clears the beam. |
 | `tail-nose.mjs` | From the mark: creep forward and stop on the tail, wait 4 s, creep back and stop on the nose. |
 | `loops-tail.mjs` | Leave, do one loop, and on the second loop stop with the tail on the beam. |
-| `signal-show.mjs` | Three loops with the controller LED as a signal. Red, yellow, green go, purple at each pass (or `--party` for the beat show), yellow while slowing, red when parked, then blue. Ends parked on the nose. |
+| `signal-show.mjs` | Two loops with the controller LED as a signal. Red, yellow, green go, purple at the pass (or `--party` for the beat show), yellow while slowing, red when parked, then blue. Ends parked on the nose. Start with the nose in the beam (on the mark); it refuses to run otherwise. Use `--loco` for the speeds in `loco_profile.json`, and `--sound` for sound effects (see Sound). The ramp-down is timed from the loop-1 lap, standing start included. |
+| `ramp-loops.mjs` | Three loops, a little faster each (`--start=0.40 --final=0.65`), then ramp to 30%, then creep onto the nose. Calibrated on loop 2, because speeds above 30% are extrapolated from the profile; needs `--allow-fast` above 9 in/s. `--plan` prints the final-loop plan. |
+| `light-test.mjs` | Shuttles the loco across the beam (about 1" past it each way, at 10%) and reports clear and blocked levels, noise and pass-time repeatability; appends a row to `light_test_results.csv`. Use `--label=` to name the lighting condition. |
+| `sound-demo.mjs` | Plays the sound set in the order a show uses it, with no train. |
+| `import-sounds.py` | Copies real sounds from the sibling `e235-sounds` and `eki-pi` projects into `sounds/`. |
 | `speed-trap.mjs` | Times the train past the beam at several throttle settings and reports speed in scale mph, plus the loop length. |
-| `learn-loco.mjs` | Learns a new locomotive on its own: finds it, measures its length and speed table, and learns how it stops. Writes `loco_profile.json`. Uses `lib/beam.mjs`. `--resume` and `--stages=find,length,speeds,stops` run parts of it. |
-| `read-a0.py` | Bench helper: `python3 -I read-a0.py 3` prints min, max and mean of A0 over 3 s. Port is hard-coded at the top. |
+| `learn-loco.mjs` | Learns a new locomotive on its own: finds it, measures its length and speed table, and learns how it stops. Writes `loco_profile.json`. Uses `lib/beam.mjs`. `--resume` and `--stages=find,length,speeds,stops` run parts of it. `--in-beam` starts with the nose already in the beam. |
+| `read-a0.py` | Bench helper: `python3 -I read-a0.py 3` prints min, max and mean of A0 over 3 s. |
 
 The scripts are deliberately standalone, so the sensor and connection helpers repeat across files.
 
+## Sound
+
+`signal-show.mjs --sound` plays effects on the Mac through `afplay` (`--volume=0.5` by default). Sound files live in `sounds/` and are git-ignored. Some are generated (`lib/synth.mjs`, an impression, not a recording of an EF210); the rest are real clips copied from two sibling projects by `python3 -I import-sounds.py`, which needs `../e235-sounds` (a BVE sound archive for the JR East E235) and `../eki-pi` next to this repo. Those sounds belong to their authors and stay on this machine. A file already in `sounds/` is always used, so you can drop your own over any name.
+
+| When | Sound |
+|---|---|
+| Red, before departure | idle blower hum, then a chime |
+| Yellow | the E235 departure brake release (yellow lasts until it ends) |
+| Green | JR horn and the E235 inverter start-up clip; the loco creeps out at 10% for 3 s (`--creep-out=<s>`) before climbing to cruise, then a steady inverter hum while running |
+| Each pass of the beam | a 2.3 s horn |
+| Curves | flange squeals, a different clip each time (four clips, random order, slight volume variation), cut 0.1 s before the curve ends |
+| Slowing | the E235 slow-down clip, then a quieter hum while creeping |
+| Creeping | a brake squeal as it drops to creep |
+| Parked | air release and the brake loosening, then a chime when the light goes blue |
+
+The flange squeals are placed by time from the speed model, not by the beam. The curve distances (a short bend at 5.5 to 12" that diverts the track around a dock, then tight curves at 37 to 57" and 104 to 124" from the sensor) are estimates from a description of the track; override with `--curves=5.5-12,37-57,104-124`.
+
+## Room light
+
+`light-test.mjs` measured the sensor under a desk lamp (an IKEA LED lamp, which gives off almost no 940 nm light): far away, near the track, and aimed straight at the receiver. Nothing moved: clear 340, blocked 29 to 30, noise sd under 2 counts, and a pass time that repeats to about 10 ms (about 0.03" of loco travel at creep). Incandescent bulbs and sunlight were not tested. The beam is steady (not modulated), so strong IR from those would add directly to the clear reading. The kit's 38 kHz receivers would ignore it, but need the emitter pulsed at 38 kHz.
+
 ## How the stops work
 
-- **Clear beam** is a flat plateau near the top of the range for 0.6 s. The level drifts a few counts, so it is measured, not fixed.
+- **Clear beam** is a flat plateau (within 6 counts) above half the blocked-to-clear span for 0.6 s. The level drifts a few counts, so it is measured, not fixed.
+- **Nose** needs two consecutive low readings in `signal-show.mjs`, so one stray sample is not counted as a train. With a solid loco the tail counts as cleared after four readings back above the nose level, so the pass LED follows the loco closely.
 - **Nose** is the first reading well below the clear level after a clear beam. **Joins and the middle car** are skipped by requiring a long clean run of windows (1.0 s) before a wall, and by ignoring the first 3.2 s after the nose.
-- **A wall** needs two or more consecutive readings below 760. A single stray low sample is ignored.
+- **Final-approach check.** Before the ramp-down, every one of the last 30 readings must be at least 20 above the stop level. It does not ask for a flat line: the clear reading wobbles a few percent while the train runs (338 to 352 seen), and the earlier flat-line version aborted a show.
+- **A wall** needs two or more consecutive readings below the wall level (72% of the span, 256 at the current levels). A single stray low sample is ignored.
 - **Final approach.** `signal-show.mjs` measures the lap period between the loop-1 and loop-2 passes, then starts the ramp-down so the train creeps for about 6 s before reaching the beam. Lap speed varies by about ±3%, which moves the creep length by about ±2 s.
 
 ## Measured numbers
@@ -75,21 +112,21 @@ The scripts are deliberately standalone, so the sensor and connection helpers re
 
 Throttle is not linear at the low end: 15% to 20% gains more speed per step than 20% to 40%.
 
-### Locomotive profile (single solid loco, from `learn-loco.mjs`)
+### Locomotive profile (single solid loco, from `learn-loco.mjs`, IR sensor, 2026-11-20)
 
-Solid body with no windows, 2.89" (73 mm) long. The beam reads about 160 to 230 while it is in front of the sensor, and the edges are sharp (about 0.35 s nose to tail at 8 in/s).
+Solid body with no windows, 3.00" (76 mm) long as measured with the IR beam (the photoresistor setup measured 2.89"). The beam reads about 26 to 28 while it is in front of the sensor, and the edges are sharp (about 0.39 s nose to tail at 8 in/s).
 
 | Throttle | Speed | At 1:220 |
 |---|---|---|
-| 8% | 1.76 in/s | 22 mph |
-| 10% | 2.31 in/s | 29 mph |
-| 12% | 2.91 in/s | 36 mph |
+| 8% | 1.80 in/s | 23 mph |
+| 10% | 2.35 in/s | 29 mph |
+| 12% | 2.92 in/s | 36 mph |
 | 15% | 3.75 in/s | 47 mph |
-| 20% | 5.39 in/s | 67 mph |
-| 25% | 6.72 in/s | 84 mph |
-| 30% | 8.23 in/s | 103 mph |
+| 20% | 5.38 in/s | 67 mph |
+| 25% | 6.58 in/s | 82 mph |
+| 30% | 8.13 in/s | 102 mph |
 
-Fit over the whole range: `v = -0.62 + 29.55 x throttle` (in/s). It never stalled down to 8% and carries on less than about 0.15" after a stop at 8%, 12% and 22% throttle. The tools cap the target speed at 9 in/s as a derailment guard.
+Fit over the whole range: `v = -0.49 + 28.65 x throttle` (in/s). It never stalled down to 8% and carried on 0" after a stop at 8%, 9% and 10% throttle (9 trials, 0 to 20 ms response). The tools cap the target speed at 9 in/s as a derailment guard.
 
 `laps.mjs` carries calibration constants fitted when the loop was assumed to be 158.5". The fit absorbed the error, so its timed laps still land close, but its in/s figures are not true speeds.
 
