@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # Read A0 values from the sensor Arduino for N seconds and summarise.
 import os, sys, time, termios, statistics
-port = "/dev/cu.usbmodem1101"
+import glob
+port = os.environ.get("SENSOR_PORT") or (glob.glob("/dev/cu.usbmodem*") or ["/dev/cu.usbmodem1101"])[0]
 secs = float(sys.argv[1]) if len(sys.argv) > 1 else 3
 fd = os.open(port, os.O_RDONLY | os.O_NOCTTY | os.O_NONBLOCK)
 a = termios.tcgetattr(fd)

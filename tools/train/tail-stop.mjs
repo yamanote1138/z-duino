@@ -9,12 +9,12 @@
 
 import { spawnSync } from "node:child_process";
 import { createReadStream } from "node:fs";
+import { LEVELS } from "./lib/levels.mjs";
 
-const HOST = process.env.TRAIN_HOST || "ztrain.local";
-const PORT = process.env.SENSOR_PORT || "/dev/cu.usbmodem1101";
+import { HOST, PORT } from "./lib/config.mjs";
 const CREEP = 0.10;
-const BLOCKED_MAX = 500;   // the loco must be sitting in the beam at the start
-const CLEAR_MIN = 800;     // two readings above this = the tail has cleared
+const BLOCKED_MAX = LEVELS.parkedMax;   // the loco must be sitting in the beam at the start
+const CLEAR_MIN = LEVELS.trip;     // two readings above this = the tail has cleared
 const MAX_MS = 8000, STALE_MS = 400, AFTER_MS = 1200;
 
 const dry = process.argv.includes("--dry");

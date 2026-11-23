@@ -10,12 +10,12 @@
 
 import { spawnSync } from "node:child_process";
 import { createReadStream, writeFileSync } from "node:fs";
+import { LEVELS } from "./lib/levels.mjs";
 
-const HOST = process.env.TRAIN_HOST || "ztrain.local";
-const PORT = process.env.SENSOR_PORT || "/dev/cu.usbmodem1101";
+import { HOST, PORT } from "./lib/config.mjs";
 
 const CREEP = 0.1;
-const LEVEL = 760;           // below this is a wall; windows stay above it
+const LEVEL = LEVELS.wall;           // below this is a wall; windows stay above it
 const CLEAN_HOLD_MS = 1000;  // clean stretch (since the last real dip) needed before a wall counts
 const TRIP_SAMPLES = 2;      // consecutive samples below LEVEL
 const ARM_MS = 3200;         // ignore the first stretch of each leg (the joins)

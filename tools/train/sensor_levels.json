@@ -1,0 +1,5 @@
+{
+  "clear": 340,
+  "blocked": 73,
+  "note": "IR pair, 22 kOhm receiver resistor. 2026-11-23 after the beam was nudged: clear 340, blocked 73 (was 30). Clear read 187 for a while on 2026-11-20 with nothing in the way; if it does that again, re-measure. Re-measure after moving the sensor."
+}

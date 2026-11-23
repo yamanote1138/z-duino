@@ -7,6 +7,7 @@
 // Moving forward a fall is the nose and a rise is the tail; reversing, the other way round.
 
 import { EventEmitter } from "node:events";
+import { LEVELS } from "./levels.mjs";
 
 const median = (a) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
 
@@ -14,10 +15,10 @@ export class BeamTracker extends EventEmitter {
   constructor(opts = {}) {
     super();
     this.holdMs = opts.holdMs ?? 600;            // flat time that counts as a clear beam
-    this.plateauMin = opts.plateauMin ?? 960;
-    this.plateauSpread = opts.plateauSpread ?? 6;
-    this.fallDrop = opts.fallDrop ?? 45;         // a fall starts this far below the clear level
-    this.fallConfirm = opts.fallConfirm ?? 800;  // and is confirmed by a reading below this
+    this.plateauMin = opts.plateauMin ?? LEVELS.plateauMin;
+    this.plateauSpread = opts.plateauSpread ?? LEVELS.plateauSpread;
+    this.fallDrop = opts.fallDrop ?? LEVELS.noseDrop;         // a fall starts this far below the clear level
+    this.fallConfirm = opts.fallConfirm ?? LEVELS.trip;  // and is confirmed by a reading below this
     this.upThreshold = opts.upThreshold ?? null; // rise level; null = clear level - 5
     this.rearmSamples = opts.rearmSamples ?? 10; // flat samples needed to re-arm after a rise
     this.samples = [];
@@ -30,6 +31,10 @@ export class BeamTracker extends EventEmitter {
     this._relapse = 0;
     this._pass = null;
   }
+
+  // Start with the loco already sitting in the beam: assume the given clear level, wait for the tail to leave.
+  // No pass is reported for that first partial crossing.
+  primeBlocked(clearLevel) { this.clearLevel = clearLevel; this.state = "blocked"; this._fallIdx = -1; this._upCount = 0; }
 
   get upLevel() { return this.upThreshold ?? this.clearLevel - 5; }
 
@@ -76,7 +81,7 @@ export class BeamTracker extends EventEmitter {
         if (this._upCount === 2 && i - 1 - this._fallIdx >= 3) {
           const riseIdx = i - 1;
           this.state = "rising"; this._rearm = 0; this._relapse = 0;
-          this._pass = { fallIdx: this._fallIdx, riseIdx };
+          this._pass = this._fallIdx >= 0 ? { fallIdx: this._fallIdx, riseIdx } : null;
           this.emit("rise", { idx: riseIdx, t: S[riseIdx].t, h: S[riseIdx].h });
         }
       } else this._upCount = 0;

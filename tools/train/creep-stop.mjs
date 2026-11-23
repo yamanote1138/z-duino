@@ -1,22 +1,23 @@
 #!/usr/bin/env node
 // Creep forward at 10% and stop the train when the beam sensor trips.
 //
-// Usage: node creep-stop.mjs [--dry]
+// Usage: node creep-stop.mjs [--dry] [--max=<seconds>]
 // Env:   TRAIN_HOST (board IP), SENSOR_PORT (default /dev/cu.usbmodem1101)
 //
 // The sensor Arduino prints one A0 reading per line (about 50 per second).
-// Clear beam reads about 988, a blocked beam drops below 650.
+// Thresholds are scaled from sensor_levels.json (lib/levels.mjs): clear ~344, blocked ~30 on the IR pair.
 
 import { spawnSync } from "node:child_process";
 import { createReadStream } from "node:fs";
+import { LEVELS } from "./lib/levels.mjs";
 
-const HOST = process.env.TRAIN_HOST || "ztrain.local";
-const PORT = process.env.SENSOR_PORT || "/dev/cu.usbmodem1101";
+import { HOST, PORT } from "./lib/config.mjs";
 const CREEP = 0.1;          // creep speed
-const TRIP = 800;           // stop when readings fall below this
+const TRIP = LEVELS.trip;   // stop when readings fall below this
 const TRIP_SAMPLES = 2;     // consecutive samples below TRIP
-const CLEAR_MIN = 900;      // beam must read at least this before we start
-const MAX_CREEP_MS = 8000;  // give up and stop after this long
+const CLEAR_MIN = LEVELS.clearMin;  // beam must read at least this before we start
+const maxArg = process.argv.find((x) => x.startsWith("--max="));
+const MAX_CREEP_MS = maxArg ? Number(maxArg.split("=")[1]) * 1000 : 8000;  // give up and stop after this long (--max=<seconds>; a full lap at creep is about 56 s)
 const STALE_MS = 400;       // stop if the sensor goes quiet while moving
 const AFTER_MS = 1500;      // keep recording after the stop
 

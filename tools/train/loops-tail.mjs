@@ -11,21 +11,21 @@
 
 import { spawnSync } from "node:child_process";
 import { createReadStream, writeFileSync } from "node:fs";
+import { LEVELS } from "./lib/levels.mjs";
 
-const HOST = process.env.TRAIN_HOST || "ztrain.local";
-const PORT = process.env.SENSOR_PORT || "/dev/cu.usbmodem1101";
+import { HOST, PORT } from "./lib/config.mjs";
 
 const CRUISE = 0.4, CREEP = 0.1;
 const CRUISE_AFTER_NOSE_MS = 13300;  // cruise this long after the lap-1 nose pass, then ramp down
 const LAP1_TIMEOUT_MS = 22000;       // abort if the nose never comes round
 const NOSE_MAX_MS = 7000;            // after the ramp-down, give up if the nose never arrives
 const TAIL_MAX_MS = 9500;            // after the nose arrives, give up if no tail wall is found
-const CLEAR_HOLD_MS = 600, PLATEAU_MIN = 960, PLATEAU_SPREAD = 6, NOSE_DROP = 45;  // lap-1 detection
-const LEVEL = 760;                   // below this = wall (windows stay above it)
+const CLEAR_HOLD_MS = 600, PLATEAU_MIN = LEVELS.plateauMin, PLATEAU_SPREAD = LEVELS.plateauSpread, NOSE_DROP = LEVELS.noseDrop;  // lap-1 detection
+const LEVEL = LEVELS.wall;                   // below this = wall (windows stay above it)
 const TRIP_SAMPLES = 2;              // consecutive samples below LEVEL = a real dip
 const CLEAN_HOLD_MS = 1000;          // clean stretch needed before a wall counts
 const ARM_AFTER_NOSE_MS = 3200;      // ignore dips this soon after the nose (the joins)
-const LEAVE_DELTA = 40, STALE_MS = 400, AFTER_MS = 1500;
+const LEAVE_DELTA = LEVELS.leaveDelta, STALE_MS = 400, AFTER_MS = 1500;
 const RAMP_INTERVAL = 100, RAMP_TIME_PER_SEGMENT = 1000;
 
 const dry = process.argv.includes("--dry");
@@ -67,6 +67,17 @@ async function connect() {
 }
 const median = (a) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
 
+// The final-approach check asks one thing: is the beam open? Every one of the last 30 readings must sit above the midpoint
+// between blocked and the clear level this run measured, so it holds if the clear level has moved since the last calibration.
+// It does not ask for a flat line: the clear reading wobbles by a few percent while the train runs (338 to 352 seen), which aborted a show.
+const lastFlat = (clear, n = 30) => {
+  const w = samples.slice(-n).map((x) => x.v);
+  if (w.length < 20) return { ok: false, why: `only ${w.length} readings` };
+  const lo = Math.min(...w), hi = Math.max(...w);
+  const need = Math.round(LEVELS.blocked + 0.5 * ((clear || LEVELS.clear) - LEVELS.blocked));   // halfway between blocked and the clear level this run measured
+  return { ok: lo >= need, why: `last ${w.length} readings ${lo} to ${hi} (need all >= ${need}, halfway between blocked and the measured clear level)` };
+};
+
 async function main() {
   await sleep(1500);
   const recent = samples.slice(-20).map((s) => s.v);
@@ -75,6 +86,7 @@ async function main() {
   const spread = Math.max(...recent) - Math.min(...recent);
   console.log(`parked reading ${parked} (spread ${spread})`);
   if (spread > 80) throw new Error("sensor reading is not steady; not moving");
+  if (parked >= LEVELS.plateauMin && !process.argv.includes("--dry")) throw new Error(`the nose is not in the beam (reading ${parked}): park the train on the mark first (node creep-stop.mjs)`);
   if (dry) { console.log("dry run: sensor fine, train not moved"); return; }
 
   const { send, close } = await connect();
@@ -175,7 +187,7 @@ async function main() {
 
     await sleep(Math.max(0, events.nose + CRUISE_AFTER_NOSE_MS - Date.now()));
     if (stopped) return;
-    if (!plateau(samples.slice(-30))) { log("beam is not clear before the final approach; stopping"); await ramp(CRUISE, 0); stop(); return; }
+    const fl = lastFlat(clearLevel); if (!fl.ok) { log("beam is not clear before the final approach; stopping (" + fl.why + ")"); await ramp(CRUISE, 0); stop(); return; }
 
     log("loop 2: ramp down to creep, nose and tail detection armed");
     finalArmed = true;

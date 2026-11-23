@@ -10,7 +10,7 @@
 // Position is open-loop (no sensors), so the train should start on the park mark.
 // Observed scatter is about +/-2.5" on one lap and +/-1.5" on two laps.
 
-const HOST = process.env.TRAIN_HOST || "ztrain.local";
+import { HOST } from "./lib/config.mjs";
 
 // ---- Calibration (measured on the 6ft x 1ft Rokuhan Z oval) ----
 const LOOP_IN = 158.5;       // loop length in inches

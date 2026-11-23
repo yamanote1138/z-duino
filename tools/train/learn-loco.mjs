@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Learn a locomotive with no help: find it, measure its length and speed, and learn how it stops.
 //
-// Usage: node learn-loco.mjs [--dry] [--resume] [--stages=find,length,speeds,stops]
+// Usage: node learn-loco.mjs [--dry] [--resume] [--in-beam] [--stages=find,length,speeds,stops]
+//   --in-beam  the loco starts with its nose already in the beam (clear level taken from sensor_levels.json)
 // Env:   TRAIN_HOST (board IP), SENSOR_PORT (default /dev/cu.usbmodem1101)
 //
 // Start with the loco on the track, facing forward, on the house side of the beam (or anywhere
@@ -18,9 +19,9 @@
 import { spawnSync } from "node:child_process";
 import { createReadStream, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { BeamTracker } from "./lib/beam.mjs";
+import { LEVELS } from "./lib/levels.mjs";
 
-const HOST = process.env.TRAIN_HOST || "ztrain.local";
-const PORT = process.env.SENSOR_PORT || "/dev/cu.usbmodem1101";
+import { HOST, PORT } from "./lib/config.mjs";
 
 const LOOP_IN = 134;            // measured earlier from the lap period and the old train's length
 const SAFE_MAX_IN_S = 9.0;      // never aim above this (the old train ran 8.6 in/s without trouble)
@@ -34,6 +35,7 @@ const MAX_RUN_MS = 25 * 60 * 1000;
 const args = process.argv.slice(2);
 const dry = args.includes("--dry");
 const resume = args.includes("--resume");
+const inBeam = args.includes("--in-beam");
 const stagesArg = (args.find((a) => a.startsWith("--stages=")) || "").slice(9);
 const want = (s) => !stagesArg || stagesArg.split(",").includes(s);
 
@@ -45,6 +47,7 @@ class Abort extends Error {}
 // ---- sensor ----
 spawnSync("stty", ["-f", PORT, "115200", "raw", "-echo", "-hupcl"]);
 const tracker = new BeamTracker();
+if (inBeam) tracker.primeBlocked(LEVELS.clear);
 let partial = "", started = false, sensorClock = 0, prevUs = null, lastSampleH = Date.now();
 const rs = createReadStream(PORT);
 rs.on("data", (buf) => {
@@ -89,18 +92,18 @@ async function connect() {
 }
 
 const profile = resume && existsSync("loco_profile.json") ? JSON.parse(readFileSync("loco_profile.json", "utf8")) : {};
-const save = () => writeFileSync("loco_profile.json", JSON.stringify(profile, null, 1));
+const save = () => { profile.clearLevel = tracker.clearLevel; writeFileSync("loco_profile.json", JSON.stringify(profile, null, 1)); };
 
 async function main() {
   // ---- beam check ----
   const ready = tracker.state !== "init" || (await waitFor("ready", 4000));
   if (!ready) throw new Abort("the beam is not reading clear and steady (is the loco sitting in it?)");
   profile.clearLevel = tracker.clearLevel;
-  log(`beam clear at ${tracker.clearLevel}`);
+  log(inBeam ? `starting in the beam; assuming clear at ${tracker.clearLevel}` : `beam clear at ${tracker.clearLevel}`);
   if (dry) { log("dry run: sensor fine, loco not moved"); return; }
 
   const { send, close } = await connect();
-  let cur = 0, forward = true, finished = false;
+  let cur = 0, forward = null, finished = false;  // null: always send the direction at the start
   const emergency = () => { cur = 0; try { send({ cmd: "stop" }); } catch {} };
   const halt = () => { cur = 0; send({ cmd: "speed", value: 0 }); };
   const setSpeed = (v) => { cur = v; send({ cmd: "speed", value: v }); };
@@ -170,14 +173,14 @@ async function main() {
         if (!pass && cur < 0.30 && Date.now() - lastBump > 5000) { setSpeed(+(cur + 0.02).toFixed(2)); lastBump = Date.now(); log(`slow in the beam; throttle up to ${Math.round(cur * 100)}%`); }
       }
       if (!pass) throw new Abort("the tail never cleared the beam");
-      const solid = pass.maxInside < 700;
-      tracker.upThreshold = solid ? 800 : null;
+      const solid = pass.maxInside < LEVELS.solidMax;
+      tracker.upThreshold = solid ? LEVELS.trip : null;
       profile.signature = { solid, minLevel: pass.minLevel, maxInside: pass.maxInside, meanInside: +pass.meanInside.toFixed(0),
                             passS: +(pass.dt / 1000).toFixed(3), atThrottle: cur, startUpThrottleUpperBound: thrAtFall };
       log(`pass at ${Math.round(cur * 100)}%: ${(pass.dt / 1000).toFixed(2)} s nose to tail; beam inside ${pass.minLevel} to ${pass.maxInside} (${solid ? "solid, no windows" : "has gaps or windows"})`);
       save();
     }
-    if (profile.signature) tracker.upThreshold = profile.signature.solid ? 800 : null;
+    if (profile.signature) tracker.upThreshold = profile.signature.solid ? LEVELS.trip : null;
 
     // ================= stage 2: length =================
     if (want("length")) {
