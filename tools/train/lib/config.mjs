@@ -4,12 +4,7 @@
 //   SENSOR_PORT  env, else the only /dev/cu.usbmodem* present (the controller is a usbserial device, so it is never matched)
 
 import { readdirSync } from "node:fs";
-import { lookup } from "node:dns/promises";
-
-async function findHost() {
-  if (process.env.TRAIN_HOST) return process.env.TRAIN_HOST;
-  try { return (await lookup("ztrain.local", { family: 4 })).address; } catch { return "ztrain.local"; }
-}
+import { findHost } from "./controller/host.mjs";
 
 function findPort() {
   if (process.env.SENSOR_PORT) return process.env.SENSOR_PORT;

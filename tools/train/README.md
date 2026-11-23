@@ -104,6 +104,18 @@ The scripts above predate a cleaner split into reusable modules. Two exist so fa
 - The playback engine is swappable: `afplay` is one implementation of `play(path, { volume, seconds, rate }) -> { done, stop }`. Pass `engine: "null"`, `"afplay"` or your own object, or `registerEngine(name, factory)`.
 - `node sound-test.mjs list | play | fill | loop | check` to audition and verify (`--engine=null` is silent).
 
+### Controller (`lib/controller`)
+
+The WebSocket link to the train as a module: connect, keepalive, ramps, and the safety rules in code rather than in each
+script. `node creep-stop.mjs` is the smallest example.
+
+- `connectController()` finds the host (`TRAIN_HOST`, else `ztrain.local`), pings every 5 s and emits `status` and `disconnect`.
+- `rampTo(v)` / `halt()` ramp at 1 s per 0.1 of throttle. `setSpeed()` to zero, or `setDirection()`, throws a `MotorCareError`
+  while the throttle is above creep (0.10): no abrupt stops or reversals at speed. `turnAround()` does it properly.
+- `guardedMove({ forward, speed, until, maxMs })` is the only way to move without a ramp: it needs a guard (a beam event),
+  a time limit and a creep speed, and refuses otherwise. It stops quietly (speed 0) when the guard fires, times out or the link drops.
+- `emergencyStop()` sends `stop` at once and is never refused.
+
 ## Show settings
 
 Every number, distance and clip name in `signal-show.mjs` (pauses, creep-out time, curve positions, sound gains, which clip plays at which moment) lives in `lib/show-config.mjs`. Change them without editing the script:
