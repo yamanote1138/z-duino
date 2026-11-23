@@ -24,3 +24,6 @@ Thumbs.db
 
 # Build artifacts
 *.d.ts
+
+# Generated sound effects
+tools/train/sounds/
