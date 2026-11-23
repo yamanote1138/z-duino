@@ -81,6 +81,19 @@ The scripts are deliberately standalone, so the sensor and connection helpers re
 
 The flange squeals are placed by time from the speed model, not by the beam. The curve distances (a short bend at 5.5 to 12" that diverts the track around a dock, then tight curves at 37 to 57" and 104 to 124" from the sensor) are estimates from a description of the track; override with `--curves=5.5-12,37-57,104-124`.
 
+## Show settings
+
+Every number, distance and clip name in `signal-show.mjs` (pauses, creep-out time, curve positions, sound gains, which clip plays at which moment) lives in `lib/show-config.mjs`. Change them without editing the script:
+
+```bash
+node lib/show-config.mjs                              # print every setting and its default (no hardware)
+node signal-show.mjs --loco --sound --creep-out=5     # short aliases: --volume --creep --cruise --creep-out --curves
+node signal-show.mjs --loco --sound --soundSet.gain.hum=0.3 --hold.redStartMs=6000   # dotted keys reach any setting
+node signal-show.mjs --loco --sound --config=my_show.json   # a JSON file of overrides, deep-merged over the defaults
+```
+
+Unknown settings are rejected, so a typo cannot silently do nothing.
+
 ## Room light
 
 `light-test.mjs` measured the sensor under a desk lamp (an IKEA LED lamp, which gives off almost no 940 nm light): far away, near the track, and aimed straight at the receiver. Nothing moved: clear 340, blocked 29 to 30, noise sd under 2 counts, and a pass time that repeats to about 10 ms (about 0.03" of loco travel at creep). Incandescent bulbs and sunlight were not tested. The beam is steady (not modulated), so strong IR from those would add directly to the clear reading. The kit's 38 kHz receivers would ignore it, but need the emitter pulsed at 38 kHz.

@@ -6,6 +6,8 @@
 //   -> yellow while slowing/creeping on loop 2 -> red when parked (4 s) -> blue (ready)
 //
 // Usage: node signal-show.mjs [--dry] [--party] [--sound [--volume=0.5]] [--loco [--cruise=<in/s>] [--creep=<s>] [--allow-fast]]
+//   Any setting can be changed: --creep-out=3, --sound.gain.hum=0.4, --config=<file.json>, ... see lib/show-config.mjs
+//   (node lib/show-config.mjs prints every setting and its default.)
 //   --sound plays effects on this Mac (blower, brake release, horn, inverter sweep and whine, crossing bell, chime)
 //   --loco takes its speeds from loco_profile.json (learn-loco.mjs); default cruise 8.8 in/s, creep aim 4 s.
 // Env:   TRAIN_HOST (board IP), SENSOR_PORT (default /dev/cu.usbmodem1101)
@@ -21,44 +23,49 @@ import { LEVELS } from "./lib/levels.mjs";
 import { Sounds } from "./lib/sounds.mjs";
 
 import { HOST, PORT } from "./lib/config.mjs";
+import { loadShowConfig } from "./lib/show-config.mjs";
+
+// Every tunable number, distance and clip name is in lib/show-config.mjs; override with flags or --config=<file.json>.
+let CFG;
+try { CFG = loadShowConfig(process.argv.slice(2), (f) => readFileSync(f, "utf8")); } catch (e) { console.error("error:", e.message); process.exit(1); }
+const SND = CFG.soundSet, CLIPS = SND.clips, GAIN = SND.gain;
 
 const RED = [1000, 0, 0], GREEN = [0, 1000, 0], BLUE = [0, 0, 1000], YELLOW = [1000, 1000, 0];
 const PURPLE = [600, 0, 1000];
 const PARTY_COLORS = [RED, GREEN, BLUE, YELLOW, [0, 1000, 1000], [1000, 0, 1000], [1000, 1000, 1000]];
 const PARTY_FRAME_MS = 50, PARTY_BPM = 128;
-const HOLD_RED_START_MS = 3000, HOLD_YELLOW_START_MS = 1000, HOLD_RED_END_MS = 4000, HOLD_BLUE_END_MS = 1500;
+const HOLD_RED_START_MS = CFG.hold.redStartMs, HOLD_YELLOW_START_MS = CFG.hold.yellowStartMs, HOLD_RED_END_MS = CFG.hold.redEndMs, HOLD_BLUE_END_MS = CFG.hold.blueEndMs;
 
 let CRUISE = 0.4, CREEP = 0.1;
-const LOOP_IN_SHOW = 134;   // loop length in inches (from the lap period and the loco length)
-const LAP1_TIMEOUT_MS = 34000, CREEP_MAX_MS = 12000;
+const LOOP_IN_SHOW = CFG.loopIn;
+const LAP1_TIMEOUT_MS = CFG.lap1TimeoutMs, CREEP_MAX_MS = CFG.creepMaxMs;
 // Final approach is timed from the lap period measured between the loop-1 and loop-2 passes.
 // remaining distance at ramp-down start = ramp distance + creep time x creep speed;
 // ramp-down starts (T - remaining / cruise speed) after the loop-2 nose pass.
 let CRUISE_IN_S = 8.64, CREEP_IN_S = 1.96, RAMP_DIST_IN = 15.9, CREEP_TARGET_S = 6.0;
-const FALLBACK_AFTER_NOSE_MS = 12700;   // used only if the measured lap period looks wrong
+const FALLBACK_AFTER_NOSE_MS = CFG.fallbackAfterNoseMs;   // used only if the measured lap period looks wrong
 const CLEAR_HOLD_MS = 600, PLATEAU_MIN = LEVELS.plateauMin, PLATEAU_SPREAD = LEVELS.plateauSpread, NOSE_DROP = LEVELS.noseDrop;
 const TRIP = LEVELS.trip, TRIP_SAMPLES = 2, LEAVE_DELTA = LEVELS.leaveDelta, STALE_MS = 400, AFTER_MS = 1500;
 const RAMP_INTERVAL = 100, RAMP_TIME_PER_SEGMENT = 1000;
 
-const dry = process.argv.includes("--dry");
-const partyMode = process.argv.includes("--party");   // beat show on passes instead of solid purple
-const MIN_PASS_LED_MS = 500;    // keep a fast pass visible: hold the pass colour at least this long
-const MAX_IN_S = 9.0;           // derailment guard on the target cruise speed
+const dry = CFG.dry;
+const partyMode = CFG.party;   // beat show on passes instead of solid purple
+const MIN_PASS_LED_MS = CFG.minPassLedMs;    // keep a fast pass visible: hold the pass colour at least this long
+const MAX_IN_S = CFG.maxInS;           // derailment guard on the target cruise speed
 const ABRUPT_STOP_MAX_IN_S = 2.5;  // motor care: only cut the throttle to zero at or below this speed
-const arg = (name) => (process.argv.find((a) => a.startsWith(`--${name}=`)) || "").split("=")[1];
 let locoLenIn = null;
-if (process.argv.includes("--loco")) {
+if (CFG.loco) {
   // Single locomotive: speeds come from loco_profile.json (written by learn-loco.mjs).
   const prof = JSON.parse(readFileSync("loco_profile.json", "utf8"));
   const b = prof.fit.inPerSecPerUnitThrottle, a = prof.fit.offsetInS;
   const speedAt = (t) => a + b * t;
-  const target = Number(arg("cruise") || 8.8);
-  if (target > MAX_IN_S && !process.argv.includes("--allow-fast")) { console.error(`target ${target} in/s is above the ${MAX_IN_S} in/s limit (add --allow-fast to override)`); process.exit(1); }
+  const target = CFG.cruiseInS;
+  if (target > MAX_IN_S && !CFG.allowFast) { console.error(`target ${target} in/s is above the ${MAX_IN_S} in/s limit (add --allow-fast to override)`); process.exit(1); }
   CRUISE = Math.round(((target - a) / b) * 100) / 100;
   CREEP = 0.10;
   CRUISE_IN_S = speedAt(CRUISE); CREEP_IN_S = speedAt(CREEP);
   RAMP_DIST_IN = speedAt((CRUISE + CREEP) / 2) * Math.max(Math.round((CRUISE - CREEP) / 0.1), 1);
-  CREEP_TARGET_S = Number(arg("creep") || 4);
+  CREEP_TARGET_S = CFG.creepTargetS;
   locoLenIn = prof.lengthIn;
   console.log(`loco mode: cruise ${Math.round(CRUISE * 100)}% = ${CRUISE_IN_S.toFixed(2)} in/s (${(CRUISE_IN_S * 220 * 3600 / 63360).toFixed(0)} mph at 1:220), creep ${Math.round(CREEP * 100)}% = ${CREEP_IN_S.toFixed(2)} in/s, ramp distance ${RAMP_DIST_IN.toFixed(1)}"`);
 }
@@ -148,37 +155,37 @@ async function main() {
   const spread = Math.max(...recent) - Math.min(...recent);
   console.log(`parked reading ${parked} (spread ${spread})`);
   if (spread > 80) throw new Error("sensor reading is not steady; not moving");
-  if (parked >= LEVELS.plateauMin && !process.argv.includes("--dry")) throw new Error(`the nose is not in the beam (reading ${parked}): park the train on the mark first (node creep-stop.mjs)`);
+  if (parked >= LEVELS.plateauMin && !CFG.dry) throw new Error(`the nose is not in the beam (reading ${parked}): park the train on the mark first (node creep-stop.mjs)`);
   if (dry) { console.log("dry run: sensor fine, train not moved"); return; }
 
   // ---- sound (optional) ----
-  const soundOn = process.argv.includes("--sound");
-  const vol = Number(arg("volume") || 0.5);
+  const soundOn = CFG.sound;
+  const vol = SND.volume;
   const snd = new Sounds({ volume: vol, enabled: soundOn });
   // The sound set (real clips come from `python3 -I import-sounds.py`; check they are all there before anything moves).
-  if (soundOn) { snd.prepare(); snd.need(["horn", "horn_pass", "accel_e235", "run_siv", "decel_e235", "brake_departure", "brake_squeal", "brake_yurume", "flange_1", "flange_2", "flange_9", "flange_12"]); }
+  if (soundOn) { snd.prepare(); snd.need([CLIPS.horn, CLIPS.pass, CLIPS.accel, CLIPS.run, CLIPS.decel, CLIPS.brakeStart, CLIPS.brakeSqueal, CLIPS.brakeLoosen, ...CLIPS.flanges.map((f) => f[0])]); }
   const soundTimers = [];
   const later = (ms, fn) => soundTimers.push(setTimeout(fn, ms));
-  const CREEP_OUT_S = Number(arg("creep-out") || 3);   // seconds at creep speed on leaving, before climbing to cruise
+  const CREEP_OUT_S = CFG.creepOutS;   // seconds at creep speed on leaving, before climbing to cruise
   const rampDur = (a, b) => Math.max(Math.round(Math.abs(b - a) / 0.1) * RAMP_TIME_PER_SEGMENT, 200) / 1000;
   // How the start unfolds (speed in in/s): ramp 0 -> creep, hold creep, ramp creep -> cruise. Time, and distance covered.
   const startSeq = () => { const tA = rampDur(0, CREEP), tB = rampDur(CREEP, CRUISE);
     return { tA, tB, t: tA + CREEP_OUT_S + tB, d: 0.5 * CREEP_IN_S * tA + CREEP_IN_S * CREEP_OUT_S + 0.5 * (CREEP_IN_S + CRUISE_IN_S) * tB }; };
   // Flange squeals on the curves. Distances are inches along the lap from the sensor, in the direction of travel:
   // (a short bend around the dock at 5.5 to 12", then a long straight, tight curves at 37 to 57" and 104 to 124".)
-  // These come from a description of the track, not a measurement; override with --curves=5.5-12,37-57,104-124.
+  // These come from a description of the track, not a measurement; override with --curves=... (see lib/show-config.mjs).
   const curveTimers = [];
-  const CURVES_IN = (arg("curves") || "5.5-12,37-57,104-124").split(",").map((c) => c.split("-").map(Number));
+  const CURVES_IN = CFG.curves.split(",").map((c) => c.split("-").map(Number));
   // A different clip each time (never the same one twice running) at a slightly different volume. flange_9 is the clip
   // the user heard as "Flange 3" in the audition (flange_3, a 0.5 s blip, was used by mistake before).
-  const FLANGES = [["flange_1", 1130], ["flange_2", 1870], ["flange_9", 870], ["flange_12", 1290]];
+  const FLANGES = CLIPS.flanges;
   let lastFlange = -1;
   const nextFlange = () => { let k; do k = Math.floor(Math.random() * FLANGES.length); while (k === lastFlange); lastFlange = k; return FLANGES[k]; };
   const squealCurve = (startMs, durMs) => {
-    const endMs = durMs - 100;   // each clip is cut 0.1 s before the curve ends
+    const endMs = durMs - SND.flangeCutS * 1000;   // each clip is cut a little before the curve ends
     for (let t = 0; t < endMs - 150;) {
-      const [name, len] = nextFlange(), secs = Math.min(len / 1000, (endMs - t) / 1000), v = vol * 0.4 * (0.8 + 0.4 * Math.random());
-      curveTimers.push(setTimeout(() => snd.once(name, v, secs), startMs + t)); t += len - 100;
+      const [name, len] = nextFlange(), secs = Math.min(len / 1000, (endMs - t) / 1000), v = vol * GAIN.flange * (1 - SND.flangeVary + 2 * SND.flangeVary * Math.random());
+      curveTimers.push(setTimeout(() => snd.once(name, v, secs), startMs + t)); t += len - SND.flangeOverlapS * 1000;
     }
   };
   // Lap 1 starts from rest (ramp to creep, hold, ramp to cruise). When is the nose `pos` inches along? (10 ms steps)
@@ -246,7 +253,7 @@ async function main() {
       phase = "inpass"; noseT = noseFirstT; passNo++; noses.push(s.t);
       log(`end of loop ${passNo}: train passing the sensor at cruise: ${partyMode ? "PARTY" : "PURPLE"}`, s.t);
       if (partyMode) startParty(); else solid(PURPLE);
-      snd.once("horn_pass", vol * 1.0);
+      snd.once(CLIPS.pass, vol * GAIN.pass);
       passLedAt = Date.now(); lastBelowT = s.t;
       if (noseWaiter) { const w = noseWaiter; noseWaiter = null; w(true); }
     } else if (phase === "inpass" && (clear || (locoLenIn && recover >= 4))) {
@@ -284,19 +291,19 @@ async function main() {
     await sleep(300);
     log("signal RED: holding");
     solid(RED);
-    snd.loop("hum", vol * 0.6);
-    if (soundOn) { log("chime"); await Promise.all([waitExit(snd.once("chime")), sleep(HOLD_RED_START_MS)]); }   // before departure: the chime
+    snd.loop(CLIPS.idle, vol * GAIN.hum);
+    if (soundOn) { log("chime"); await Promise.all([waitExit(snd.once(CLIPS.chime)), sleep(HOLD_RED_START_MS)]); }   // before departure: the chime
     else await sleep(HOLD_RED_START_MS);
     log("signal YELLOW: about to move");
     solid(YELLOW);
-    if (soundOn) { log("brake release"); await Promise.all([waitExit(snd.once("brake_departure")), sleep(HOLD_YELLOW_START_MS)]); }   // yellow lasts until the release has finished
-    else { snd.once("air"); await sleep(HOLD_YELLOW_START_MS); }
+    if (soundOn) { log("brake release"); await Promise.all([waitExit(snd.once(CLIPS.brakeStart)), sleep(HOLD_YELLOW_START_MS)]); }   // yellow lasts until the release has finished
+    else { snd.once(CLIPS.air); await sleep(HOLD_YELLOW_START_MS); }
     t0 = Date.now();
     log(`signal GREEN: go! dispatching, ramp to ${Math.round(CRUISE * 100)}%`);
     solid(GREEN);
     dog = setInterval(() => { const l = samples[samples.length - 1]; if (!stopped && (!l || Date.now() - l.t > STALE_MS)) { console.error("sensor went quiet; stopping"); stop(); } }, 100);
-    snd.stopLoop(); snd.once("horn"); snd.once("accel_e235");
-    later(6800, () => snd.loop("run_siv", vol * 0.6));   // the running loop takes over as the start-up clip fades out
+    snd.stopLoop(); snd.once(CLIPS.horn); snd.once(CLIPS.accel);
+    later(SND.runStartMs, () => snd.loop(CLIPS.run, vol * GAIN.run));   // the running loop takes over as the start-up clip fades out
     if (soundOn) for (const [a, b] of CURVES_IN) squealCurve(lap1TimeAt(a) * 1000, (lap1TimeAt(b) - lap1TimeAt(a)) * 1000);
     await ramp(0, CREEP);                       // creep out of the house ...
     await sleep(CREEP_OUT_S * 1000);
@@ -327,21 +334,21 @@ async function main() {
     log("loop 2: slowing: YELLOW");
     solid(YELLOW);
     finalArmed = true;
-    soundTimers.forEach(clearTimeout); snd.stopLoop(); snd.once("decel_e235");
+    soundTimers.forEach(clearTimeout); snd.stopLoop(); snd.once(CLIPS.decel);
     await ramp(CRUISE, CREEP);
-    later(4800, () => snd.loop("run_siv", vol * 0.4));   // quiet running sound once the slow-down clip has finished
-    if (!stopped) { log("creeping at 10%: yellow"); snd.once("brake_squeal", vol * 0.7); }
+    later(SND.runCreepMs, () => snd.loop(CLIPS.run, vol * GAIN.runCreep));   // quiet running sound once the slow-down clip has finished
+    if (!stopped) { log("creeping at 10%: yellow"); snd.once(CLIPS.brakeSqueal, vol * GAIN.brakeSqueal); }
     const outcome = await Promise.race([tripPromise.then(() => "tripped"), sleep(CREEP_MAX_MS).then(() => "no trip")]);
     if (outcome !== "tripped") { stop(); log("no nose trip while creeping; stopped"); return; }
 
     log(`parked: nose broke the beam (reading ${tripV}). Signal RED`, tripAt);
     solid(RED);
-    soundTimers.forEach(clearTimeout); snd.stopLoop(); snd.once("air"); snd.once("brake_yurume", vol * 0.8);
+    soundTimers.forEach(clearTimeout); snd.stopLoop(); snd.once(CLIPS.air); snd.once(CLIPS.brakeLoosen, vol * GAIN.brakeLoosen);
     await sleep(HOLD_RED_END_MS);
     log("ready for the next job: BLUE");
     solid(BLUE);
-    snd.once("chime");
-    await sleep(soundOn ? 2200 : HOLD_BLUE_END_MS);
+    snd.once(CLIPS.chime);
+    await sleep(soundOn ? CFG.hold.blueEndSoundMs : HOLD_BLUE_END_MS);
     console.log(`          final reading ${samples[samples.length - 1].v}`);
     finishedOk = true;
   } finally {
