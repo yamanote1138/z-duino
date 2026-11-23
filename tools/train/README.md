@@ -155,6 +155,21 @@ step is at the top of `lib/show/schema.mjs`; the validator names the path of eve
 - `sim` uses the real runtime, controller and sound-library checks; only the sensor (a ghost that answers after a fixed
   delay), the WebSocket and the audio are faked, so it checks order and commands, not your layout's timing.
 
+## The web page
+
+`node serve.mjs --open` starts a page on `http://127.0.0.1:4040/` (this Mac only; no dependencies, nothing to build):
+
+- **Shows**: your shows (`local/shows/`) and the examples. Pick one, change its settings, then Validate, Simulate (the
+  timeline on a virtual clock; nothing moves or plays) or Run it on the train, with the log live beside it. Export a show as
+  JSON, or import one (it is validated first and saved to `local/shows/`). `#local/<name>` in the address opens a show.
+- **Sounds**: every sound in the packs, with gain and cut-off controls, to audition before putting one in a show.
+- **STOP** ramps the loco down like Ctrl-C; **E-STOP** sends the controller's stop command at once. Both are always on screen.
+- One show at a time. A run needs the sensor working and, for `start: blocked`, the nose on the mark; sounds are off limits
+  while a show runs. The service holds the sensor's serial port, so stop it before `calibrate.mjs` or `measure-zones.mjs`.
+- `--no-sensor` runs the page without hardware (validate, simulate, import/export and sounds still work); `--port=`, `--volume=`.
+- It only answers `127.0.0.1`/`localhost` and only JSON posts, so a web page open in your browser cannot start the train.
+  The API (`lib/web/server.mjs`) is plain JSON plus an event stream; it is tested against the simulator (`test/web.test.mjs`).
+
 ## Show settings
 
 Every number, distance and clip name in `signal-show.mjs` (pauses, creep-out time, curve positions, sound gains, which clip plays at which moment) lives in `lib/show-config.mjs`. Change them without editing the script:

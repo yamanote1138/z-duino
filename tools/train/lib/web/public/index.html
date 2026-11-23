@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Train control</title>
+<style>
+  :root {
+    --bg: #f4f1ea; --panel: #fffdf8; --ink: #23201b; --muted: #6c655a; --line: #d9d2c3;
+    --red: #c4342d; --amber: #c98a0a; --green: #2c8a4a; --blue: #2d62a8; --accent: #2d62a8;
+    --code-bg: #efe9dc; --shadow: 0 1px 2px rgba(0,0,0,.08);
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #15171a; --panel: #1e2125; --ink: #e8e4dc; --muted: #9a958a; --line: #343840;
+    --red: #e5534b; --amber: #e0a526; --green: #4cb36d; --blue: #6aa0e8; --accent: #6aa0e8;
+    --code-bg: #101215; --shadow: none; color-scheme: dark; } }
+  :root[data-theme="dark"] {
+    --bg: #15171a; --panel: #1e2125; --ink: #e8e4dc; --muted: #9a958a; --line: #343840;
+    --red: #e5534b; --amber: #e0a526; --green: #4cb36d; --blue: #6aa0e8; --accent: #6aa0e8;
+    --code-bg: #101215; --shadow: none; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--line); box-shadow: var(--shadow); }
+  .bar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; padding: 10px max(16px, env(safe-area-inset-left)); max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 17px; margin: 0; letter-spacing: .02em; }
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; min-width: 0; }
+  .pill { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px; font-size: 13px; background: var(--bg); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none; }
+  .dot.red { background: var(--red); } .dot.green { background: var(--green); } .dot.amber { background: var(--amber); } .dot.blue { background: var(--blue); }
+  .stops { display: flex; gap: 8px; }
+  button, .btn { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 8px; padding: 7px 14px; cursor: pointer; text-decoration: none; display: inline-block; }
+  button:hover:not(:disabled), .btn:hover { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: var(--green); border-color: var(--green); color: #fff; font-weight: 600; }
+  button.stop { background: var(--amber); border-color: var(--amber); color: #1c1500; font-weight: 700; }
+  button.estop { background: var(--red); border-color: var(--red); color: #fff; font-weight: 700; }
+  nav { display: flex; gap: 4px; max-width: 1200px; margin: 0 auto; padding: 0 max(16px, env(safe-area-inset-left)); }
+  nav button { border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 8px 14px; }
+  nav button[aria-selected="true"] { border-bottom-color: var(--accent); font-weight: 600; }
+  main { max-width: 1200px; margin: 0 auto; padding: 16px max(16px, env(safe-area-inset-left)) 40px; }
+  .cols { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; box-shadow: var(--shadow); min-width: 0; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; }
+  h3 { font-size: 18px; margin: 0 0 4px; }
+  .list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .item { text-align: left; width: 100%; display: block; }
+  .item[aria-current="true"] { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+  .item small { display: block; color: var(--muted); }
+  .muted { color: var(--muted); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+  label.set { display: inline-flex; gap: 6px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; background: var(--bg); }
+  input[type=number], input[type=text] { font: inherit; width: 6.5em; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); }
+  pre, .log { background: var(--code-bg); border-radius: 8px; padding: 10px 12px; margin: 8px 0; font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; overflow: auto; max-height: 340px; white-space: pre-wrap; word-break: break-word; }
+  .log { min-height: 90px; }
+  .log .t { color: var(--muted); display: inline-block; min-width: 6.5em; }
+  .log .bad { color: var(--red); } .log .good { color: var(--green); }
+  .msg { padding: 8px 12px; border-radius: 8px; margin: 8px 0; border: 1px solid var(--line); }
+  .msg.bad { border-color: var(--red); } .msg.warn { border-color: var(--amber); } .msg.good { border-color: var(--green); }
+  .msg ul { margin: 4px 0 0 18px; padding: 0; }
+  .need { font-size: 13px; }
+  .sounds { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+  .snd { display: flex; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--panel); min-width: 0; }
+  .snd .info { flex: 1; min-width: 0; } .snd .info b { word-break: break-all; } .snd .info small { display: block; color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  details summary { cursor: pointer; color: var(--muted); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <h1>Train control</h1>
+    <div class="pills">
+      <span class="pill" id="p-sensor"><span class="dot"></span><span>sensor …</span></span>
+      <span class="pill" id="p-run"><span class="dot"></span><span>idle</span></span>
+      <span class="pill" id="p-link"><span class="dot"></span><span>connecting …</span></span>
+    </div>
+    <div class="stops">
+      <button class="stop" id="stop" title="Stop the show: the loco ramps down like Ctrl-C">STOP</button>
+      <button class="estop" id="estop" title="Send the controller's stop command now">E-STOP</button>
+    </div>
+  </div>
+  <nav role="tablist">
+    <button role="tab" id="tab-shows" aria-selected="true">Shows</button>
+    <button role="tab" id="tab-sounds" aria-selected="false">Sounds</button>
+  </nav>
+</header>
+
+<main>
+  <section id="shows">
+    <div class="cols">
+      <div>
+        <div class="card">
+          <h2>Yours</h2><div class="list" id="list-local"></div>
+          <h2>Examples</h2><div class="list" id="list-examples"></div>
+          <div class="row">
+            <label class="btn" for="import-file">Import a show…</label>
+            <input type="file" id="import-file" accept="application/json,.json" hidden>
+          </div>
+          <div id="import-msg"></div>
+        </div>
+      </div>
+      <div>
+        <div class="card" id="detail"><span class="muted">Pick a show.</span></div>
+        <div class="card" style="margin-top:16px">
+          <h2>Log</h2>
+          <div class="log" id="log" aria-live="polite"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="sounds" hidden>
+    <div class="card">
+      <div class="row">
+        <label class="set">gain <input type="range" id="gain" min="0" max="1.5" step="0.05" value="1"> <span id="gain-v">1.0</span></label>
+        <label class="set">cut after <input type="number" id="secs" min="0" step="0.5" placeholder="whole"> s</label>
+        <button id="snd-stop">Stop all sounds</button>
+        <span class="muted need" id="snd-note"></span>
+      </div>
+      <div class="chips" id="chips"></div>
+      <div class="sounds" id="sound-grid"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const $ = (s, el = document) => el.querySelector(s);
+const h = (tag, props = {}, ...kids) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === "class") e.className = v; else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else if (v === true) e.setAttribute(k, ""); else if (v !== false && v != null) e.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) if (kid != null) e.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  return e;
+};
+async function api(method, path, body) {
+  try {
+    const r = await fetch(path, { method, headers: body !== undefined ? { "content-type": "application/json" } : {}, body: body !== undefined ? JSON.stringify(body) : undefined });
+    const text = await r.text(); let data; try { data = JSON.parse(text); } catch { data = text; }
+    return { ok: r.ok, status: r.status, data };
+  } catch (e) { return { ok: false, status: 0, data: { error: `cannot reach the service: ${e.message}` } }; }
+}
+const secs = (ms) => (ms / 1000).toFixed(2).padStart(7) + " s";
+
+let status = null, shows = [], selected = null, detail = null, sounds = null, chip = null;
+
+// ---------- status ----------
+function setPill(id, color, text) { const p = $(id); p.querySelector(".dot").className = "dot " + color; p.querySelector("span:last-child").textContent = text; }
+function renderStatus(st) {
+  status = st;
+  const s = st.sensor;
+  if (!s) setPill("#p-sensor", "", "no sensor");
+  else if (s.state === "lost") setPill("#p-sensor", "red", "sensor lost");
+  else setPill("#p-sensor", s.state === "blocked" ? "amber" : "green", `beam ${s.state}${s.reading != null ? ` (${s.reading})` : ""}`);
+  if (st.run) {
+    const c = st.controller;
+    setPill("#p-run", "blue", `${st.run.state}: ${st.run.name}${c && c.connected ? ` · speed ${c.speed.toFixed(2)} ${c.forward ? "▶" : "◀"}` : ""}`);
+  } else setPill("#p-run", "", st.lastRun ? `idle · last: ${st.lastRun.ok ? "finished" : "stopped"}` : "idle");
+  $("#stop").disabled = !st.run;
+  updateButtons();
+  $("#snd-note").textContent = st.run ? "sounds are off while a show runs" : "";
+}
+function updateButtons() {
+  const run = $("#run"); if (!run || !detail) return;
+  const st = status, s = st && st.sensor, need = detail.show.start || "any";
+  let why = "";
+  if (!st) why = "waiting for the service";
+  else if (st.run) why = "a show is running";
+  else if (!s) why = "no sensor: shows can be simulated, not run";
+  else if (s.state === "lost") why = "the sensor stopped reporting";
+  else if (need !== "any" && s.state !== need) why = `the beam must be ${need} (it is ${s.state}): put the loco on the mark first`;
+  else if (detail.errors.length) why = "fix the validation problems first";
+  run.disabled = !!why;
+  $("#need").textContent = why || (need === "blocked" ? "✓ nose is on the mark" : "ready");
+  $("#need").style.color = why ? "var(--amber)" : "var(--green)";
+}
+
+// ---------- log ----------
+const logEl = $("#log");
+function logLine(text, cls = "", t = null) { logEl.append(h("div", { class: cls }, h("span", { class: "t" }, t == null ? "" : secs(t)), " ", text)); logEl.scrollTop = logEl.scrollHeight; }
+function logClear() { logEl.textContent = ""; }
+
+// ---------- shows ----------
+async function loadShows() {
+  const r = await api("GET", "/api/shows"); if (!r.ok) { logLine(r.data.error, "bad"); return; }
+  shows = r.data.shows;
+  for (const where of ["local", "examples"]) {
+    const box = $("#list-" + where); box.textContent = "";
+    const mine = shows.filter((s) => s.where === where);
+    if (!mine.length) box.append(h("span", { class: "muted" }, where === "local" ? "none yet: import one, or copy an example into local/shows/" : "none"));
+    for (const s of mine) box.append(h("button", { class: "item", "aria-current": s.id === selected ? "true" : null, onclick: () => select(s.id) }, s.title, h("small", {}, s.unreadable ? `unreadable: ${s.unreadable}` : `${s.id} · ${s.steps} steps${s.start === "blocked" ? " · starts on the mark" : ""}`)));
+  }
+}
+async function select(id) {
+  selected = id; history.replaceState(null, "", "#" + id); await loadShows();
+  const r = await api("GET", `/api/show?id=${encodeURIComponent(id)}`);
+  if (!r.ok) { $("#detail").textContent = r.data.error; detail = null; return; }
+  detail = r.data; renderDetail();
+}
+function settingsValues() {
+  const out = {}; for (const i of document.querySelectorAll("#detail input[data-set]")) { const v = Number(i.value); if (i.value !== "" && Number.isFinite(v)) out[i.dataset.set] = v; }
+  return out;
+}
+function problems(box, errors, warnings, okText) {
+  box.textContent = "";
+  if (errors && errors.length) box.append(h("div", { class: "msg bad" }, `${errors.length} problem${errors.length > 1 ? "s" : ""}`, h("ul", {}, errors.map((e) => h("li", {}, e)))));
+  else if (okText) box.append(h("div", { class: "msg good" }, okText));
+  if (warnings && warnings.length) box.append(h("div", { class: "msg warn" }, "warnings", h("ul", {}, warnings.map((e) => h("li", {}, e)))));
+}
+function renderDetail() {
+  const { id, show } = detail, box = $("#detail"); box.textContent = "";
+  const sets = Object.entries(show.settings || {});
+  box.append(
+    h("h3", {}, show.name || id), h("div", { class: "muted" }, show.description || ""),
+    h("div", { class: "row" }, sets.length ? sets.map(([k, v]) => h("label", { class: "set" }, k, h("input", { type: "number", step: "any", value: v, "data-set": k }))) : h("span", { class: "muted" }, "no settings")),
+    h("div", { class: "row" },
+      h("button", { onclick: doValidate }, "Validate"), h("button", { onclick: doSim }, "Simulate"),
+      h("button", { class: "primary", id: "run", onclick: doRun }, "Run on the train"),
+      h("a", { class: "btn", href: `/api/export?id=${encodeURIComponent(id)}`, download: `${id.split("/")[1]}.json` }, "Export"),
+      h("span", { class: "need", id: "need" })),
+    h("div", { id: "result" }),
+    h("details", {}, h("summary", {}, `Steps (${(show.steps || []).length}) — the show as JSON`), h("pre", {}, JSON.stringify(show, null, 2))));
+  problems($("#result"), detail.errors, detail.warnings, null);
+  updateButtons();
+}
+async function doValidate() {
+  const r = await api("POST", "/api/validate", { id: detail.id, settings: settingsValues() });
+  if (!r.ok) return problems($("#result"), [r.data.error]);
+  problems($("#result"), r.data.errors, r.data.warnings, "Valid: no problems");
+}
+async function doSim() {
+  const r = await api("POST", "/api/sim", { id: detail.id, settings: settingsValues() });
+  const box = $("#result");
+  if (!r.ok) return problems(box, r.data.errors || [r.data.error], r.data.warnings);
+  const d = r.data; box.textContent = "";
+  box.append(h("div", { class: `msg ${d.ok ? "good" : "bad"}` }, `${d.ok ? "Finished" : `FAILED: ${d.error}`} after ${(d.elapsedMs / 1000).toFixed(1)} simulated seconds · top throttle ${d.maxSpeed} · ${d.commands} controller commands · ${d.sounds} sound calls`));
+  box.append(h("div", { class: "log" }, d.log.map((e) => h("div", {}, h("span", { class: "t" }, secs(e.t)), " ", e.text))));
+  box.append(h("div", { class: "muted need" }, "Simulated with a ghost sensor: the order and the commands are real, the timing is not."));
+  if (d.warnings.length) { const w = h("div"); problems(w, [], d.warnings); box.append(w); }
+}
+async function doRun() {
+  logClear(); $("#result").textContent = "";
+  const r = await api("POST", "/api/run", { id: detail.id, settings: settingsValues() });
+  if (!r.ok) { if (r.data.errors) problems($("#result"), r.data.errors, r.data.warnings); logLine(r.data.error, "bad"); return; }
+  logLine(`started: ${r.data.run.name}`, "good");
+}
+
+// ---------- import ----------
+$("#import-file").addEventListener("change", async (ev) => {
+  const f = ev.target.files[0]; ev.target.value = ""; if (!f) return;
+  const box = $("#import-msg"); box.textContent = "";
+  let show; try { show = JSON.parse(await f.text()); } catch (e) { return box.append(h("div", { class: "msg bad" }, `${f.name} is not valid JSON`)); }
+  const name = f.name.replace(/\.json$/i, "");
+  const save = async (overwrite) => {
+    const r = await api("POST", "/api/show", { name, show, overwrite });
+    box.textContent = "";
+    if (r.ok) { box.append(h("div", { class: "msg good" }, `Saved as ${r.data.id}`)); await loadShows(); return select(r.data.id); }
+    if (r.status === 409 && r.data.exists) return box.append(h("div", { class: "msg warn" }, `${r.data.id} already exists. `, h("button", { onclick: () => save(true) }, "Replace it")));
+    problems(box, r.data.errors || [r.data.error]);
+  };
+  save(false);
+});
+
+// ---------- sounds ----------
+async function loadSounds() {
+  const r = await api("GET", "/api/sounds"); if (!r.ok) return $("#sound-grid").append(h("span", { class: "muted" }, r.data.error));
+  sounds = r.data; renderSounds();
+}
+function renderSounds() {
+  const chips = $("#chips"); chips.textContent = "";
+  chips.append(h("button", { class: "chip", "aria-pressed": String(chip === null), onclick: () => { chip = null; renderSounds(); } }, "all"));
+  for (const c of sounds.categories) chips.append(h("button", { class: "chip", "aria-pressed": String(chip === c), onclick: () => { chip = c; renderSounds(); } }, c));
+  const grid = $("#sound-grid"); grid.textContent = "";
+  for (const s of sounds.sounds.filter((x) => !chip || x.category === chip)) {
+    grid.append(h("div", { class: "snd" },
+      h("button", { title: "play", onclick: () => playSound(s.id) }, "▶"),
+      h("div", { class: "info" }, h("b", {}, s.id), h("small", {}, [s.durationMs ? `${(s.durationMs / 1000).toFixed(1)} s` : "", s.variants > 1 ? `${s.variants} variants` : "", s.description].filter(Boolean).join(" · ")))));
+  }
+}
+async function playSound(id) {
+  const secs = $("#secs").value; const body = { id, gain: Number($("#gain").value) }; if (secs) body.seconds = Number(secs);
+  const r = await api("POST", "/api/sounds/play", body); if (!r.ok) $("#snd-note").textContent = r.data.error;
+}
+$("#gain").addEventListener("input", (e) => { $("#gain-v").textContent = Number(e.target.value).toFixed(1); });
+$("#snd-stop").addEventListener("click", () => api("POST", "/api/sounds/stop", {}));
+
+// ---------- stop buttons, tabs ----------
+$("#stop").addEventListener("click", async () => { const r = await api("POST", "/api/stop", {}); logLine(r.ok ? r.data.message : r.data.error, r.ok ? "" : "bad"); });
+$("#estop").addEventListener("click", async () => { const r = await api("POST", "/api/estop", {}); logLine(r.ok ? `E-STOP: ${r.data.message}` : `E-STOP failed: ${r.data.error}`, "bad"); });
+for (const t of ["shows", "sounds"]) $("#tab-" + t).addEventListener("click", () => {
+  for (const u of ["shows", "sounds"]) { $("#tab-" + u).setAttribute("aria-selected", u === t); $("#" + u).hidden = u !== t; }
+  if (t === "sounds" && !sounds) loadSounds();
+});
+
+// ---------- live events ----------
+function connect() {
+  const es = new EventSource("/api/events");
+  es.onopen = () => setPill("#p-link", "green", "live");
+  es.onerror = () => setPill("#p-link", "red", "disconnected: retrying");
+  es.addEventListener("status", (e) => renderStatus(JSON.parse(e.data)));
+  es.addEventListener("run", (e) => { const r = JSON.parse(e.data); if (r.log && r.log.length && !logEl.children.length) for (const l of r.log) logLine(l.text, "", l.t); });
+  es.addEventListener("log", (e) => { const l = JSON.parse(e.data); logLine(l.text, /^stopped|fail/i.test(l.text) ? "bad" : "", l.t); });
+  es.addEventListener("run-end", (e) => { const r = JSON.parse(e.data); logLine(r.ok ? `finished in ${(r.elapsedMs / 1000).toFixed(1)} s` : `stopped: ${r.error}`, r.ok ? "good" : "bad"); api("GET", "/api/status").then((s) => s.ok && renderStatus(s.data)); });
+}
+loadShows().then(() => { const id = decodeURIComponent(location.hash.slice(1)); if (shows.some((x) => x.id === id)) select(id); });
+connect();
+</script>
+</body>
+</html>

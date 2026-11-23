@@ -16,8 +16,7 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadShow, loadLayout, loadLoco, validateLayout, validateShow, simulateShow, runShow, usesZones } from "./lib/show/index.mjs";
-import { SoundLibrary } from "./lib/sound/index.mjs";
-import { ensureSynthPack } from "./lib/sound/synth-pack.mjs";
+import { defaultSounds } from "./lib/sound/defaults.mjs";
 import { localPath } from "./lib/paths.mjs";
 
 const root = dirname(fileURLToPath(import.meta.url)) + "/";
@@ -50,10 +49,7 @@ function context(needZones) {
   return { layout, loco };
 }
 function soundLibrary(engine) {
-  ensureSynthPack(root + "packs/synth");
-  const packs = (flags.packs || "packs/synth,packs/jr-east").split(",").map((p) => (p.startsWith("/") ? p : root + p));
-  const ok = packs.filter((p) => { try { new SoundLibrary({ packs: [p], engine: "null" }); return true; } catch (e) { console.error(`skipping pack ${p}: ${e.message}`); return false; } });
-  return new SoundLibrary({ packs: ok, engine, volume: Number(flags.volume || 0.5) });
+  return defaultSounds({ engine, volume: Number(flags.volume || 0.5), packs: flags.packs, onSkip: (p, e) => console.error(`skipping pack ${p}: ${e.message}`) });
 }
 function report(check) {
   for (const w of check.warnings) console.log(`warning: ${w}`);
