@@ -27,3 +27,6 @@ Thumbs.db
 
 # Generated sound effects
 tools/train/sounds/
+# Audio inside sound packs (manifests are committed, audio is generated or imported)
+tools/train/packs/*/*.wav
+tools/train/packs/*/*.mp3

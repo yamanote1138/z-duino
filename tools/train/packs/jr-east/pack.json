@@ -1,0 +1,128 @@
+{
+  "format": "z-sounds/1",
+  "name": "jr-east",
+  "license": "personal use only: clips are other people's recordings (a BVE E235 sound set and the eki-pi project); not redistributable",
+  "source": "python3 -I import-sounds.py (needs ../e235-sounds and ../eki-pi)",
+  "root": "../../sounds",
+  "sounds": {
+    "horn.depart": {
+      "file": "horn.wav",
+      "description": "JR East electric horn, attack + sustain + decay (2.2 s)"
+    },
+    "horn.pass": {
+      "file": "horn_pass.wav",
+      "description": "the same horn, a little longer, for the pass"
+    },
+    "motion.accelerate": {
+      "file": "accel_e235.wav",
+      "description": "E235 SiC-VVVF start-up"
+    },
+    "motion.run": {
+      "file": "run_siv.wav",
+      "loop": true,
+      "gain": 0.6,
+      "description": "E259 static inverter hum, made to loop"
+    },
+    "motion.decelerate": {
+      "file": "decel_e235.wav",
+      "description": "E235 SiC-VVVF slowing"
+    },
+    "brake.departure": {
+      "file": "brake_departure.wav",
+      "description": "E235 brake release at departure"
+    },
+    "brake.squeal": {
+      "file": "brake_squeal.wav"
+    },
+    "brake.loosen": {
+      "file": "brake_yurume.wav",
+      "description": "short brake loosening"
+    },
+    "brake.release": {
+      "file": "brake_release.wav"
+    },
+    "flange": {
+      "variants": [
+        {
+          "file": "flange_1.wav"
+        },
+        {
+          "file": "flange_2.wav"
+        },
+        {
+          "file": "flange_9.wav"
+        },
+        {
+          "file": "flange_12.wav"
+        }
+      ],
+      "noRepeat": true,
+      "gain": 0.4,
+      "gainJitter": 0.2,
+      "description": "the four curve squeals chosen by ear"
+    },
+    "flange.other": {
+      "variants": [
+        {
+          "file": "flange_3.wav"
+        },
+        {
+          "file": "flange_4.wav"
+        },
+        {
+          "file": "flange_5.wav"
+        },
+        {
+          "file": "flange_6.wav"
+        },
+        {
+          "file": "flange_7.wav"
+        },
+        {
+          "file": "flange_8.wav"
+        },
+        {
+          "file": "flange_10.wav"
+        },
+        {
+          "file": "flange_11.wav"
+        }
+      ],
+      "noRepeat": true,
+      "category": "flange",
+      "gain": 0.4,
+      "gainJitter": 0.2,
+      "description": "the other eight squeals (shorter blips)"
+    },
+    "station.seseragi": {
+      "file": "melody_seseragi.mp3",
+      "durationMs": 13400,
+      "category": "station"
+    },
+    "station.water_crown": {
+      "file": "melody_water_crown.mp3",
+      "durationMs": 12900,
+      "category": "station"
+    },
+    "station.atom": {
+      "file": "melody_atom.mp3",
+      "durationMs": 18300,
+      "category": "station"
+    },
+    "announcement.jp1": {
+      "file": "announce1_jp.wav"
+    },
+    "announcement.en1": {
+      "file": "announce1_en.wav"
+    },
+    "rail.joint": {
+      "file": "railloop.wav",
+      "loop": true,
+      "gain": 0.2,
+      "description": "rail joint clatter (choppy when re-timed; not used)"
+    },
+    "alert.ef210_buzzer": {
+      "file": "buzzer_ef210.wav"
+    }
+  }
+}

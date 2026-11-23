@@ -81,6 +81,23 @@ The scripts are deliberately standalone, so the sensor and connection helpers re
 
 The flange squeals are placed by time from the speed model, not by the beam. The curve distances (a short bend at 5.5 to 12" that diverts the track around a dock, then tight curves at 37 to 57" and 104 to 124" from the sensor) are estimates from a description of the track; override with `--curves=5.5-12,37-57,104-124`.
 
+## Modules (work in progress)
+
+The scripts above predate a cleaner split into reusable modules. Two exist so far; both are tested without hardware (`node --test test/*.test.mjs`), and the older scripts do not use them yet.
+
+**Sensor (`lib/sensor/`)** turns beam readings into events and owns calibration.
+- `createSensor({ source })`: sources are `SerialSource` (the Arduino) and `ReplaySource` (a recorded or synthetic trace); anything with `start(cb)` / `stop()` works.
+- Events: `ready`, `break`, `restore`, `pass` (duration, minimum level), `nose` / `tail` (only once you call `sensor.setDirection("forward" | "reverse")`; the sensor cannot see direction by itself), `drift` (the open-beam level no longer matches calibration, or the beam sits steadily half-blocked), `lost` / `recovered` (no readings).
+- `await sensor.waitFor("pass", { timeoutMs })`, `sensor.collect(ms)`, `sensor.recent()`.
+- Thresholds are fractions of the span between the calibrated clear and blocked levels (`DETECTOR_DEFAULTS` in `detector.mjs`), so the same config suits any emitter, receiver or distance.
+- `node calibrate.mjs` measures the two levels (you place the loco; it never moves the train) and writes `sensor_levels.json`. `node sensor-watch.mjs` prints events live; `--replay=<csv>` needs no hardware.
+
+**Sound (`lib/sound/`)** is a library of packs, picked by id or category.
+- A pack is a folder with a `pack.json` (format in `lib/sound/pack.mjs`); the repo holds manifests only. `packs/synth` is generated (`node sound-test.mjs list` makes its files); `packs/jr-east` points at the clips `import-sounds.py` copies into `sounds/`.
+- `lib.play("horn.depart")`, `lib.play("flange")` (a category picks a member; an exact id wins over a category), `lib.fill("flange", { ms: 2400, cutMs: 100 })`, `lib.loop("run", "motion.run")`. Variants carry weights, no-repeat, and gain/rate jitter. `lib.check([...])` fails early if a sound or file is missing.
+- The playback engine is swappable: `afplay` is one implementation of `play(path, { volume, seconds, rate }) -> { done, stop }`. Pass `engine: "null"`, `"afplay"` or your own object, or `registerEngine(name, factory)`.
+- `node sound-test.mjs list | play | fill | loop | check` to audition and verify (`--engine=null` is silent).
+
 ## Show settings
 
 Every number, distance and clip name in `signal-show.mjs` (pauses, creep-out time, curve positions, sound gains, which clip plays at which moment) lives in `lib/show-config.mjs`. Change them without editing the script:
