@@ -143,6 +143,13 @@ step is at the top of `lib/show/schema.mjs`; the validator names the path of eve
   re-anchored on every beam edge, good to about an inch at creep and worse at speed, so use zones for effects (a squeal
   through a curve) and slow-downs with a beam-guarded `creep` after them, never for stopping. `wait-zone` has a time limit
   (60 s by default).
+- **Measuring zones.** `node measure-zones.mjs --save` (in your own terminal: it reads your key presses) creeps one lap at
+  0.08 while you press a key as the nose reaches the start and end of each bend, then writes the inches into
+  `local/layout.json`. It shows the list of marks first and waits for SPACE before the loco moves. Inches come from the lap
+  time (the beam events at both ends of the lap and `loopIn`), so the speed model is not involved. `--marks=` picks other
+  marks (`zone.from`, `zone.to`; `a.to=b.from` is one press for two bends that run straight into each other), `--lag-ms=`
+  takes your reaction time off, `--preview` prints the list without touching the loco. Optional `hints` in the layout
+  describe each zone in the prompts.
 - **If anything goes wrong** (a step fails, Ctrl-C, the sensor stops reporting) sounds stop and the loco ramps down to a quiet
   stop. A second Ctrl-C is an emergency stop.
 - `sim` uses the real runtime, controller and sound-library checks; only the sensor (a ghost that answers after a fixed
