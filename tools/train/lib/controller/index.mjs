@@ -35,12 +35,13 @@ export const CONTROLLER_DEFAULTS = {
 
 export class MotorCareError extends Error { constructor(m) { super(m); this.name = "MotorCareError"; } }
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const realClock = { now: () => Date.now(), sleep: (ms) => new Promise((r) => setTimeout(r, ms)) };
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
 export class Controller extends EventEmitter {
-  constructor({ host, url, WebSocketImpl = globalThis.WebSocket, config = {} } = {}) {
+  constructor({ host, url, WebSocketImpl = globalThis.WebSocket, config = {}, clock = realClock } = {}) {
     super();
+    this.clock = clock;   // { now(), sleep(ms) }: replaced by a virtual clock when a show is simulated
     this.config = { ...CONTROLLER_DEFAULTS, ...config };
     this.url = url || `ws://${host}:${this.config.port}`;
     this.WebSocketImpl = WebSocketImpl;
@@ -65,6 +66,7 @@ export class Controller extends EventEmitter {
     ws.addEventListener("close", () => this._gone());
     ws.addEventListener("error", (e) => { if (this.connected) this.emit("error", new Error("controller connection error")); });
     this._ping = setInterval(() => { if (this.connected) this.send({ cmd: "ping" }); }, this.config.pingMs);
+    this._ping.unref?.();   // the keepalive alone must not hold a process open; the socket does that
     return this;
   }
   _gone() {
@@ -97,7 +99,7 @@ export class Controller extends EventEmitter {
     if (this.speed > this.config.creepMax) throw new MotorCareError(`cannot reverse at throttle ${this.speed.toFixed(2)}: ramp to 0 first`);
     this.send({ cmd: "direction", value: !!forward });
     this.forward = !!forward;
-    await sleep(this.config.directionSettleMs);
+    await this.clock.sleep(this.config.directionSettleMs);
   }
 
   /** Ramp the throttle to `target` linearly, `rampSecondsPer01` per 0.1. Resolves { completed } (false if cancelled by a later call). */
@@ -111,7 +113,7 @@ export class Controller extends EventEmitter {
     const steps = Math.max(1, Math.round(totalMs / step));
     this._ramp = true;
     for (let i = 1; i <= steps; i++) {
-      await sleep(totalMs / steps);
+      await this.clock.sleep(totalMs / steps);
       if (this._rampId !== id || !this.connected) return { completed: false };
       const v = i === steps ? target : from + ((target - from) * i) / steps;
       this.send({ cmd: "speed", value: +v.toFixed(4) }); this.speed = v;
@@ -120,6 +122,10 @@ export class Controller extends EventEmitter {
     return { completed: true };
   }
   cancelRamp() { this._rampId++; this._ramp = null; }
+
+  /** The status LED: r, g, b from 0 to 1000 (it stays that colour until ledAuto()). */
+  led(r, g, b) { this.send({ cmd: "led", r, g, b }); }
+  ledAuto() { this.send({ cmd: "led_auto" }); }
 
   /** Bring the loco to a quiet stop: ramp to zero. */
   halt(opts) { return this.rampTo(0, opts); }
@@ -153,27 +159,26 @@ export class Controller extends EventEmitter {
     if (!(speed > 0) || speed > this.config.creepMax) throw new MotorCareError(`guardedMove is for creep speeds (up to ${this.config.creepMax}), not ${speed}`);
     const guard = typeof until === "function" ? until() : until;
     await this.setDirection(forward);
-    const t0 = Date.now();
+    const t0 = this.clock.now();
     const gone = new Promise((res) => { const f = () => res("disconnect"); this.once("disconnect", f); this._offGone = () => this.off("disconnect", f); });
-    let timer;
-    const timeout = new Promise((res) => { timer = setTimeout(() => res("timeout"), maxMs); });
+    const timeout = this.clock.sleep(maxMs).then(() => "timeout");
     this.cancelRamp(); this.send({ cmd: "speed", value: speed }); this.speed = speed;
     let result;
     try {
       const racers = [Promise.resolve(guard).then(() => "guard"), timeout, gone];
       if (abort) racers.push(Promise.resolve(abort).then(() => "abort"));
       result = await Promise.race(racers);
-      if (result === "guard" && afterMs > 0) await sleep(afterMs);
+      if (result === "guard" && afterMs > 0) await this.clock.sleep(afterMs);
     } finally {
-      clearTimeout(timer); if (this._offGone) this._offGone();
+      if (this._offGone) this._offGone();
       if (this.connected) { this.send({ cmd: "speed", value: 0 }); this.speed = 0; }
     }
-    return { result, elapsedMs: Date.now() - t0 };
+    return { result, elapsedMs: this.clock.now() - t0 };
   }
 
   async close() {
     clearInterval(this._ping); this.cancelRamp();
-    if (this.connected) { await sleep(100); this.connected = false; this.ws.close(); }
+    if (this.connected) { await this.clock.sleep(100); this.connected = false; this.ws.close(); }
   }
 }
 

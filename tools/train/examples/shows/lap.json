@@ -1,0 +1,31 @@
+{
+  "format": "z-show/1",
+  "name": "One lap with sound",
+  "description": "Nose on the mark. Brake release and horn, one lap with the engine loop and flange squeals through the curve, then a creep back onto the mark and a station chime.",
+  "start": "blocked",
+  "settings": { "cruise": 0.25, "creep": 0.1, "lapTimeoutMs": 60000 },
+  "steps": [
+    { "do": "led", "color": "red" },
+    { "do": "sound", "id": "brake.release", "wait": false },
+    { "do": "wait", "ms": 1500 },
+    { "do": "sound", "id": "horn.depart" },
+    { "do": "direction", "forward": true },
+    { "do": "led", "color": "green" },
+    { "do": "loop", "slot": "motion", "id": "motion.run", "gain": 0.7 },
+    { "do": "parallel", "branches": [
+      [ { "do": "ramp", "to": "$cruise" } ],
+      [
+        { "do": "wait-for", "event": "restore", "timeoutMs": 15000 },
+        { "do": "wait-zone", "zone": "approach", "edge": "enter" },
+        { "do": "ramp", "to": "$creep" }
+      ],
+      [
+        { "do": "fill", "id": "flange", "zone": "curve", "cutMs": 100 }
+      ]
+    ] },
+    { "do": "creep", "forward": true, "speed": "$creep", "until": "break", "maxMs": 20000 },
+    { "do": "stop-loop", "slot": "motion" },
+    { "do": "led-auto" },
+    { "do": "sound", "id": "chime.station" }
+  ]
+}

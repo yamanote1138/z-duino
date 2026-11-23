@@ -116,6 +116,38 @@ script. `node creep-stop.mjs` is the smallest example.
   a time limit and a creep speed, and refuses otherwise. It stops quietly (speed 0) when the guard fires, times out or the link drops.
 - `emergencyStop()` sends `stop` at once and is never refused.
 
+### Shows (`lib/show`, `show.mjs`)
+
+A show is a plain JSON file (`z-show/1`) that ties sensor events to controller moves and sounds. Export and import is just
+the file; `examples/shows/lap.json` is a complete one, `local/shows/` is where yours go.
+
+```
+node show.mjs list
+node show.mjs validate lap        # fields, sound ids, zones, blind runs: moves and plays nothing
+node show.mjs sim lap             # runs on a virtual clock with a ghost sensor and prints the timeline
+node show.mjs run lap --no-sound  # for real (add --set=cruise=0.2 to override a setting)
+```
+
+Steps (`"do"`): `direction`, `ramp`, `halt`, `wait`, `wait-for` (a sensor event), `creep` (a guarded move that stops on a
+beam event, creep speed only; it does not move if the beam is already in that state), `wait-zone`, `sound`, `fill`, `loop`,
+`stop-loop`, `stop-sounds`, `led`, `led-auto`, `repeat`, `parallel` (branches run together), `log`. Numbers can be `"$name"`
+from the show's `settings`. `start: "blocked"` makes the runner check the nose is on the mark first. The field list for each
+step is at the top of `lib/show/schema.mjs`; the validator names the path of every mistake.
+
+- **Parallel for waits.** A `ramp` blocks until it finishes, and a beam event during it is gone before the next step starts
+  listening. Put the ramp and the `wait-for` in separate `parallel` branches (see the example).
+- **The blind-run rule is checked.** Ramping above creep (0.10) with no `wait-for`, `creep` or `wait-zone` before the next
+  slow-down is a validation error, and so is ending the show above creep.
+- **Zones** come from a layout file (`z-layout/1`: `loopIn` and named `zones` as inches of nose travel past the beam;
+  `examples/layout.example.json`, yours is `local/layout.json`). The position is estimated from the loco's speed model and
+  re-anchored on every beam edge, good to about an inch at creep and worse at speed, so use zones for effects (a squeal
+  through a curve) and slow-downs with a beam-guarded `creep` after them, never for stopping. `wait-zone` has a time limit
+  (60 s by default).
+- **If anything goes wrong** (a step fails, Ctrl-C, the sensor stops reporting) sounds stop and the loco ramps down to a quiet
+  stop. A second Ctrl-C is an emergency stop.
+- `sim` uses the real runtime, controller and sound-library checks; only the sensor (a ghost that answers after a fixed
+  delay), the WebSocket and the audio are faked, so it checks order and commands, not your layout's timing.
+
 ## Show settings
 
 Every number, distance and clip name in `signal-show.mjs` (pauses, creep-out time, curve positions, sound gains, which clip plays at which moment) lives in `lib/show-config.mjs`. Change them without editing the script:

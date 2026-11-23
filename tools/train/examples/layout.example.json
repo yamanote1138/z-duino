@@ -1,0 +1,9 @@
+{
+  "format": "z-layout/1",
+  "name": "Example layout",
+  "loopIn": 134,
+  "zones": {
+    "curve": { "fromIn": 5.5, "toIn": 12, "note": "positions are inches of nose travel past the beam, in the direction of travel; replace with your own" },
+    "approach": { "fromIn": 116, "toIn": 133, "note": "the stretch before the beam on the way round: slow down in here" }
+  }
+}
