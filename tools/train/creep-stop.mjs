@@ -4,7 +4,7 @@
 // Usage: node creep-stop.mjs [--dry] [--max=<seconds>]
 // Env:   TRAIN_HOST (board IP), SENSOR_PORT (the sensor Arduino's serial port)
 //
-// The beam must be clear before it moves. Levels come from sensor_levels.json (node calibrate.mjs), through the sensor
+// The beam must be clear before it moves. Levels come from local/sensor_levels.json (node calibrate.mjs), through the sensor
 // module (lib/sensor): it supplies the break event, and a `lost` event if the readings stop while the train is moving.
 
 import { createSensor, SerialSource } from "./lib/sensor/index.mjs";

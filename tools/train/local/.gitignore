@@ -1,0 +1,4 @@
+# Everything here is yours and stays out of git, except the README and this file.
+*
+!.gitignore
+!README.md

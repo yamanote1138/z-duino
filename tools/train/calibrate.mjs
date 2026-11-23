@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Calibrate the sensor: measure the open-beam and blocked levels and save them (sensor_levels.json).
+// Calibrate the sensor: measure the open-beam and blocked levels and save them (local/sensor_levels.json).
 // Usage: node calibrate.mjs [--ms=3000] [--no-save]
 // It never moves the train: you set up each state by hand and press Enter. For a hands-free version, let the controller
 // do the moving and call sensor.calibrate({ clearStep, blockedStep }) yourself.

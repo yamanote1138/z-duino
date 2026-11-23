@@ -13,6 +13,7 @@ import { createReadStream, writeFileSync } from "node:fs";
 import { LEVELS } from "./lib/levels.mjs";
 
 import { HOST, PORT } from "./lib/config.mjs";
+import { localFile } from "./lib/paths.mjs";
 
 const CREEP = 0.1;
 const LEVEL = LEVELS.wall;           // below this is a wall; windows stay above it
@@ -118,7 +119,7 @@ async function main() {
     stop();
     await sleep(AFTER_MS);
     const final = samples[samples.length - 1].v;
-    writeFileSync(`trace_${name}.csv`, samples.slice(legStartIdx).map((x) => `${((x.t - t0) / 1000).toFixed(3)},${x.v}`).join("\n"));
+    writeFileSync(localFile("traces", `trace_${name}.csv`), samples.slice(legStartIdx).map((x) => `${((x.t - t0) / 1000).toFixed(3)},${x.v}`).join("\n"));
     console.log(`${name}: dips seen (first sample below ${LEVEL}):\n  ` + (dips.join("\n  ") || "none"));
     if (hit) console.log(`${name}: STOP, wall hit ${((trip.t - t0) / 1000).toFixed(2)} s in (reading ${trip.v}, after ${(trip.clean / 1000).toFixed(2)} s clean); final reading ${final}`);
     else console.log(`${name}: no wall found within ${LEG_MAX_MS / 1000} s; stopped; final reading ${final}`);

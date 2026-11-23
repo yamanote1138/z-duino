@@ -3,9 +3,9 @@
 // a person pressing Enter, or a controller doing a guarded shuttle.
 
 import { readFileSync, writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { localFile } from "../paths.mjs";
 
-export const DEFAULT_FILE = fileURLToPath(new URL("../../sensor_levels.json", import.meta.url));
+export const DEFAULT_FILE = localFile("sensor_levels.json");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Levels from the file (or env BEAM_CLEAR / BEAM_BLOCKED), or null if there is no usable calibration. */

@@ -59,7 +59,7 @@ All scripts need Node 22+ (global `WebSocket`). The controller's address and the
 | `sound-demo.mjs` | Plays the sound set in the order a show uses it, with no train. |
 | `import-sounds.py` | Copies real sounds from the sibling `e235-sounds` and `eki-pi` projects into `sounds/`. |
 | `speed-trap.mjs` | Times the train past the beam at several throttle settings and reports speed in scale mph, plus the loop length. |
-| `learn-loco.mjs` | Learns a new locomotive on its own: finds it, measures its length and speed table, and learns how it stops. Writes `loco_profile.json`. Uses `lib/beam.mjs`. `--resume` and `--stages=find,length,speeds,stops` run parts of it. `--in-beam` starts with the nose already in the beam. |
+| `learn-loco.mjs` | Learns a new locomotive on its own: finds it, measures its length and speed table, and learns how it stops. Writes `local/loco_profile.json`. Uses `lib/beam.mjs`. `--resume` and `--stages=find,length,speeds,stops` run parts of it. `--in-beam` starts with the nose already in the beam. |
 | `read-a0.py` | Bench helper: `python3 -I read-a0.py 3` prints min, max and mean of A0 over 3 s. |
 
 The scripts are deliberately standalone, so the sensor and connection helpers repeat across files.
@@ -81,6 +81,12 @@ The scripts are deliberately standalone, so the sensor and connection helpers re
 
 The flange squeals are placed by time from the speed model, not by the beam. The curve distances (a short bend at 5.5 to 12" that diverts the track around a dock, then tight curves at 37 to 57" and 104 to 124" from the sensor) are estimates from a description of the track; override with `--curves=5.5-12,37-57,104-124`.
 
+## Your files
+
+Everything specific to your layout, loco and room lives in `local/`, which is git-ignored apart from its README: the
+sensor calibration, the loco profile, results and raw traces (see `local/README.md`). `lib/paths.mjs` is the one place
+that knows where it is; set `TRAIN_LOCAL` to keep several setups side by side.
+
 ## Modules (work in progress)
 
 The scripts above predate a cleaner split into reusable modules. Two exist so far; both are tested without hardware (`node --test test/*.test.mjs`), and the older scripts do not use them yet.
@@ -90,7 +96,7 @@ The scripts above predate a cleaner split into reusable modules. Two exist so fa
 - Events: `ready`, `break`, `restore`, `pass` (duration, minimum level), `nose` / `tail` (only once you call `sensor.setDirection("forward" | "reverse")`; the sensor cannot see direction by itself), `drift` (the open-beam level no longer matches calibration, or the beam sits steadily half-blocked), `lost` / `recovered` (no readings).
 - `await sensor.waitFor("pass", { timeoutMs })`, `sensor.collect(ms)`, `sensor.recent()`.
 - Thresholds are fractions of the span between the calibrated clear and blocked levels (`DETECTOR_DEFAULTS` in `detector.mjs`), so the same config suits any emitter, receiver or distance.
-- `node calibrate.mjs` measures the two levels (you place the loco; it never moves the train) and writes `sensor_levels.json`. `node sensor-watch.mjs` prints events live; `--replay=<csv>` needs no hardware.
+- `node calibrate.mjs` measures the two levels (you place the loco; it never moves the train) and writes `local/sensor_levels.json`. `node sensor-watch.mjs` prints events live; `--replay=<csv>` needs no hardware.
 
 **Sound (`lib/sound/`)** is a library of packs, picked by id or category.
 - A pack is a folder with a `pack.json` (format in `lib/sound/pack.mjs`); the repo holds manifests only. `packs/synth` is generated (`node sound-test.mjs list` makes its files); `packs/jr-east` points at the clips `import-sounds.py` copies into `sounds/`.

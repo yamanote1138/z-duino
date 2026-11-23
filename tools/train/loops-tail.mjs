@@ -14,6 +14,7 @@ import { createReadStream, writeFileSync } from "node:fs";
 import { LEVELS } from "./lib/levels.mjs";
 
 import { HOST, PORT } from "./lib/config.mjs";
+import { localFile } from "./lib/paths.mjs";
 
 const CRUISE = 0.4, CREEP = 0.1;
 const CRUISE_AFTER_NOSE_MS = 13300;  // cruise this long after the lap-1 nose pass, then ramp down
@@ -217,7 +218,7 @@ async function main() {
     if (dog) clearInterval(dog);
     stop();
     send({ cmd: "direction", value: true });
-    writeFileSync("trace_loops_tail.csv", samples.map((x) => `${((x.t - t0) / 1000).toFixed(3)},${x.v}`).join("\n"));
+    writeFileSync(localFile("traces", "trace_loops_tail.csv"), samples.map((x) => `${((x.t - t0) / 1000).toFixed(3)},${x.v}`).join("\n"));
     await close();
   }
 }

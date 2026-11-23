@@ -24,6 +24,7 @@ import { Sounds } from "./lib/sounds.mjs";
 
 import { HOST, PORT } from "./lib/config.mjs";
 import { loadShowConfig } from "./lib/show-config.mjs";
+import { localPath } from "./lib/paths.mjs";
 
 // Every tunable number, distance and clip name is in lib/show-config.mjs; override with flags or --config=<file.json>.
 let CFG;
@@ -56,7 +57,7 @@ const ABRUPT_STOP_MAX_IN_S = 2.5;  // motor care: only cut the throttle to zero 
 let locoLenIn = null;
 if (CFG.loco) {
   // Single locomotive: speeds come from loco_profile.json (written by learn-loco.mjs).
-  const prof = JSON.parse(readFileSync("loco_profile.json", "utf8"));
+  const prof = JSON.parse(readFileSync(localPath("loco_profile.json"), "utf8"));
   const b = prof.fit.inPerSecPerUnitThrottle, a = prof.fit.offsetInS;
   const speedAt = (t) => a + b * t;
   const target = CFG.cruiseInS;

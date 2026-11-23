@@ -13,6 +13,7 @@ import { createReadStream, writeFileSync } from "node:fs";
 import { LEVELS } from "./lib/levels.mjs";
 
 import { HOST, PORT } from "./lib/config.mjs";
+import { localFile } from "./lib/paths.mjs";
 
 const TRAIN_MM = 272;                       // 3 cars x 88 mm + 2 gaps x 4 mm
 const SCALE = 220;                          // Z scale 1:220
@@ -216,7 +217,7 @@ async function main() {
     stop();
     send({ cmd: "led_auto" });
     send({ cmd: "direction", value: true });
-    writeFileSync("speedtrap_results.json", JSON.stringify({ results, loopInches: results.loopInches }, null, 1));
+    writeFileSync(localFile("results", "speedtrap_results.json"), JSON.stringify({ results, loopInches: results.loopInches }, null, 1));
     await close();
   }
 }

@@ -5,7 +5,7 @@
 //   --plan   print the final-loop plan for the default numbers and exit (no sensor, no train)
 // Env:   TRAIN_HOST (board IP), SENSOR_PORT (default /dev/cu.usbmodem1101)
 //
-// Start with the loco's nose in the beam (on the mark, the beam reading low) and loco_profile.json present.
+// Start with the loco's nose in the beam (on the mark, the beam reading low) and local/loco_profile.json present.
 //   loop 1  ramp to --start, lap at that throttle        (nose passes the beam at the end of the loop)
 //   loop 2  ramp to the midpoint, lap
 //   loop 3  ramp to --final, cruise, ramp down to 30%, hold briefly, ramp to creep, creep until the nose
@@ -23,13 +23,14 @@ import { createReadStream, readFileSync } from "node:fs";
 import { LEVELS } from "./lib/levels.mjs";
 
 import { HOST, PORT } from "./lib/config.mjs";
+import { localPath } from "./lib/paths.mjs";
 
 const args = process.argv.slice(2);
 const flag = (n) => args.includes(`--${n}`);
 const opt = (n, d) => { const a = args.find((x) => x.startsWith(`--${n}=`)); return a ? Number(a.split("=")[1]) : d; };
 const dry = flag("dry");
 
-const prof = JSON.parse(readFileSync(new URL("./loco_profile.json", import.meta.url), "utf8"));
+const prof = JSON.parse(readFileSync(localPath("loco_profile.json"), "utf8"));
 const FIT_A = prof.fit.offsetInS, FIT_B = prof.fit.inPerSecPerUnitThrottle;
 const SOLID = prof.signature?.solid === true;
 const vm = (thr) => Math.max(0.5, FIT_A + FIT_B * thr);   // in/s from the profile fit (extrapolated above 30%)

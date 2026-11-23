@@ -4,16 +4,16 @@
 // hard-codes a count. Everything is placed as a fraction of the span between "blocked" and "clear":
 //   clear   - beam open (nothing between the domes)
 //   blocked - a solid loco sitting in the beam
-// Both come from sensor_levels.json next to this lib's parent folder (re-measure after moving the
+// Both come from local/sensor_levels.json (node calibrate.mjs; re-measure after moving the
 // sensor), or from BEAM_CLEAR / BEAM_BLOCKED in the environment.
 //
 // Fractions are the old photoresistor thresholds (clear 983, blocked ~160, trip 800, wall 760, ...) re-expressed
 // on the same scale, so behaviour matches what the scripts were tuned for.
 
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { localPath } from "./paths.mjs";
 
-const FILE = fileURLToPath(new URL("../sensor_levels.json", import.meta.url));
+const FILE = localPath("sensor_levels.json");
 
 function load() {
   let base = { clear: 344, blocked: 30 };

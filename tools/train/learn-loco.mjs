@@ -2,7 +2,7 @@
 // Learn a locomotive with no help: find it, measure its length and speed, and learn how it stops.
 //
 // Usage: node learn-loco.mjs [--dry] [--resume] [--in-beam] [--stages=find,length,speeds,stops]
-//   --in-beam  the loco starts with its nose already in the beam (clear level taken from sensor_levels.json)
+//   --in-beam  the loco starts with its nose already in the beam (clear level taken from local/sensor_levels.json)
 // Env:   TRAIN_HOST (board IP), SENSOR_PORT (default /dev/cu.usbmodem1101)
 //
 // Start with the loco on the track, facing forward, on the house side of the beam (or anywhere
@@ -14,7 +14,7 @@
 //   speeds  throttle -> speed table, climbing to a safe limit and descending to the stall point
 //   stops   shuttle at the beam: how far the loco carries on after stopping on its nose and its tail
 //
-// Writes loco_profile.json (and loco_trace.csv). --resume reloads the profile to run later stages.
+// Writes local/loco_profile.json (and local/traces/loco_trace.csv). --resume reloads the profile to run later stages.
 
 import { spawnSync } from "node:child_process";
 import { createReadStream, readFileSync, writeFileSync, existsSync } from "node:fs";
@@ -22,6 +22,7 @@ import { BeamTracker } from "./lib/beam.mjs";
 import { LEVELS } from "./lib/levels.mjs";
 
 import { HOST, PORT } from "./lib/config.mjs";
+import { localPath, localFile } from "./lib/paths.mjs";
 
 const LOOP_IN = 134;            // measured earlier from the lap period and the old train's length
 const SAFE_MAX_IN_S = 9.0;      // never aim above this (the old train ran 8.6 in/s without trouble)
@@ -91,8 +92,8 @@ async function connect() {
   return { send, close };
 }
 
-const profile = resume && existsSync("loco_profile.json") ? JSON.parse(readFileSync("loco_profile.json", "utf8")) : {};
-const save = () => { profile.clearLevel = tracker.clearLevel; writeFileSync("loco_profile.json", JSON.stringify(profile, null, 1)); };
+const profile = resume && existsSync(localPath("loco_profile.json")) ? JSON.parse(readFileSync(localPath("loco_profile.json"), "utf8")) : {};
+const save = () => { profile.clearLevel = tracker.clearLevel; writeFileSync(localFile("loco_profile.json"), JSON.stringify(profile, null, 1)); };
 
 async function main() {
   // ---- beam check ----
@@ -331,7 +332,7 @@ async function main() {
     clearInterval(dog);
     if (!finished) emergency(); else { try { halt(); } catch {} }
     try { send({ cmd: "direction", value: true }); } catch {}
-    writeFileSync("loco_trace.csv", tracker.samples.map((s) => `${(s.t / 1000).toFixed(3)},${s.v}`).join("\n"));
+    writeFileSync(localFile("traces", "loco_trace.csv"), tracker.samples.map((s) => `${(s.t / 1000).toFixed(3)},${s.v}`).join("\n"));
     await close();
   }
 }

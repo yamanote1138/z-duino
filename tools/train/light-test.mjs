@@ -9,7 +9,7 @@
 // crossing is one pass). It ends by creeping forward onto the mark again. The whole move stays within about 4 inches
 // of the beam, at 10% throttle, and only changes direction from a standstill after a pause.
 //
-// Per run it reports and appends to light_test_results.csv:
+// Per run it reports and appends to local/results/light_test_results.csv:
 //   clear level (mean, lowest, highest, noise sd), blocked level, swing, and how repeatable the pass time is
 //   (the loco crosses at a constant speed, so the spread of its pass time is the spread of the edge timing).
 // Run it once under each lighting condition and compare the rows.
@@ -19,6 +19,7 @@ import { createReadStream, appendFileSync, existsSync, writeFileSync } from "nod
 import { LEVELS } from "./lib/levels.mjs";
 
 import { HOST, PORT } from "./lib/config.mjs";
+import { localFile } from "./lib/paths.mjs";
 const args = process.argv.slice(2);
 const opt = (n, d) => { const a = args.find((x) => x.startsWith(`--${n}=`)); return a ? a.split("=")[1] : d; };
 const dry = args.includes("--dry");
@@ -193,10 +194,10 @@ function report(startIdx) {
   console.log(`  clear    mean ${row.clearMean}, lowest ${row.clearMin}, highest ${row.clearMax}, noise sd ${row.clearSd}  (${row.clearN} readings)`);
   console.log(`  blocked  mean ${row.blockedMean}  ->  swing ${row.swing}`);
   console.log(`  pass time  mean ${row.passMeanS} s, sd ${row.passSdMs} ms over ${row.passes} passes (forward ${row.fwdMeanS} s, reverse ${row.revMeanS} s)`);
-  const file = new URL("./light_test_results.csv", import.meta.url).pathname;
+  const file = localFile("results", "light_test_results.csv");
   if (!existsSync(file)) writeFileSync(file, Object.keys(row).join(",") + "\n");
   appendFileSync(file, Object.values(row).map((v) => String(v).replace(/,/g, ";")).join(",") + "\n");
-  console.log(`  appended to light_test_results.csv`);
+  console.log(`  appended to local/results/light_test_results.csv`);
 }
 
 main().catch((e) => { console.error("error:", e.message); process.exit(1); }).then(() => process.exit(0));
