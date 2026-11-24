@@ -15,6 +15,8 @@
 //   no blind moves guardedMove() will not start without a guard (a promise, or a function returning one), and it is limited
 //                  to creep speed so the guard can stop it straight away. Cruise speeds belong in shows, with ramps.
 //   keepalive      a ping every `pingMs` (the firmware stops the motor after 30 s of silence).
+//   optional LED   led() and ledAuto() do nothing when the controller reports no status LED (features.led = false), so shows
+//                  and scripts written with LED steps still run on a controller built without one.
 //   quiet stop     speed 0 is used for stopping, not {cmd:"stop"} (which blinks the LED magenta); that is emergencyStop().
 //
 // Events: "status" (the controller's own report), "disconnect", "error".
@@ -39,8 +41,9 @@ const realClock = { now: () => Date.now(), sleep: (ms) => new Promise((r) => set
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
 export class Controller extends EventEmitter {
-  constructor({ host, url, WebSocketImpl = globalThis.WebSocket, config = {}, clock = realClock, invert = null } = {}) {
+  constructor({ host, url, WebSocketImpl = globalThis.WebSocket, config = {}, clock = realClock, invert = null, led = "auto" } = {}) {
     super();
+    this.led_ = led;   // "auto": the controller's status says whether it has a status LED; true / false force it
     this.invert = invert;   // true/false: sent to the controller when we connect; null: leave the controller's own setting alone
     this.clock = clock;   // { now(), sleep(ms) }: replaced by a virtual clock when a show is simulated
     this.config = { ...CONTROLLER_DEFAULTS, ...config };
@@ -125,9 +128,18 @@ export class Controller extends EventEmitter {
   }
   cancelRamp() { this._rampId++; this._ramp = null; }
 
-  /** The status LED: r, g, b from 0 to 1000 (it stays that colour until ledAuto()). */
-  led(r, g, b) { this.send({ cmd: "led", r, g, b }); }
-  ledAuto() { this.send({ cmd: "led_auto" }); }
+  /**
+   * Does the controller have a status LED? The status message says (`features.led`); a controller that says nothing (older
+   * firmware) is assumed to have one, and so is one that has not reported yet. The `led` option (true/false) overrides.
+   */
+  get hasLed() {
+    if (this.led_ === true || this.led_ === false) return this.led_;
+    return !(this.status && this.status.features && this.status.features.led === false);
+  }
+  /** The status LED: r, g, b from 0 to 1000 (it stays that colour until ledAuto()). Does nothing, and returns false, when there is no LED. */
+  led(r, g, b) { if (!this.hasLed) return false; this.send({ cmd: "led", r, g, b }); return true; }
+  /** Give the LED back to the controller (its own status colours). Does nothing, and returns false, when there is no LED. */
+  ledAuto() { if (!this.hasLed) return false; this.send({ cmd: "led_auto" }); return true; }
 
   /** Bring the loco to a quiet stop: ramp to zero. */
   halt(opts) { return this.rampTo(0, opts); }
@@ -192,5 +204,5 @@ export async function connectController({ config = null, ...opts } = {}) {
   const c = config ? config.controller : {};
   let host = opts.host || c.host || null;
   if (!host && !opts.url) host = await findHost();
-  return new Controller({ ...opts, host, invert: opts.invert !== undefined ? opts.invert : (c.invert ?? null), config: { ...(c.port ? { port: c.port } : {}), ...(c.pingMs ? { pingMs: c.pingMs } : {}), ...(opts.config || {}) } }).connect();
+  return new Controller({ ...opts, host, invert: opts.invert !== undefined ? opts.invert : (c.invert ?? null), led: opts.led !== undefined ? opts.led : (c.led ?? "auto"), config: { ...(c.port ? { port: c.port } : {}), ...(c.pingMs ? { pingMs: c.pingMs } : {}), ...(opts.config || {}) } }).connect();
 }

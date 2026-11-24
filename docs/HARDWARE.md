@@ -6,7 +6,7 @@
 |---|---|
 | Wemos D1 Mini (ESP8266) | WiFi microcontroller |
 | TB6612FNG breakout | H-bridge motor driver |
-| 5mm RGB LED (common cathode) | Status indicator (see [wiring](status-led-wiring.md)) |
+| 5mm RGB LED (common cathode), **optional** | Status indicator (see [wiring](status-led-wiring.md)); build with `-D HAS_STATUS_LED=0` if you skip it |
 | 12V DC power supply | Track power |
 | Z-scale track + locomotive | The whole point, really |
 
@@ -37,6 +37,6 @@ A02         ─────────  Rail 2
 
 Only Motor A is used. Motor B pins are left unconnected.
 
-**Status LED** — see [status-led-wiring.md](status-led-wiring.md) for full wiring, resistor values, and pinout. Summary: D5=Red (220Ω), D6=Green (100Ω), D7=Blue (100Ω), GND=Cathode.
+**Status LED (optional)** — see [status-led-wiring.md](status-led-wiring.md) for full wiring, resistor values, and pinout. Summary: D5=Red (220Ω), D6=Green (100Ω), D7=Blue (100Ω), GND=Cathode.
 
 **Important:** Connect the Wemos GND and the 12V supply GND to the TB6612FNG's GND — they must share a common ground.

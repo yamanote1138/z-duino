@@ -136,7 +136,7 @@ node show.mjs run lap --no-sound  # for real (add --set=cruise=0.2 to override a
 
 Steps (`"do"`): `direction`, `ramp`, `halt`, `wait`, `wait-for` (a sensor event), `creep` (a guarded move that stops on a
 beam event, creep speed only; it does not move if the beam is already in that state), `wait-zone`, `sound`, `fill`, `loop`,
-`stop-loop`, `stop-sounds`, `led`, `led-auto`, `repeat`, `parallel` (branches run together), `log`. Numbers can be `"$name"`
+`stop-loop`, `stop-sounds`, `led`, `led-auto` (skipped, and logged as such, when the controller has no status LED: it is optional hardware, reported in the status message as `features.led`; `controller.led` in the settings can force it), `repeat`, `parallel` (branches run together), `log`. Numbers can be `"$name"`
 from the show's `settings`. `start: "blocked"` makes the runner check the nose is on the mark first. The field list for each
 step is at the top of `lib/show/schema.mjs`; the validator names the path of every mistake.
 
@@ -241,6 +241,7 @@ Fit over the whole range: `v = -0.49 + 28.65 x throttle` (in/s). It never stalle
 ## Controller behaviour these scripts rely on
 
 - The firmware stops the motor after 30 s with no message, so every script pings every 5 s.
+- The status LED is optional (firmware `HAS_STATUS_LED`, default on). The controller reports it as `features.led`; `lib/controller` skips `led` and `led_auto` when it is false. The notes below apply when one is fitted.
 - `stop` blinks the status LED magenta four times. The signal show uses `speed 0` for its final stop to avoid hiding the red.
 - The `direction` command resets the LED to its status colour, so set LED colours after it.
 - With no client connected the status LED is blue. Disconnecting returns it there.

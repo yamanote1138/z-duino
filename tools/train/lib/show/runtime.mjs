@@ -110,8 +110,8 @@ export async function runShow(show, { controller: ctl, sensor, sound, layout = n
       case "loop": sound.loop(s.slot, s.id, { gain: s.gain != null ? n(s.gain) : 1 }); say(`loop ${s.slot}: ${s.id}`, path); break;
       case "stop-loop": sound.stop(s.slot); say(`stop loop ${s.slot}`, path); break;
       case "stop-sounds": sound.stopAll(); say("stop all sounds", path); break;
-      case "led": { const c = s.color ? COLORS[s.color] : [n(s.r), n(s.g), n(s.b)]; ctl.led(...c); say(`led ${s.color || c.join(",")}`, path); break; }
-      case "led-auto": ctl.ledAuto(); say("led auto", path); break;
+      case "led": { const c = s.color ? COLORS[s.color] : [n(s.r), n(s.g), n(s.b)]; say(ctl.led(...c) === false ? "led skipped (no status LED)" : `led ${s.color || c.join(",")}`, path); break; }
+      case "led-auto": say(ctl.ledAuto() === false ? "led skipped (no status LED)" : "led auto", path); break;
       case "log": say(s.message, path); break;
       case "repeat": for (let i = 1; i <= n(s.times); i++) { say(`repeat ${i}/${n(s.times)}`, path); await seq(s.steps, `${path}.steps`); } break;
       case "parallel": await race(Promise.all(s.branches.map((b, j) => seq(b, `${path}.branches[${j}]`)))); break;

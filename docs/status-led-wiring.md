@@ -1,5 +1,7 @@
 # Status LED Wiring — Z-Duino
 
+> **The LED is optional.** If you do not fit one, build the firmware with `-D HAS_STATUS_LED=0` (see `secrets.ini.example`): D5–D7 are then left untouched and free, the controller reports `features.led = false`, and the web app and Mac tools hide or skip everything LED-related. The default is to expect an LED, so existing builds are unchanged.
+
 ## Component
 - **Standard 4-pin through-hole RGB LED** — 5mm, **common cathode**, diffused lens
 

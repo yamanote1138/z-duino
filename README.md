@@ -23,10 +23,10 @@ Discoverable via mDNS at `http://ztrain.local`.
 - **Throttle UI** — 10-segment speed bar with colour-coded zones (red/yellow/green), smooth ramping between speed steps
 - **Direction control** — forward/reverse toggle with automatic ramp-down-switch-ramp-up when the train is moving
 - **Direction invert** — swap forward/reverse polarity to match your track wiring (persisted in browser)
-- **Emergency stop** — immediate halt, bypasses ramping, magenta LED blink
+- **Emergency stop** — immediate halt, bypasses ramping (with the optional status LED: a magenta blink)
 - **Track voltage readout** — live track voltage next to the speed display, turning red above 10V as a warning for Z-scale motors
-- **Status LED** — RGB LED indicates connection and motor state; supports manual colour control via LED test panel
-- **Party mode** — techno light show on the status LED: 128 BPM kick pulses, off-beat hi-hat sparkle, a new colour every bar, and a 16th-note fill every fourth bar
+- **Status LED (optional)** — an RGB LED indicates connection and motor state; supports manual colour control via LED test panel. Built without one (`-D HAS_STATUS_LED=0`), the firmware leaves its pins alone and the app hides the LED controls
+- **Party mode** (needs the LED) — techno light show on the status LED: 128 BPM kick pulses, off-beat hi-hat sparkle, a new colour every bar, and a 16th-note fill every fourth bar
 - **Configurable PWM** — tune top speed (`MAX_PWM`) and motor PWM frequency (`PWM_FREQ`) at build time via `secrets.ini`
 - **Safety timeout** — train stops automatically if the controller loses contact for 30 seconds
 - **Zero external dependencies** — everything served from the device itself, no internet required
@@ -34,7 +34,7 @@ Discoverable via mDNS at `http://ztrain.local`.
 
 ## Hardware
 
-Wemos D1 Mini (ESP8266) → TB6612FNG H-bridge → track, plus an RGB status LED. Full parts list, wiring diagram, and pinout live in **[docs/HARDWARE.md](docs/HARDWARE.md)**.
+Wemos D1 Mini (ESP8266) → TB6612FNG H-bridge → track, plus an optional RGB status LED. Full parts list, wiring diagram, and pinout live in **[docs/HARDWARE.md](docs/HARDWARE.md)**.
 
 ## Quickstart
 

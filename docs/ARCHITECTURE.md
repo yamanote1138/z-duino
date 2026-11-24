@@ -11,7 +11,7 @@ flowchart LR
   end
   subgraph wemos["Wemos D1 Mini (ESP8266)"]
     FW["Firmware<br/>(firmware/z-duino)"]
-    M["Motor driver + RGB LED"]
+    M["Motor driver + optional RGB LED"]
     FW --> M
   end
   subgraph mac["Mac (tools/train, Node)"]
@@ -35,7 +35,7 @@ flowchart LR
 
 | Code | Runs on | Talks to | Owns |
 |---|---|---|---|
-| `firmware/z-duino/`, `lib/` (MotorLogic, LedTiming, Command) | Wemos D1 Mini. `lib/` is also compiled natively for `pio test -e native`. | Serves HTTP :80 and WebSocket :81; mDNS name from `MDNS_HOSTNAME` (default `ztrain.local`) | Current speed and direction, the invert flag (RAM only, forgotten on reboot), the connected-client count. **The only code that drives the motor and the LED.** Persists nothing; LittleFS holds only the built frontend. |
+| `firmware/z-duino/`, `lib/` (MotorLogic, LedTiming, Command) | Wemos D1 Mini. `lib/` is also compiled natively for `pio test -e native`. | Serves HTTP :80 and WebSocket :81; mDNS name from `MDNS_HOSTNAME` (default `ztrain.local`) | Current speed and direction, the invert flag (RAM only, forgotten on reboot), the connected-client count. **The only code that drives the motor and the (optional) status LED.** Which optional hardware a controller was built with (`HAS_STATUS_LED`) is reported in its status message as `features`, and the throttle app and the Mac tools adapt to it. Persists nothing; LittleFS holds only the built frontend. |
 | `frontend/` | Built by Vite into `build/data/`, flashed to LittleFS, runs in a phone or desktop browser. `npm run dev:all` runs it on the Mac against `mock-server.ts`. | WebSocket :81 on the host it was loaded from | Client-side speed ramping; the invert choice (browser `localStorage`, re-sent on every connect); party-mode beat engine. |
 | `tools/train/sensor/` | Arduino Uno R4 Minima | USB serial to the Mac | Nothing: streams `reading,microseconds` at about 50 Hz. |
 | `tools/train/lib/` modules and the scripts around them (`show.mjs`, `serve.mjs`, `calibrate.mjs`, `measure-zones.mjs`, ...) | Mac, Node 22+, zero dependencies | WebSocket :81 as a client of the Wemos; serial from the Uno; `afplay` for sound; HTTP on `127.0.0.1` for the web page | Show runs, sensor state, sound playback; your files in `tools/train/local/` (calibration, loco profile, layout, shows, settings). |

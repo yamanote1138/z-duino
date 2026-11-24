@@ -75,7 +75,7 @@ z-duino/
 ├── firmware/z-duino/
 │   ├── z-duino.ino              # Main sketch (WiFi, mDNS, HTTP, WebSocket)
 │   ├── Motor.h / Motor.cpp      # TB6612FNG motor driver abstraction
-│   └── StatusLED.h / StatusLED.cpp  # RGB status LED abstraction
+│   └── StatusLED.h / StatusLED.cpp  # RGB status LED abstraction (optional: no-op when built with -D HAS_STATUS_LED=0)
 ├── frontend/
 │   ├── src/
 │   │   ├── App.vue              # Root component

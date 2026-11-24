@@ -24,6 +24,7 @@ type IncomingCommand =
 
 const PORT = 81
 const RAILROAD_NAME = 'Mock Railroad Co.'
+const HAS_LED = process.env.MOCK_LED !== '0' // MOCK_LED=0 npm run mock: act like a controller built without the status LED
 const wss = new WebSocketServer({ port: PORT })
 
 const state: TrainState = {
@@ -37,7 +38,8 @@ function sendStatus(ws: WebSocket) {
     name: RAILROAD_NAME,
     speed: state.speed,
     direction: state.direction,
-    connected: true
+    connected: true,
+    features: { led: HAS_LED }
   }))
 }
 
@@ -73,11 +75,11 @@ wss.on('connection', (ws: WebSocket) => {
           break
 
         case 'led':
-          console.log(`LED: r=${msg.r} g=${msg.g} b=${msg.b}`)
+          console.log(HAS_LED ? `LED: r=${msg.r} g=${msg.g} b=${msg.b}` : 'LED command ignored: no status LED fitted')
           break
 
         case 'led_auto':
-          console.log('LED: auto status resumed')
+          if (HAS_LED) console.log('LED: auto status resumed')
           break
 
         case 'ping':

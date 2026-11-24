@@ -197,3 +197,32 @@ test("findHost: TRAIN_HOST wins, then the resolved address, then the plain name"
   assert.equal(await findHost({}, async () => ({ address: "192.168.1.9" })), "192.168.1.9");
   assert.equal(await findHost({}, async () => { throw new Error("no mdns"); }), "ztrain.local");
 });
+
+test("the status LED is optional: led() and ledAuto() do nothing when the controller reports none", async () => {
+  const c = await make();
+  assert.equal(c.hasLed, true, "assumed present until told otherwise");
+  assert.equal(c.led(1000, 0, 0), true); assert.equal(c.ledAuto(), true);
+  FakeWS.last.message({ type: "status", name: "ztrain", speed: 0, direction: true, connected: true });   // older firmware: no features
+  assert.equal(c.hasLed, true);
+  FakeWS.last.message({ type: "status", name: "ztrain", speed: 0, direction: true, connected: true, features: { led: true } });
+  assert.equal(c.hasLed, true);
+  assert.equal(cmds(c, "led").length, 1); assert.equal(cmds(c, "led_auto").length, 1);
+  FakeWS.last.message({ type: "status", name: "ztrain", speed: 0, direction: true, connected: true, features: { led: false } });
+  assert.equal(c.hasLed, false);
+  assert.equal(c.led(0, 1000, 0), false); assert.equal(c.ledAuto(), false);
+  assert.equal(cmds(c, "led").length, 1, "nothing more was sent"); assert.equal(cmds(c, "led_auto").length, 1);
+  await c.close();
+});
+
+test("the led option forces the answer either way", async () => {
+  FakeWS.failOpen = false;
+  const off = new Controller({ host: "h", WebSocketImpl: FakeWS, config: FAST, led: false }); await off.connect();
+  assert.equal(off.led(1, 2, 3), false); assert.equal(FakeWS.last.sent.filter((m) => m.cmd === "led").length, 0);
+  FakeWS.last.message({ type: "status", speed: 0, direction: true, connected: true, features: { led: true } });
+  assert.equal(off.hasLed, false, "forced off even though the controller reports an LED");
+  await off.close();
+  const on = new Controller({ host: "h", WebSocketImpl: FakeWS, config: FAST, led: true }); await on.connect();
+  FakeWS.last.message({ type: "status", speed: 0, direction: true, connected: true, features: { led: false } });
+  assert.equal(on.led(1, 2, 3), true); assert.equal(FakeWS.last.sent.filter((m) => m.cmd === "led").length, 1);
+  await on.close();
+});

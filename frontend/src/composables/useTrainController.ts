@@ -25,6 +25,8 @@ interface StatusMessage {
   speed: number
   direction: boolean
   connected: boolean
+  // Hardware this controller has fitted. Older firmware sends no "features": treat that as everything present.
+  features?: { led?: boolean }
 }
 
 interface PongMessage {
@@ -79,6 +81,7 @@ const ledTestMode = ref(false)
 const ledBright = ref(true)
 const activeLedColor = ref<string | null>(null)
 const partyMode = ref(false)
+const hasLed = ref(true) // the status LED is optional hardware; the controller says whether it is fitted
 
 const trackVoltage = computed(() => SUPPLY_VOLTAGE * currentSpeed.value)
 const trackVoltageDanger = computed(() => trackVoltage.value > TRACK_VOLTAGE_DANGER_THRESHOLD)
@@ -161,6 +164,13 @@ function connect() {
         }
         currentSpeed.value = msg.speed
         currentDirection.value = msg.direction
+        hasLed.value = msg.features?.led !== false
+        if (!hasLed.value && (ledTestMode.value || partyMode.value)) {
+          // The LED vanished under us (re-flashed without one): drop out of LED test and party mode
+          stopParty()
+          ledTestMode.value = false
+          activeLedColor.value = null
+        }
       }
     } catch (e) {
       // ignore malformed messages
@@ -278,6 +288,7 @@ function toggleInvert() {
 // ── LED test panel ──
 
 function toggleLedTest() {
+  if (!hasLed.value) return // no LED fitted: nothing to test
   // Kill party mode if active
   if (partyMode.value) stopParty()
   ledTestMode.value = !ledTestMode.value
@@ -343,6 +354,7 @@ function startParty() {
 }
 
 function togglePartyMode() {
+  if (!hasLed.value) return // no LED fitted: nothing to party with
   partyMode.value = !partyMode.value
   if (partyMode.value) {
     activeLedColor.value = null
@@ -376,10 +388,14 @@ function getDebugInfo(): { label: string; value: string; danger?: boolean }[] {
     { label: 'Direction', value: currentDirection.value ? 'FWD' : 'REV' },
     { label: 'Direction Inverted', value: String(directionInverted.value) },
     { label: 'Ramping', value: String(rampTimer !== null) },
-    { label: 'LED Test Mode', value: String(ledTestMode.value) },
-    { label: 'Party Mode', value: String(partyMode.value) },
-    { label: 'LED Brightness', value: ledBright.value ? 'Bright' : 'Dim' },
-    { label: 'Active LED Color', value: activeLedColor.value ?? 'none' },
+    ...(hasLed.value
+      ? [
+          { label: 'LED Test Mode', value: String(ledTestMode.value) },
+          { label: 'Party Mode', value: String(partyMode.value) },
+          { label: 'LED Brightness', value: ledBright.value ? 'Bright' : 'Dim' },
+          { label: 'Active LED Color', value: activeLedColor.value ?? 'none' },
+        ]
+      : [{ label: 'Status LED', value: 'not fitted' }]),
     { label: 'Ping Interval', value: `${PING_INTERVAL}ms` },
     { label: 'Ping Active', value: String(pingTimer !== null) },
     { label: 'Hostname', value: location.hostname || 'localhost' },
@@ -407,6 +423,7 @@ export function useTrainController() {
     ledTestMode,
     ledBright,
     activeLedColor,
+    hasLed,
 
     getSegmentClass,
     setSpeed,

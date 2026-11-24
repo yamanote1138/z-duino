@@ -3,6 +3,13 @@
 
 #include <Arduino.h>
 
+// The RGB status LED is optional hardware. Build with -D HAS_STATUS_LED=0 (in secrets.ini) if you did not fit one:
+// StatusLED then does nothing, touches no pins, and the controller reports features.led = false so the web app and
+// the Mac tools leave their LED controls out. The default is 1, so existing builds are unchanged.
+#ifndef HAS_STATUS_LED
+#define HAS_STATUS_LED 1
+#endif
+
 enum LEDState {
   WIFI_CONNECTING,
   IDLE,
@@ -11,6 +18,8 @@ enum LEDState {
   LED_TEST,
   EMERGENCY_STOP_BLINK
 };
+
+#if HAS_STATUS_LED
 
 class StatusLED {
   public:
@@ -33,5 +42,18 @@ class StatusLED {
     int _testG;
     int _testB;
 };
+
+#else  // no LED fitted: the same interface, so the sketch needs no #ifs at its call sites
+
+class StatusLED {
+  public:
+    StatusLED() {}
+    void setState(LEDState) {}
+    void setTestColor(int, int, int) {}
+    void blinkEmergencyStop() {}
+    void update() {}
+};
+
+#endif  // HAS_STATUS_LED
 
 #endif

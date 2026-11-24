@@ -273,3 +273,20 @@ test("simulateShow returns a failed run with its timeline instead of throwing", 
   assert.ok(r.log.some((e) => /^stopped:/.test(e.text)));
   assert.equal(r.commands.filter((c) => c.cmd === "speed").at(-1).value, 0);
 });
+
+test("a controller with no status LED: led and led-auto steps are skipped, logged, and the rest of the show runs", async () => {
+  const clock = new VirtualClock();
+  const ctl = new Controller({ host: "sim", WebSocketImpl: SimSocket, clock, config: { pingMs: 2e9 }, led: false });
+  await ctl.connect();
+  const sensor = new GhostSensor(clock, { state: "clear" });
+  const sound = new SimSound(clock, null);
+  let result;
+  await clock.run((async () => {
+    result = await runShow(show([{ do: "led", color: "red" }, { do: "wait", ms: 100 }, { do: "led-auto" }, { do: "direction", forward: true }]), { controller: ctl, sensor, sound, clock });
+    await ctl.close();
+  })());
+  const sent = SimSocket.last.sent.filter((m) => m.cmd !== "ping");
+  assert.ok(!sent.some((m) => m.cmd === "led" || m.cmd === "led_auto"), JSON.stringify(sent));
+  assert.ok(sent.some((m) => m.cmd === "direction"));
+  assert.equal(result.log.filter((e) => /led skipped/.test(e.text)).length, 2);
+});

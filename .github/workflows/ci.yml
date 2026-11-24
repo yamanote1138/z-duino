@@ -36,5 +36,7 @@ jobs:
         run: cp secrets.ini.example secrets.ini
       - name: Compile
         run: pio run
+      - name: Compile without the optional status LED
+        run: PLATFORMIO_BUILD_FLAGS="-D HAS_STATUS_LED=0" pio run
       - name: Run native unit tests
         run: pio test -e native

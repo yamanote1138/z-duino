@@ -253,3 +253,54 @@ describe('party mode', () => {
     expect(peak).toBeLessThanOrEqual(250)
   })
 })
+
+describe('optional status LED', () => {
+  const status = (features?: { led?: boolean }) => ({ type: 'status', speed: 0, direction: true, connected: true, ...(features ? { features } : {}) })
+  const ledMessages = (socket: (typeof FakeWebSocket.instances)[number]) =>
+    socket.sent.map(m => JSON.parse(m)).filter(m => m.cmd === 'led' || m.cmd === 'led_auto')
+
+  it('assumes an LED when the controller says nothing (older firmware)', () => {
+    const socket = FakeWebSocket.instances[0]
+    expect(tc.hasLed.value).toBe(true)
+    socket.simulateMessage(status())
+    expect(tc.hasLed.value).toBe(true)
+    tc.toggleLedTest()
+    expect(tc.ledTestMode.value).toBe(true)
+  })
+
+  it('knows when the controller reports an LED', () => {
+    FakeWebSocket.instances[0].simulateMessage(status({ led: true }))
+    expect(tc.hasLed.value).toBe(true)
+  })
+
+  it('with no LED fitted, LED test and party mode do nothing and send nothing', async () => {
+    const socket = FakeWebSocket.instances[0]
+    socket.simulateMessage(status({ led: false }))
+    expect(tc.hasLed.value).toBe(false)
+    tc.toggleLedTest()
+    tc.togglePartyMode()
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(tc.ledTestMode.value).toBe(false)
+    expect(tc.partyMode.value).toBe(false)
+    expect(ledMessages(socket)).toEqual([])
+  })
+
+  it('the debug panel drops the LED rows and says the LED is not fitted', () => {
+    FakeWebSocket.instances[0].simulateMessage(status({ led: false }))
+    expect(() => getDebugValue('LED Test Mode')).toThrow()
+    expect(() => getDebugValue('Party Mode')).toThrow()
+    expect(getDebugValue('Status LED')).toBe('not fitted')
+  })
+
+  it('party mode stops if the controller turns out to have no LED', async () => {
+    const socket = FakeWebSocket.instances[0]
+    tc.togglePartyMode()
+    await vi.advanceTimersByTimeAsync(300)
+    expect(tc.partyMode.value).toBe(true)
+    socket.simulateMessage(status({ led: false }))
+    const after = socket.sent.length
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(tc.partyMode.value).toBe(false)
+    expect(socket.sent.length).toBe(after)
+  })
+})

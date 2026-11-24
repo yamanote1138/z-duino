@@ -14,12 +14,12 @@ Network-controlled Z-scale model train controller. ESP8266 (Wemos D1 Mini) firmw
 - Wemos D1 Mini (ESP8266)
 - TB6612FNG H-bridge (Motor A only)
 - 12V DC power supply
-- Common cathode RGB LED (4-pin through-hole)
-- Pins: D1=PWMA, D2=AIN2, D3=AIN1, D4=STBY, D5=LED-R, D6=LED-G, D7=LED-B
+- Common cathode RGB LED (4-pin through-hole) — **optional**: build with `-D HAS_STATUS_LED=0` in `secrets.ini` if none is fitted (default on). The status message reports `features.led`; the app and the Mac tools hide or skip LED features when it is false.
+- Pins: D1=PWMA, D2=AIN2, D3=AIN1, D4=STBY, D5=LED-R, D6=LED-G, D7=LED-B (D5-D7 only with the LED)
 
 ## WebSocket Protocol (port 81)
 Client sends JSON: `{"cmd": "speed", "value": 0.0-1.0}`, `{"cmd": "direction", "value": true/false}`, `{"cmd": "stop"}`, `{"cmd": "ping"}`, `{"cmd": "invert", "value": true/false}` (motor direction invert), `{"cmd": "led", "r": 0-1000, "g": 0-1000, "b": 0-1000}` (LED test mode / party mode), `{"cmd": "led_auto"}` (resume status LED)
-Server responds: `{"type": "status", "name": "...", "speed": 0.0, "direction": true, "connected": true}`, `{"type": "pong"}`
+Server responds: `{"type": "status", "name": "...", "speed": 0.0, "direction": true, "connected": true, "features": {"led": true}}` (`features` = hardware fitted; absent on older firmware, which clients treat as "everything present"), `{"type": "pong"}`. Without an LED, `led` and `led_auto` are accepted and ignored.
 
 ## Development
 ```bash
@@ -46,7 +46,7 @@ Both run in CI. Code touching real hardware I/O (pins, WiFi/sockets) isn't unit-
 - `lib/MotorLogic/`, `lib/LedTiming/`, `lib/Command/` — hardware-independent logic, unit-tested via `pio test -e native`
 - `firmware/z-duino/z-duino.ino` — Main sketch
 - `firmware/z-duino/Motor.h/.cpp` — Motor abstraction
-- `firmware/z-duino/StatusLED.h/.cpp` — Status LED abstraction
+- `firmware/z-duino/StatusLED.h/.cpp` — Status LED abstraction (no-op stand-in when `HAS_STATUS_LED=0`)
 - `frontend/src/App.vue` — Root Vue component
 - `frontend/src/composables/useTrainController.ts` — Core controller logic (WebSocket, ramping, state)
 - `frontend/src/composables/partyBeat.ts` — Pure party-mode beat engine (BPM → RGB frames), unit-tested

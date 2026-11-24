@@ -34,6 +34,7 @@ export const SCHEMA = {
     port: int(81, 1, 65535, "The controller's WebSocket port."),
     pingMs: int(5000, 100, 25000, "Keepalive ping interval. The firmware stops the motor after 30 s of silence, so keep this well under that."),
     invert: { type: "boolean", nullable: true, default: null, flag: "invert", doc: "Motor direction invert, sent to the controller when a tool connects. Left empty, nothing is sent and the controller keeps whatever it has (it forgets on every reboot, and the web app sets it per browser; the controller has one flag, so whoever connected last wins)." },
+    led: { type: "autobool", default: "auto", flag: "led", doc: "Whether the controller has the optional RGB status LED. \"auto\" asks the controller (it reports features.led; older firmware reports nothing and is assumed to have one). true or false forces it. Without an LED, led and led-auto show steps are skipped." },
   },
   sensor: {
     port: str("The sensor Arduino's serial port, e.g. /dev/cu.usbmodem1101. Left empty, the only /dev/cu.usbmodem* present is used (and found again if macOS renames it after a replug).", { env: "SENSOR_PORT", flag: "sensor-port" }),
@@ -97,6 +98,7 @@ function check(spec, v) {
   switch (spec.type) {
     case "string": return typeof v === "string" && v ? null : "must be a non-empty string";
     case "boolean": return typeof v === "boolean" ? null : "must be true or false";
+    case "autobool": return v === "auto" || typeof v === "boolean" ? null : "must be \"auto\", true or false";
     case "list": return Array.isArray(v) && v.length && v.every((x) => typeof x === "string" && x) ? null : "must be a list of one or more strings";
     case "number": case "integer": {
       if (typeof v !== "number" || !Number.isFinite(v)) return "must be a number";
@@ -113,6 +115,7 @@ function coerce(spec, s) {
   if (s === "null" || s === "") return spec.nullable ? null : s;
   switch (spec.type) {
     case "boolean": return s === "true" ? true : s === "false" ? false : s;
+    case "autobool": return s === "true" ? true : s === "false" ? false : s;
     case "number": case "integer": return s.trim() !== "" && !Number.isNaN(Number(s)) ? Number(s) : s;
     case "list": return s.split(",").map((x) => x.trim()).filter(Boolean);
     default: return s;

@@ -25,7 +25,13 @@
     // and the controller keeps whatever it has (it forgets on every reboot, and the web app sets it
     // per browser; the controller has one flag, so whoever connected last wins).
     // Also settable by: flag --invert=.
-    // "invert": null
+    // "invert": null,
+
+    // Whether the controller has the optional RGB status LED. "auto" asks the controller (it reports
+    // features.led; older firmware reports nothing and is assumed to have one). true or false forces
+    // it. Without an LED, led and led-auto show steps are skipped.
+    // Also settable by: flag --led=.
+    // "led": "auto"
   },
 
   "sensor": {

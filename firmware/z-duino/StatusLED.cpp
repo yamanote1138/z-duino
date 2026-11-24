@@ -1,4 +1,7 @@
 #include "StatusLED.h"
+
+#if HAS_STATUS_LED
+
 #include <LedTiming.h>
 
 StatusLED::StatusLED(int pinR, int pinG, int pinB)
@@ -90,3 +93,5 @@ void StatusLED::update() {
     }
   }
 }
+
+#endif  // HAS_STATUS_LED

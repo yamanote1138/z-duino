@@ -74,6 +74,19 @@ test("mistakes are errors that name the key, with a suggestion for typos", () =>
   try { load({ localDir: dirWith(`{ "web": { "port": "x", "bogus": 1 } }`) }); assert.fail("should throw"); } catch (e) { assert.equal(e.problems.length, 2); }
 });
 
+test("controller.led is auto, true or false, and reaches the controller", async () => {
+  assert.equal(load({ localDir: dirWith() }).controller.led, "auto");
+  assert.equal(load({ localDir: dirWith(`{ "controller": { "led": false } }`) }).controller.led, false);
+  assert.equal(load({ localDir: dirWith(), argv: ["--led=true"] }).controller.led, true);
+  assert.equal(load({ localDir: dirWith(`{ "controller": { "led": false } }`), argv: ["--led=auto"] }).controller.led, "auto");
+  assert.throws(() => load({ localDir: dirWith(`{ "controller": { "led": "sometimes" } }`) }), /controller\.led must be "auto", true or false/);
+  assert.throws(() => load({ localDir: dirWith(), argv: ["--led=maybe"] }), /flag --led/);
+  const ctl = await connectController({ config: load({ localDir: dirWith(`{ "controller": { "host": "h", "led": false } }`) }), WebSocketImpl: SimSocket });
+  assert.equal(ctl.hasLed, false); assert.equal(ctl.led(1, 2, 3), false); await ctl.close();
+  const dflt = await connectController({ config: load({ localDir: dirWith(`{ "controller": { "host": "h" } }`) }), WebSocketImpl: SimSocket });
+  assert.equal(dflt.hasLed, true); await dflt.close();
+});
+
 test("stripJsonc keeps strings intact", () => {
   assert.deepEqual(parseConfigText(`{ "a": "// not a comment", "b": "/* nor this */", "c": "a,}", // real
  "d": [1, 2,], }`), { a: "// not a comment", b: "/* nor this */", c: "a,}", d: [1, 2] });

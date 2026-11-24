@@ -6,8 +6,8 @@
           <TrainHeader />
         </template>
 
-        <SpeedController v-if="!ledTestMode" />
-        <LedTestPanel v-if="ledTestMode" />
+        <SpeedController v-if="!(hasLed && ledTestMode)" />
+        <LedTestPanel v-if="hasLed && ledTestMode" />
 
         <template #footer>
           <TrainFooter />
@@ -24,5 +24,5 @@ import SpeedController from './components/SpeedController.vue'
 import LedTestPanel from './components/LedTestPanel.vue'
 import TrainFooter from './components/TrainFooter.vue'
 
-const { ledTestMode } = useTrainController()
+const { ledTestMode, hasLed } = useTrainController()
 </script>

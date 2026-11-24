@@ -3,6 +3,7 @@
     <DirectionInvert />
     <DebugModal />
     <UButton
+      v-if="hasLed"
       size="sm"
       :color="ledTestMode ? 'primary' : 'neutral'"
       variant="outline"
@@ -12,6 +13,7 @@
       {{ ledTestMode ? 'Back to Throttle' : 'LED Test' }}
     </UButton>
     <UButton
+      v-if="hasLed"
       size="sm"
       :color="partyMode ? 'warning' : 'neutral'"
       :variant="partyMode ? 'solid' : 'outline'"
@@ -29,5 +31,5 @@ import { useTrainController } from '../composables/useTrainController'
 import DirectionInvert from './DirectionInvert.vue'
 import DebugModal from './DebugModal.vue'
 
-const { connected, ledTestMode, toggleLedTest, partyMode, togglePartyMode } = useTrainController()
+const { connected, hasLed, ledTestMode, toggleLedTest, partyMode, togglePartyMode } = useTrainController()
 </script>

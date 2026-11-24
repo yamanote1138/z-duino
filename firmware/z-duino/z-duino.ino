@@ -14,7 +14,7 @@
 #define VERSION "2.5.1"
 
 // analogWrite on ESP8266 is software PWM sharing one hardware timer across
-// all 4 active channels (motor + R/G/B status LED). Above ~40kHz the
+// all active channels (the motor, plus R/G/B if a status LED is fitted: 4 at most). Above ~40kHz the
 // interrupt load starts contending with the WiFi/WebSocket stack, risking
 // jitter and dropped connections.
 #if PWM_FREQ > 40000
@@ -33,10 +33,12 @@ int aIn2 = D2;   // GPIO4  - AIN2
 int aIn1 = D3;   // GPIO0  - AIN1
 int stby = D4;   // GPIO2  - STBY
 
-// Status LED pin assignments (common cathode RGB)
+// Status LED pin assignments (common cathode RGB). Optional: with HAS_STATUS_LED=0 these pins are left alone.
+#if HAS_STATUS_LED
 int ledR = D5;   // GPIO14 - Red cathode
 int ledG = D6;   // GPIO12 - Green cathode
 int ledB = D7;   // GPIO13 - Blue cathode
+#endif
 
 // State
 float currentSpeed = 0.0;
@@ -53,8 +55,12 @@ WebSocketsServer socket(81);
 // Motor
 Motor motor(pwmA, aIn1, aIn2);
 
-// Status LED
+// Status LED (a do-nothing stand-in when none is fitted)
+#if HAS_STATUS_LED
 StatusLED led(ledR, ledG, ledB);
+#else
+StatusLED led;
+#endif
 
 void applyLedStatus() {
   if (connectedClients > 0) {
@@ -86,6 +92,10 @@ String buildStatusJson() {
   doc["speed"] = currentSpeed;
   doc["direction"] = currentDirection;
   doc["connected"] = true;
+  // What this controller has fitted, so clients can leave out controls for hardware that is not there.
+  // Clients treat a missing "features" (older firmware) as "everything present".
+  JsonObject features = doc["features"].to<JsonObject>();
+  features["led"] = (bool)HAS_STATUS_LED;
 
   String json;
   serializeJson(doc, json);
@@ -131,12 +141,18 @@ void handleWebSocketMessage(uint8_t num, uint8_t *payload, size_t length) {
 
     case CMD_LED:
       led.setTestColor(cmd.ledR, cmd.ledG, cmd.ledB);
+#if HAS_STATUS_LED
       Serial.printf("LED test: r=%d g=%d b=%d\n", cmd.ledR, cmd.ledG, cmd.ledB);
+#else
+      Serial.println("LED command ignored: no status LED fitted");
+#endif
       break;
 
     case CMD_LED_AUTO:
       applyLedStatus();
+#if HAS_STATUS_LED
       Serial.println("LED: auto status resumed");
+#endif
       break;
 
     case CMD_PING: {
