@@ -61,7 +61,7 @@ The Wemos has no idea the Mac exists: a Mac script is just another WebSocket cli
 | Invert (motor polarity) | Wemos RAM, set by `{cmd:"invert"}` | The browser re-sends its saved choice on connect. The Mac tools send `controller.invert` from their settings if you set it. The firmware has one flag, so **whichever client connected last wins**. |
 | WiFi, hostname, railroad name, PWM limits | `secrets.ini`, compiled into the firmware | Changing them means re-flashing. |
 | Beam calibration, loco profile, layout, shows, results, traces, your settings | `tools/train/local/` (git-ignored) | Copy the folder to move a setup. `TRAIN_LOCAL` points the tools at another folder. |
-| Sound packs | `tools/train/packs/` (manifests, committed) and the audio files they name (generated or imported by you, not committed) | The `sound.packs` setting chooses which load. |
+| Sound packs | `tools/train/packs/` (manifests, committed) and the audio files they name (generated into `packs/synth/`, or imported by you into `tools/train/local/sounds/`; neither is committed) | The `sound.packs` setting chooses which load. |
 
 ## Configuration
 

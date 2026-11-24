@@ -71,7 +71,7 @@ Defaults live in the code (`lib/config/index.mjs`). To change any, copy `config.
 
 ## Sound
 
-Shows and the web page play effects on the Mac through `afplay` (`sound.volume`, 0.5 by default). Sound files live in `sounds/` and are git-ignored. Some are generated (`lib/synth.mjs`, an impression, not a recording of an EF210); the rest are real clips copied from two sibling projects by `python3 -I import-sounds.py`, which needs `../e235-sounds` (a BVE sound archive for the JR East E235) and `../eki-pi` next to this repo. Those sounds belong to their authors and stay on this machine. A file already in `sounds/` is always used, so you can drop your own over any name.
+Shows and the web page play effects on the Mac through `afplay` (`sound.volume`, 0.5 by default). Sound files live in `local/sounds/` (git-ignored; the real clips are written there by `import-sounds.py`) and in `packs/synth/` (generated on first use). Some are generated (`lib/synth.mjs`, an impression, not a recording of an EF210); the rest are real clips copied from two sibling projects by `python3 -I import-sounds.py`, which needs `../e235-sounds` (a BVE sound archive for the JR East E235) and `../eki-pi` next to this repo. Those sounds belong to their authors and stay on this machine. A file already in `sounds/` is always used, so you can drop your own over any name.
 
 The table is the `full-lap` example show's sound design:
 

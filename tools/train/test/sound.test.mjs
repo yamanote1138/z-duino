@@ -142,3 +142,16 @@ test("a loop on an engine whose clips end instantly does not starve the event lo
   clearInterval(iv); lib.stopAll();
   assert.ok(ticks >= 5, `timers only fired ${ticks} times: the loop starved the event loop`);
 });
+
+test("a pack root can point into local/ with the local: prefix", async () => {
+  const { mkdtempSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join, sep } = await import("node:path");
+  const { loadPack } = await import("../lib/sound/index.mjs");
+  const dir = mkdtempSync(join(tmpdir(), "pk-"));
+  writeFileSync(join(dir, "pack.json"), JSON.stringify({ format: "z-sounds/1", name: "t", root: "local:sounds", sounds: { "a.b": { file: "x.wav" } } }));
+  const e = loadPack(dir).entries["a.b"].variants[0].path;
+  assert.ok(e.endsWith(`${sep}local${sep}sounds${sep}x.wav`), e);
+  writeFileSync(join(dir, "pack.json"), JSON.stringify({ format: "z-sounds/1", name: "t", root: "../elsewhere", sounds: { "a.b": { file: "x.wav" } } }));
+  assert.equal(loadPack(dir).entries["a.b"].variants[0].path, join(dir, "..", "elsewhere", "x.wav"), "relative roots still resolve against the manifest");
+});

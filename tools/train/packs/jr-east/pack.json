@@ -3,7 +3,7 @@
   "name": "jr-east",
   "license": "personal use only: clips are other people's recordings (a BVE E235 sound set and the eki-pi project); not redistributable",
   "source": "python3 -I import-sounds.py (needs ../e235-sounds and ../eki-pi)",
-  "root": "../../sounds",
+  "root": "local:sounds",
   "sounds": {
     "horn.depart": {
       "file": "horn.wav",

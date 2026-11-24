@@ -4,7 +4,8 @@
 // pack.json:
 // {
 //   "format": "z-sounds/1", "name": "jr-east", "license": "personal use only", "source": "where the audio came from",
-//   "root": "../../sounds",                       optional: where the files are, relative to this manifest (default: the manifest's folder)
+//   "root": "local:sounds",                       optional: where the files are: relative to this manifest, absolute, or "local:name" for
+//                                                 tools/train/local/name (default: the manifest's folder)
 //   "sounds": {
 //     "horn.depart": { "file": "horn.wav", "gain": 1 },                         one file
 //     "flange": {                                                                several variants, one chosen per play
@@ -18,6 +19,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, resolve, isAbsolute } from "node:path";
 import { wavDurationMs } from "./wav.mjs";
+import { localPath } from "../paths.mjs";
 
 export const PACK_FORMAT = "z-sounds/1";
 
@@ -26,7 +28,7 @@ export function loadPack(manifestPath) {
   const raw = JSON.parse(readFileSync(file, "utf8"));
   if (raw.format !== PACK_FORMAT) throw new Error(`${file}: format must be "${PACK_FORMAT}" (got ${JSON.stringify(raw.format)})`);
   if (!raw.sounds || typeof raw.sounds !== "object") throw new Error(`${file}: no "sounds"`);
-  const root = raw.root ? resolve(dirname(file), raw.root) : dirname(file);
+  const root = !raw.root ? dirname(file) : raw.root.startsWith("local:") ? localPath(raw.root.slice(6)) : resolve(dirname(file), raw.root);
   const entries = {};
   for (const [id, e] of Object.entries(raw.sounds)) {
     const list = e.variants || (e.file ? [{ file: e.file, durationMs: e.durationMs, weight: e.weight }] : null);
