@@ -97,7 +97,7 @@ Only one program at a time can hold the sensor's serial port: stop `serve.mjs` b
 
 ## Inside tools/train
 
-- **Modules** (`lib/`): `sensor` (events from the beam, calibration), `sound` (library, packs, engines), `controller` (WebSocket client with the motor-care rules), `show` (the `z-show/1` JSON runtime, layout zones, simulator), `web` (the page's service), `config` (settings), `paths` (the `local/` folder). Each takes its dependencies as arguments, so everything is tested without hardware.
+- **Modules** (`lib/`): `sensor` (events from the beam, calibration), `sound` (library, packs, engines), `controller` (WebSocket client with the motor-care rules), `show` (the `z-show/1` JSON runtime, layout zones, simulator), `track` (putting the loco back on the mark, and a physics model of the track for tests and dry runs), `web` (the page's service), `config` (settings), `paths` (the `local/` folder). Each takes its dependencies as arguments, so everything is tested without hardware.
 - **Scripts** (top level): thin command-line front ends over the modules (`show.mjs`, `serve.mjs`, `calibrate.mjs`, `creep-stop.mjs`, `measure-zones.mjs`, `sound-test.mjs`, `sensor-watch.mjs`, `config.mjs`).
 - The jobs of the earlier hand-written scripts (`signal-show`, `ramp-loops`, `tail-stop`, ...) are now example shows in `examples/shows/`; the ones that are not shows (`learn-loco`, `light-test`, `nudge`, ...) are written on the modules too, so there is one serial reader, one controller client and one set of beam thresholds (`DETECTOR_DEFAULTS`).
 - The throttle app (`frontend/`) and the Mac web page share no code. The Mac page imitates the throttle app's look so the two read as one product.

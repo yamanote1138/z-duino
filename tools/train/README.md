@@ -23,7 +23,7 @@ Without your own layout or loco profile, `validate` and `sim` use the examples i
 1. Build and flash the controller (see the repo's main README); it should answer at `ztrain.local`.
 2. Wire the break-beam sensor (**Hardware** below) and flash its sketch: `cd sensor && pio run -t upload`.
 3. `node calibrate.mjs` measures the open-beam and blocked readings (interactive).
-4. Park the loco with its nose in the beam, "the mark": `node creep-stop.mjs` from a few inches short of the beam, or `node nudge.mjs to-mark` from anywhere clear of it.
+4. Park the loco with its nose in the beam, "the mark": `node nudge.mjs to-mark` from wherever it is (see **Returning to the mark** below), or `node creep-stop.mjs` from a few inches short of the beam.
 5. `node learn-loco.mjs --in-beam` teaches the loco's length and speed table (about 8 minutes; it runs the loco around the loop at several speeds).
 6. Measure your track. Measure the length of one lap along the rails with a piece of string, then `node measure-zones.mjs --loop-in=<inches> --save` and press a key as the nose reaches the start and end of a bend. Repeat with `--marks=` for more zones.
 7. Run something: `node show.mjs run park-on-tail`, or `node serve.mjs --open` for the page.
@@ -77,12 +77,12 @@ All scripts need Node 22+ (global `WebSocket`). The controller's address and the
 
 | Script | What it does |
 |---|---|
-| `show.mjs` | Check, simulate and run a show (a JSON file): `node show.mjs list \| validate \| sim \| run <show>`. See **Shows**. |
+| `show.mjs` | Check, simulate and run a show (a JSON file): `node show.mjs list \| validate \| sim \| run <show>`. See **Shows**. `run --reset` puts the loco on the mark first. |
 | `serve.mjs` | The web page: run shows, audition sounds, import and export shows. See **The web page**. |
 | `calibrate.mjs` | Measure the open-beam and blocked readings and write `local/sensor_levels.json`. Interactive; needs the sensor only. |
 | `sensor-watch.mjs` | Print the sensor's events live, or replay a trace (`--replay=<csv>`). |
 | `creep-stop.mjs` | Creep forward at 10% and stop when the nose breaks the beam. Start with the nose a few inches short of the beam; it gives up after 8 s (`--max=<seconds>` for longer; a full lap at creep is about 56 s). This puts the train on "the mark". |
-| `nudge.mjs` | Move the loco by hand, with the beam as the safety: `fwd <s>` / `back <s>` creep for up to 6 s and stop at any beam event; `to-mark` backs over the beam and forward onto the mark from anywhere clear of it. |
+| `nudge.mjs` | Move the loco by hand, with the beam as the safety: `fwd <s>` / `back <s>` creep for up to 6 s and stop at any beam event; `to-mark` puts the loco back on the mark from wherever it is (**Returning to the mark**). |
 | `measure-zones.mjs` | Measure your layout's zones (curves, approach) by pressing a key as the nose reaches each mark during one slow lap. See **Shows**. |
 | `sound-test.mjs` | List, play and check the sound library, with no train. |
 | `config.mjs` | Print the settings in effect and where each came from (`--example` prints the documented template). |
@@ -188,6 +188,18 @@ step is at the top of `lib/show/schema.mjs`; the validator names the path of eve
 - `sim` uses the real runtime, controller and sound-library checks; only the sensor (a ghost that answers after a fixed
   delay), the WebSocket and the audio are faked, so it checks order and commands, not your layout's timing.
 
+## Returning to the mark
+
+Every show that says `start: blocked` begins with the nose on the mark, and refuses to move if the beam says otherwise. `node nudge.mjs to-mark` (also the page's **Return to the mark** button, and `node show.mjs run <show> --reset`) puts the loco there from wherever it is, simplest thing first, every move at creep speed and stopped by a beam event:
+
+1. **Beam blocked** (the nose or the tail is in it): back off until it clears, then creep forward until it breaks. That seats the nose on the edge whichever end was in the beam.
+2. **Beam clear, just short of the mark?** Creep forward for a few seconds (`--near=5`, about 12 in): a break means it is there.
+3. **Just past it?** Back up over the beam (break, then clear), then creep forward until it breaks.
+4. **Neither:** creep forward round the loop until the beam breaks, for one lap's time plus a margin.
+5. If even that fails, the loco is stopped and the message says what to check (something else blocking the beam, the loco off the track, the sensor not working).
+
+Ctrl-C or STOP stops it at once, and so does losing the sensor. The logic is in `lib/track/mark.mjs`; `lib/track/physics.mjs` is a model of the track (a loco with a position, the beam where the geometry puts it, injectable faults) that the tests drive it with.
+
 ## The web page
 
 `node serve.mjs --open` starts a page on `http://127.0.0.1:4040/` (this Mac only; no dependencies, nothing to build):
@@ -196,6 +208,7 @@ step is at the top of `lib/show/schema.mjs`; the validator names the path of eve
   timeline on a virtual clock; nothing moves or plays) or Run it on the train, with the log live beside it. Export a show as
   JSON, or import one (it is validated first and saved to `local/shows/`). `#local/<name>` in the address opens a show.
 - **Sounds**: every sound in the packs, with gain and cut-off controls, to audition before putting one in a show.
+- **Return to the mark**: a button that does what `nudge.mjs to-mark` does, stoppable like a show.
 - **STOP** ramps the loco down like Ctrl-C; **E-STOP** sends the controller's stop command at once. Both are always on screen.
 - One show at a time. A run needs the sensor working and, for `start: blocked`, the nose on the mark; sounds are off limits
   while a show runs. The service holds the sensor's serial port, so stop it before `calibrate.mjs` or `measure-zones.mjs`.
