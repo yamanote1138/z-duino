@@ -39,8 +39,9 @@ const realClock = { now: () => Date.now(), sleep: (ms) => new Promise((r) => set
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
 export class Controller extends EventEmitter {
-  constructor({ host, url, WebSocketImpl = globalThis.WebSocket, config = {}, clock = realClock } = {}) {
+  constructor({ host, url, WebSocketImpl = globalThis.WebSocket, config = {}, clock = realClock, invert = null } = {}) {
     super();
+    this.invert = invert;   // true/false: sent to the controller when we connect; null: leave the controller's own setting alone
     this.clock = clock;   // { now(), sleep(ms) }: replaced by a virtual clock when a show is simulated
     this.config = { ...CONTROLLER_DEFAULTS, ...config };
     this.url = url || `ws://${host}:${this.config.port}`;
@@ -59,6 +60,7 @@ export class Controller extends EventEmitter {
       ws.addEventListener("error", () => { clearTimeout(timer); rej(new Error(`connect failed (${this.url})`)); }, { once: true });
     });
     this.connected = true;
+    if (this.invert !== null) this.send({ cmd: "invert", value: !!this.invert });
     ws.addEventListener("message", (ev) => {
       let m; try { m = JSON.parse(typeof ev.data === "string" ? ev.data : String(ev.data)); } catch { return; }
       if (m && m.type === "status") { this.status = m; this.emit("status", m); }
@@ -182,9 +184,13 @@ export class Controller extends EventEmitter {
   }
 }
 
-/** Connect to the controller. With no options, the host comes from findHost() (TRAIN_HOST, else ztrain.local). */
-export async function connectController(opts = {}) {
-  let { host } = opts;
+/**
+ * Connect to the controller. `config` is the resolved settings (lib/config): its controller section gives the host
+ * (else findHost(): ztrain.local), port, keepalive and invert. Explicit options win over it.
+ */
+export async function connectController({ config = null, ...opts } = {}) {
+  const c = config ? config.controller : {};
+  let host = opts.host || c.host || null;
   if (!host && !opts.url) host = await findHost();
-  return new Controller({ ...opts, host }).connect();
+  return new Controller({ ...opts, host, invert: opts.invert !== undefined ? opts.invert : (c.invert ?? null), config: { ...(c.port ? { port: c.port } : {}), ...(c.pingMs ? { pingMs: c.pingMs } : {}), ...(opts.config || {}) } }).connect();
 }

@@ -14,34 +14,36 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createWebServer } from "./lib/web/server.mjs";
 import { defaultSounds } from "./lib/sound/defaults.mjs";
+import { loadConfigOrExit } from "./lib/config/index.mjs";
 import { connectController } from "./lib/controller/index.mjs";
 import { localPath } from "./lib/paths.mjs";
 
 const root = dirname(fileURLToPath(import.meta.url)) + "/";
 const argv = process.argv.slice(2);
-const flag = (name, dflt) => { const a = argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : dflt; };
-const port = Number(flag("port", 4040)), volume = Number(flag("volume", 0.5));
+const config = loadConfigOrExit(argv);
 const skip = (p, e) => console.error(`skipping sound pack ${p}: ${e.message}`);
-const sounds = { play: defaultSounds({ engine: "afplay", volume, onSkip: skip }), dry: defaultSounds({ engine: "null", volume }) };
+const { volume, packs } = config.sound;
+const sounds = { play: defaultSounds({ engine: config.sound.engine, volume, packs, onSkip: skip }), dry: defaultSounds({ engine: "null", volume, packs }) };
 
 let sensor = null;
 if (!argv.includes("--no-sensor")) {
   const { createSensor, SerialSource } = await import("./lib/sensor/index.mjs");
-  const { PORT } = await import("./lib/config.mjs");
-  sensor = createSensor({ source: new SerialSource({ port: PORT }) });
+  const source = new SerialSource(config.sensor);
+  sensor = createSensor({ source });
   sensor.on("error", (e) => console.error("sensor error:", e.message));
   await sensor.start();
-  console.log(`sensor on ${PORT}`);
+  await new Promise((r) => setTimeout(r, 1500));
+  console.log(sensor.lastReading != null ? `sensor on ${source.current}` : `sensor: no readings yet (${source.lastError ? source.lastError.message : "waiting"}); the page will show it as lost until it appears`);
 }
 
 const web = createWebServer({
-  hardware: { sensor, connectController: () => connectController() },
+  hardware: { sensor, connectController: () => connectController({ config }) },
   sounds,
   dirs: { local: localPath("shows"), examples: root + "examples/shows" },
   layoutFile: localPath("layout.json"), locoFile: localPath("loco_profile.json"),
   log: (m) => console.error(m),
 });
-const { url } = await web.listen(port);
+const { url } = await web.listen(config.web.port);
 console.log(`train page: ${url}   (Ctrl-C to stop)`);
 if (argv.includes("--open")) spawn("open", [url], { stdio: "ignore", detached: true }).unref();
 

@@ -17,13 +17,22 @@ export function detectPorts(dir = "/dev") {
 export class SerialSource {
   constructor({ port, baud = 115200, reconnectMs = 1000, detect = detectPorts }) {
     this.port = port; this.baud = baud; this.reconnectMs = reconnectMs; this.detect = detect;
-    this._rs = null; this._stopped = true; this._timer = null; this.current = null;
+    this._rs = null; this._stopped = true; this._timer = null; this.current = null; this.lastError = null;
   }
   resolve() {
     if (typeof this.port === "function") return this.port();
-    if (existsSync(this.port)) return this.port;
+    if (this.port && existsSync(this.port)) return this.port;
     const found = this.detect();
     return found.length === 1 ? found[0] : null;
+  }
+  /** Why no port could be opened, in words you can act on. */
+  why(path) {
+    if (path) return `no serial port at ${path}`;
+    const found = this.detect();
+    const gone = typeof this.port === "string" && this.port ? `${this.port} is not there and ` : "";
+    return found.length > 1
+      ? `no serial port: several sensor ports (${found.join(", ")}): set sensor.port in local/config.jsonc, or SENSOR_PORT`
+      : `no serial port: ${gone}no /dev/cu.usbmodem* device is present (is the sensor Arduino plugged in directly, not through a power-only adapter?)`;
   }
   start(onSample, onError = (e) => { throw e; }) {
     this._stopped = false;
@@ -31,7 +40,7 @@ export class SerialSource {
     const open = () => {
       if (this._stopped) return;
       const path = this.resolve();
-      if (!path || !existsSync(path)) return retry(new Error(`no serial port${path ? ` at ${path}` : ""}`));
+      if (!path || !existsSync(path)) return retry(new Error(this.why(path)));
       const flags = process.platform === "darwin" ? ["-f"] : ["-F"];
       spawnSync("stty", [...flags, path, String(this.baud), "raw", "-echo", "-hupcl"]);
       this.current = path;
@@ -61,6 +70,7 @@ export class SerialSource {
     };
     const retry = (err) => {
       if (this._stopped) return;
+      this.lastError = err;
       if (!this.reconnectMs) return onError(err);
       this._timer = setTimeout(open, this.reconnectMs);
     };

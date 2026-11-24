@@ -1,0 +1,64 @@
+// Z-Duino tools: your settings.
+//
+// Copy this file to local/config.jsonc and uncomment (remove the leading //) what you want to change; anything left
+// commented out keeps its default. Comments and trailing commas are fine in this file.
+//
+// Precedence: built-in defaults < this file < environment variables < command-line flags.
+// `node config.mjs` prints what is in effect and where each value came from.
+{
+  "controller": {
+    // The Wemos controller's address. Left empty, ztrain.local is looked up and its IP used (mDNS
+    // names are unreliable for the WebSocket).
+    // Also settable by: env TRAIN_HOST, flag --host=.
+    // "host": null,
+
+    // The controller's WebSocket port.
+    // Range 1 to 65535.
+    // "port": 81,
+
+    // Keepalive ping interval. The firmware stops the motor after 30 s of silence, so keep this well
+    // under that.
+    // Range 100 to 25000.
+    // "pingMs": 5000,
+
+    // Motor direction invert, sent to the controller when a tool connects. Left empty, nothing is sent
+    // and the controller keeps whatever it has (it forgets on every reboot, and the web app sets it
+    // per browser; the controller has one flag, so whoever connected last wins).
+    // Also settable by: flag --invert=.
+    // "invert": null
+  },
+
+  "sensor": {
+    // The sensor Arduino's serial port, e.g. /dev/cu.usbmodem1101. Left empty, the only
+    // /dev/cu.usbmodem* present is used (and found again if macOS renames it after a replug).
+    // Also settable by: env SENSOR_PORT, flag --sensor-port=.
+    // "port": null,
+
+    // Serial speed. Must match the sensor sketch.
+    // Range 300 to 4000000.
+    // "baud": 115200
+  },
+
+  "web": {
+    // The web page's port (serve.mjs). 0 picks a free one. It only listens on 127.0.0.1.
+    // Also settable by: flag --port=.
+    // Range 0 to 65535.
+    // "port": 4040
+  },
+
+  "sound": {
+    // Master volume for every sound.
+    // Also settable by: flag --volume=.
+    // Range 0 to 1.5.
+    // "volume": 0.5,
+
+    // What plays the sounds: afplay (macOS) or null (silent).
+    // Also settable by: flag --engine=.
+    // "engine": "afplay",
+
+    // Sound packs to load, later ones winning. A relative path is under tools/train/, an absolute path
+    // is used as is, and local:name means local/name (so your own packs can live in local/packs/).
+    // Also settable by: flag --packs=.
+    // "packs": ["packs/synth","packs/jr-east"]
+  }
+}

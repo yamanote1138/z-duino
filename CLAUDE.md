@@ -7,6 +7,8 @@ Network-controlled Z-scale model train controller. ESP8266 (Wemos D1 Mini) firmw
 - **Firmware** (`firmware/z-duino/`) — Arduino sketch for ESP8266. Motor control via TB6612FNG H-bridge. WebSocket server on port 81 for real-time commands.
 - **Frontend** (`frontend/`) — Vue 3 + Vite + Nuxt UI + Tailwind CSS v4 + TypeScript. Throttle UI with 10-segment speed bar, smooth ramping, direction toggle, direction invert, party mode (beat-synced techno light show on the status LED, logic in `partyBeat.ts`). Built to `build/data/` for LittleFS.
 - **Build** (`build.sh`) — Interactive script: compiles firmware, builds frontend, flashes both to ESP8266.
+- **Mac tools** (`tools/train/`) — Node (22+, no dependencies) toolchain that runs on the Mac, not the Wemos: beam sensor over USB serial, sound library (afplay), JSON shows, a web page on `127.0.0.1:4040`. A WebSocket client of the controller like the browser. Settings: `tools/train/local/config.jsonc` (template `tools/train/config.example.jsonc`). Tests: `cd tools/train && node --test --test-timeout=30000 test/*.test.mjs`. Details: `tools/train/README.md`.
+- **Read `docs/ARCHITECTURE.md`** for what runs where, who enforces motor care (the clients, not the firmware), and where each setting lives.
 
 ## Hardware
 - Wemos D1 Mini (ESP8266)
@@ -51,6 +53,8 @@ Both run in CI. Code touching real hardware I/O (pins, WiFi/sockets) isn't unit-
 - `frontend/src/components/` — Vue SFCs (SpeedController, LedTestPanel, DebugModal, etc.)
 - `frontend/mock-server.ts` — Mock WebSocket for local dev
 - `docs/LITTLEFS.md` — LittleFS flash layout & mklittlefs parameters
+- `docs/ARCHITECTURE.md` — what runs where, authority and safety rules, configuration map
+- `tools/train/` — Mac-side toolchain (see its README)
 
 ## Dependencies
 - Firmware (PlatformIO, `espressif8266` platform): ArduinoJson, WebSockets — declared in `platformio.ini`, resolved automatically

@@ -5,16 +5,18 @@
 // do the moving and call sensor.calibrate({ clearStep, blockedStep }) yourself.
 import { createInterface } from "node:readline/promises";
 import { createSensor, SerialSource, DEFAULT_FILE } from "./lib/sensor/index.mjs";
-import { PORT } from "./lib/config.mjs";
+import { loadConfigOrExit } from "./lib/config/index.mjs";
 
 const arg = (n, d) => { const a = process.argv.find((x) => x.startsWith(`--${n}=`)); return a ? a.split("=")[1] : d; };
 const rl = createInterface({ input: process.stdin, output: process.stdout });
 const ask = (q) => rl.question(q);
 
-const sensor = createSensor({ source: new SerialSource({ port: PORT }), levels: { clear: 1000, blocked: 0 } });   // levels are replaced by this run
+const config = loadConfigOrExit();
+const source = new SerialSource(config.sensor);
+const sensor = createSensor({ source, levels: { clear: 1000, blocked: 0 } });   // levels are replaced by this run
 await sensor.start();
 await new Promise((r) => setTimeout(r, 800));
-if (sensor.lastReading == null) { console.error(`no readings from ${PORT}`); process.exit(1); }
+if (sensor.lastReading == null) { console.error(`no readings: ${source.lastError ? source.lastError.message : "the port is silent"}`); process.exit(1); }
 console.log(`reading now: ${sensor.lastReading}`);
 
 try {

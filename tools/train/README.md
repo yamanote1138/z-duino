@@ -44,7 +44,7 @@ The scripts open the port with `stty` (macOS syntax). The Arduino must be plugge
 
 ## Scripts
 
-All scripts need Node 22+ (global `WebSocket`). The controller's address and the sensor's serial port are found automatically (`lib/config.mjs`: `ztrain.local` resolved to an IP, and the only `/dev/cu.usbmodem*`); set `TRAIN_HOST` or `SENSOR_PORT` to override. Both change (DHCP, which USB port). Most scripts take `--dry`, which checks the sensor and does not move the train. All of them send `stop` on Ctrl-C.
+All scripts need Node 22+ (global `WebSocket`). The controller's address and the sensor's serial port are found automatically (`ztrain.local` resolved to an IP, and the only `/dev/cu.usbmodem*`); override them in `local/config.jsonc` or with `TRAIN_HOST` and `SENSOR_PORT` (see **Settings** below). Both can change (DHCP, which USB port). Most scripts take `--dry`, which checks the sensor and does not move the train. All of them send `stop` on Ctrl-C.
 
 | Script | What it does |
 |---|---|
@@ -63,6 +63,12 @@ All scripts need Node 22+ (global `WebSocket`). The controller's address and the
 | `read-a0.py` | Bench helper: `python3 -I read-a0.py 3` prints min, max and mean of A0 over 3 s. |
 
 The scripts are deliberately standalone, so the sensor and connection helpers repeat across files.
+
+## Settings
+
+Defaults live in the code (`lib/config/index.mjs`). To change any, copy `config.example.jsonc` to `local/config.jsonc`, uncomment what you want and edit it; the example documents every key. Precedence, lowest to highest: **defaults, `local/config.jsonc`, environment variables (`TRAIN_HOST`, `SENSOR_PORT`, `TRAIN_LOCAL`), command-line flags** (`--host=`, `--sensor-port=`, `--port=`, `--volume=`, `--engine=`, `--packs=`, `--invert=`). A mistyped key or a wrong value is an error that names it. `node config.mjs` prints what is in effect and where each value came from. The file is JSON with `//` comments and trailing commas allowed; nothing in it is executed. The scripts that use the modules read it; the older scripts honour the host and port only.
+
+`controller.invert` is sent to the controller when a tool connects. Left unset, nothing is sent: the controller forgets the flag on every reboot, the web app sets it per browser, and the controller has one flag, so whoever connected last wins.
 
 ## Sound
 

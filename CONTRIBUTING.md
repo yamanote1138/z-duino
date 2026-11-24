@@ -96,7 +96,12 @@ z-duino/
 │   ├── HARDWARE.md              # Parts list & wiring diagram
 │   ├── PROTOCOL.md              # Full WebSocket protocol spec
 │   ├── LITTLEFS.md              # LittleFS flash layout & mklittlefs parameters
+│   ├── ARCHITECTURE.md          # What runs where, authority/safety rules, configuration map
 │   └── status-led-wiring.md     # RGB LED wiring & resistor values
+├── tools/train/                 # Mac-side toolchain (Node, no deps): sensor, sound, shows, web page — see its README
+│   ├── lib/                     #   modules: sensor, sound, controller, show, web, config
+│   ├── test/                    #   node:test suites (node --test --test-timeout=30000 test/*.test.mjs)
+│   └── local/                   #   your own files (git-ignored): calibration, layout, shows, config.jsonc
 └── build.sh                     # Build + deploy script
 ```
 

@@ -61,10 +61,15 @@ Power up the Wemos, connect your 12V track supply, and open **http://ztrain.loca
 
 > **Z-scale note:** These locomotives are tiny and light. Don't be surprised if nothing happens at low power — it's normal for a Z-scale train to sit still until 40–50% throttle, then take off suddenly once it overcomes static friction. Start around segment 4 and work up from there.
 
+## Automation on the Mac (optional)
+
+`tools/train/` adds a Mac-side toolchain on top of the controller: a break-beam sensor (an Arduino Uno on USB) that sees the train pass, a sound library, JSON "shows" that tie sensor events to throttle moves and sounds, and a small web page to run them. None of it changes the firmware or the throttle app; the Mac is just another WebSocket client. See **[tools/train/README.md](tools/train/README.md)**, and **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** for how the pieces fit.
+
 ## Documentation
 
 - **[docs/BUILD.md](docs/BUILD.md)** — full prerequisites, setup, and `build.sh` reference
 - **[docs/HARDWARE.md](docs/HARDWARE.md)** — parts list & wiring diagram
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — what runs where (Wemos, browser, Mac tools, sensor), who may do what, where each setting lives
 - **[docs/PROTOCOL.md](docs/PROTOCOL.md)** — WebSocket protocol spec
 - **[docs/LITTLEFS.md](docs/LITTLEFS.md)** — LittleFS flash layout & partition details
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — local development setup & project structure

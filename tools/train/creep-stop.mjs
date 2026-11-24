@@ -2,14 +2,14 @@
 // Creep forward at 10% and stop the train when the beam sensor trips.
 //
 // Usage: node creep-stop.mjs [--dry] [--max=<seconds>]
-// Env:   TRAIN_HOST (board IP), SENSOR_PORT (the sensor Arduino's serial port)
+// Settings: local/config.jsonc, TRAIN_HOST and SENSOR_PORT (see `node config.mjs`)
 //
 // The beam must be clear before it moves. Levels come from local/sensor_levels.json (node calibrate.mjs), through the sensor
 // module (lib/sensor): it supplies the break event, and a `lost` event if the readings stop while the train is moving.
 
 import { createSensor, SerialSource } from "./lib/sensor/index.mjs";
 import { connectController } from "./lib/controller/index.mjs";
-import { PORT } from "./lib/config.mjs";
+import { loadConfigOrExit } from "./lib/config/index.mjs";
 
 const CREEP = 0.1;          // creep speed
 const AFTER_MS = 1500;      // keep watching after the stop
@@ -18,7 +18,9 @@ const MAX_CREEP_MS = maxArg ? Number(maxArg.split("=")[1]) * 1000 : 8000;  // gi
 const dry = process.argv.includes("--dry");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const sensor = createSensor({ source: new SerialSource({ port: PORT }), emitSamples: true });
+const config = loadConfigOrExit();
+const source = new SerialSource(config.sensor);
+const sensor = createSensor({ source, emitSamples: true });
 sensor.on("error", (e) => { console.error("sensor error:", e.message); process.exit(1); });
 
 async function main() {
@@ -26,13 +28,13 @@ async function main() {
   await sensor.start();
   await sleep(1500);
   const recent = sensor.recent(20);
-  if (recent.length < 20) throw new Error(`no sensor data from ${PORT}`);
+  if (recent.length < 20) throw new Error(`no sensor data: ${source.lastError ? source.lastError.message : "the port is silent"}`);
   const th = sensor.thresholds;
   console.log(`beam check: ${recent.length} samples, lowest ${Math.min(...recent.map((s) => s.v))}, state ${sensor.state} (breaks below ${th.break.toFixed(0)})`);
   if (sensor.state !== "clear") throw new Error(`beam is not clear (state ${sensor.state}, reading ${sensor.lastReading}); not moving`);
   if (dry) { console.log("dry run: sensor fine, train not moved"); return; }
 
-  const ctl = await connectController();
+  const ctl = await connectController({ config });
   process.on("SIGINT", () => { ctl.emergencyStop(); process.exit(130); });
   process.on("SIGTERM", () => { ctl.emergencyStop(); process.exit(130); });
 

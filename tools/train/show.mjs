@@ -17,6 +17,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadShow, loadLayout, loadLoco, validateLayout, validateShow, simulateShow, runShow, usesZones } from "./lib/show/index.mjs";
 import { defaultSounds } from "./lib/sound/defaults.mjs";
+import { loadConfigOrExit } from "./lib/config/index.mjs";
 import { localPath } from "./lib/paths.mjs";
 
 const root = dirname(fileURLToPath(import.meta.url)) + "/";
@@ -26,6 +27,7 @@ const flags = Object.fromEntries(argv.filter((a) => a.startsWith("--") && a.incl
 const sets = argv.filter((a) => a.startsWith("--set=")).map((a) => a.slice(6));
 const [cmd, which] = pos;
 
+const config = loadConfigOrExit(argv);
 const fail = (m) => { console.error(`error: ${m}`); process.exit(1); };
 const showDirs = [localPath("shows"), root + "examples/shows"];
 
@@ -49,7 +51,7 @@ function context(needZones) {
   return { layout, loco };
 }
 function soundLibrary(engine) {
-  return defaultSounds({ engine, volume: Number(flags.volume || 0.5), packs: flags.packs, onSkip: (p, e) => console.error(`skipping pack ${p}: ${e.message}`) });
+  return defaultSounds({ engine, volume: config.sound.volume, packs: config.sound.packs, onSkip: (p, e) => console.error(`skipping pack ${p}: ${e.message}`) });
 }
 function report(check) {
   for (const w of check.warnings) console.log(`warning: ${w}`);
@@ -65,7 +67,7 @@ if (cmd === "list") {
 } else if (cmd === "validate" || cmd === "sim" || cmd === "run") {
   const file = findShow(which), show = loadShow(file), settings = parseSettings();
   const { layout, loco } = context();
-  const engine = cmd !== "run" || argv.includes("--no-sound") ? "null" : flags.engine || "afplay";
+  const engine = cmd !== "run" || argv.includes("--no-sound") ? "null" : config.sound.engine;
   const sounds = soundLibrary(engine);
   const check = validateShow(show, { sounds, layout, loco, settings });
   console.log(`${show.name}  (${file.replace(root, "")})`);
@@ -80,14 +82,14 @@ if (cmd === "list") {
   } else {
     const { createSensor, SerialSource } = await import("./lib/sensor/index.mjs");
     const { connectController } = await import("./lib/controller/index.mjs");
-    const { PORT } = await import("./lib/config.mjs");
-    const sensor = createSensor({ source: new SerialSource({ port: PORT }) });
+    const source = new SerialSource(config.sensor);
+    const sensor = createSensor({ source });
     sensor.on("error", (e) => { console.error("sensor error:", e.message); });
     await sensor.start();
     await new Promise((r) => setTimeout(r, 1200));
-    if (sensor.lastReading == null) fail(`no readings from ${PORT}`);
+    if (sensor.lastReading == null) fail(`no readings: ${source.lastError ? source.lastError.message : "the port is silent"}`);
     console.log(`sensor: ${sensor.state}, reading ${sensor.lastReading}`);
-    const ctl = await connectController();
+    const ctl = await connectController({ config });
     const ac = new AbortController();
     let interrupts = 0;
     process.on("SIGINT", () => { if (++interrupts === 1) { console.log("\nstopping the show (ramping down); Ctrl-C again for an emergency stop"); ac.abort(); } else { ctl.emergencyStop(); process.exit(130); } });

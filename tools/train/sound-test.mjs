@@ -6,18 +6,16 @@
 //   node sound-test.mjs fill <id|category> <ms> [--cut=100] [--overlap=0]     clips back to back for ms
 //   node sound-test.mjs loop <id|category> [--for=6]    loop a sound for a few seconds
 //   node sound-test.mjs check <id|category> ...         exit 1 if anything is unknown or its file is missing
-// Options: --packs=packs/synth,packs/jr-east   --volume=0.5   --engine=afplay|null
-import { SoundLibrary } from "./lib/sound/index.mjs";
-import { ensureSynthPack } from "./lib/sound/synth-pack.mjs";
+// Options: --packs=packs/synth,packs/jr-east   --volume=0.5   --engine=afplay|null   (or sound.* in local/config.jsonc)
+import { defaultSounds } from "./lib/sound/defaults.mjs";
+import { loadConfigOrExit } from "./lib/config/index.mjs";
 
 const argv = process.argv.slice(2), flags = Object.fromEntries(argv.filter((a) => a.startsWith("--")).map((a) => { const [k, v = "true"] = a.slice(2).split("="); return [k, v]; }));
 const pos = argv.filter((a) => !a.startsWith("--")), cmd = pos[0];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-ensureSynthPack(new URL("./packs/synth", import.meta.url).pathname);
-const root = new URL(".", import.meta.url).pathname;
-const packs = (flags.packs || "packs/synth,packs/jr-east").split(",").map((p) => (p.startsWith("/") ? p : root + p));
-const lib = new SoundLibrary({ packs: packs.filter((p) => { try { new SoundLibrary({ packs: [p], engine: "null" }); return true; } catch (e) { console.error(`skipping ${p}: ${e.message}`); return false; } }), engine: flags.engine || "afplay", volume: Number(flags.volume || 0.5) });
+const config = loadConfigOrExit(argv);   // --packs= --volume= --engine= and sound.* in local/config.jsonc
+const lib = defaultSounds({ engine: config.sound.engine, volume: config.sound.volume, packs: config.sound.packs, onSkip: (p, e) => console.error(`skipping ${p}: ${e.message}`) });
 process.on("SIGINT", () => { lib.stopAll(); process.exit(130); });
 
 if (!cmd || cmd === "list") {

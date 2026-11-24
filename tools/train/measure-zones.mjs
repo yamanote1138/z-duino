@@ -15,7 +15,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { createSensor, SerialSource } from "./lib/sensor/index.mjs";
 import { connectController } from "./lib/controller/index.mjs";
-import { PORT } from "./lib/config.mjs";
+import { loadConfigOrExit } from "./lib/config/index.mjs";
 import { loadLayout, validateLayout } from "./lib/show/index.mjs";
 import { localPath } from "./lib/paths.mjs";
 import { loadLoco, speedModel } from "./lib/show/index.mjs";
@@ -55,12 +55,14 @@ Every few seconds I print a rough position, so you know when a mark is coming.
 `);
 printBanner();
 if (flags.preview) process.exit(0);
-const sensor = createSensor({ source: new SerialSource({ port: PORT }) });
+const config = loadConfigOrExit();
+const source = new SerialSource(config.sensor);
+const sensor = createSensor({ source });
 sensor.on("error", (e) => console.error("sensor error:", e.message));
 await sensor.start();
 await new Promise((r) => setTimeout(r, 1200));
 if (sensor.state !== "blocked") { sensor.stop(); fail(`the beam is ${sensor.state} (reading ${sensor.lastReading ?? "?"}): put the nose on the mark first`); }
-const ctl = await connectController();
+const ctl = await connectController({ config });
 sensor.setDirection("forward");
 
 let tStart = null;

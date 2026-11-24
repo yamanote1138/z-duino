@@ -9,7 +9,7 @@ const secs = Number(arg("seconds", 30));
 const replay = arg("replay");
 let source;
 if (replay) source = ReplaySource.fromCsv(replay);
-else { const { PORT } = await import("./lib/config.mjs"); source = new SerialSource({ port: PORT }); }
+else { const { loadConfigOrExit } = await import("./lib/config/index.mjs"); source = new SerialSource(loadConfigOrExit().sensor); }
 
 const sensor = createSensor({ source, emitSamples: process.argv.includes("--samples") });
 const t0 = Date.now(), ts = () => `+${((Date.now() - t0) / 1000).toFixed(2).padStart(6)} s`;
