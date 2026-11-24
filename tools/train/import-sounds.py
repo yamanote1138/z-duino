@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pull real train sounds out of two sibling projects into ./sounds (git-ignored), under the names lib/sounds.mjs expects.
+"""Pull real train sounds out of two sibling projects into ./sounds (git-ignored), under the file names the sound pack manifests (packs/jr-east/pack.json) refer to.
 
   ../e235-sounds/data/*.ssdx   BVE sound archive (a zip; filenames are Shift-JIS)
   ../eki-pi/sounds/            station melodies and JP/EN announcements

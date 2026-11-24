@@ -48,19 +48,21 @@ All scripts need Node 22+ (global `WebSocket`). The controller's address and the
 
 | Script | What it does |
 |---|---|
-| `laps.mjs` | Timed laps with no sensor: `node laps.mjs <1-5> [30\|35\|40]`. Also `node laps.mjs nudge <fwd\|back> <seconds>` for hand positioning at 10%. |
+| `show.mjs` | Check, simulate and run a show (a JSON file): `node show.mjs list \| validate \| sim \| run <show>`. See **Shows**. |
+| `serve.mjs` | The web page: run shows, audition sounds, import and export shows. See **The web page**. |
+| `calibrate.mjs` | Measure the open-beam and blocked readings and write `local/sensor_levels.json`. Interactive; needs the sensor only. |
+| `sensor-watch.mjs` | Print the sensor's events live, or replay a trace (`--replay=<csv>`). |
 | `creep-stop.mjs` | Creep forward at 10% and stop when the nose breaks the beam. Start with the nose a few inches short of the beam; it gives up after 8 s (`--max=<seconds>` for longer; a full lap at creep is about 56 s). This puts the train on "the mark". |
-| `tail-stop.mjs` | Single solid loco: from the mark (nose in the beam), creep forward at 10% and stop when the tail clears the beam. |
-| `tail-nose.mjs` | From the mark: creep forward and stop on the tail, wait 4 s, creep back and stop on the nose. |
-| `loops-tail.mjs` | Leave, do one loop, and on the second loop stop with the tail on the beam. |
-| `signal-show.mjs` | Two loops with the controller LED as a signal. Red, yellow, green go, purple at the pass (or `--party` for the beat show), yellow while slowing, red when parked, then blue. Ends parked on the nose. Start with the nose in the beam (on the mark); it refuses to run otherwise. Use `--loco` for the speeds in `loco_profile.json`, and `--sound` for sound effects (see Sound). The ramp-down is timed from the loop-1 lap, standing start included. |
-| `ramp-loops.mjs` | Three loops, a little faster each (`--start=0.40 --final=0.65`), then ramp to 30%, then creep onto the nose. Calibrated on loop 2, because speeds above 30% are extrapolated from the profile; needs `--allow-fast` above 9 in/s. `--plan` prints the final-loop plan. |
+| `nudge.mjs` | Move the loco by hand, with the beam as the safety: `fwd <s>` / `back <s>` creep for up to 6 s and stop at any beam event; `to-mark` backs over the beam and forward onto the mark from anywhere clear of it. |
+| `measure-zones.mjs` | Measure your layout's zones (curves, approach) by pressing a key as the nose reaches each mark during one slow lap. See **Shows**. |
+| `sound-test.mjs` | List, play and check the sound library, with no train. |
+| `config.mjs` | Print the settings in effect and where each came from (`--example` prints the documented template). |
 | `light-test.mjs` | Shuttles the loco across the beam (about 1" past it each way, at 10%) and reports clear and blocked levels, noise and pass-time repeatability; appends a row to `light_test_results.csv`. Use `--label=` to name the lighting condition. |
 | `import-sounds.py` | Copies real sounds from the sibling `e235-sounds` and `eki-pi` projects into `sounds/`. |
 | `speed-trap.mjs` | Times the train past the beam at several throttle settings and reports speed in scale mph, plus the loop length. |
 | `learn-loco.mjs` | Learns a new locomotive on its own: finds it, measures its length and speed table, and learns how it stops. Writes `local/loco_profile.json`. Uses `lib/beam.mjs`. `--resume` and `--stages=find,length,speeds,stops` run parts of it. `--in-beam` starts with the nose already in the beam. |
 
-The scripts are deliberately standalone, so the sensor and connection helpers repeat across files.
+The jobs of the earlier hand-written scripts are now example shows in `examples/shows/`: `park-on-tail` (was `tail-stop`), `shuttle` (was `tail-nose`), `ramp-loops` (was `ramp-loops.mjs`), `full-lap` (was `signal-show`), with `lap`. They need your layout and loco profile where they use zones; `node show.mjs sim <name>` checks them without moving anything. Timed laps (`laps.mjs`) are gone: a move without a beam to stop it is not something these tools do (`nudge.mjs` is the guarded replacement).
 
 ## Settings
 
@@ -70,15 +72,16 @@ Defaults live in the code (`lib/config/index.mjs`). To change any, copy `config.
 
 ## Sound
 
-`signal-show.mjs --sound` plays effects on the Mac through `afplay` (`--volume=0.5` by default). Sound files live in `sounds/` and are git-ignored. Some are generated (`lib/synth.mjs`, an impression, not a recording of an EF210); the rest are real clips copied from two sibling projects by `python3 -I import-sounds.py`, which needs `../e235-sounds` (a BVE sound archive for the JR East E235) and `../eki-pi` next to this repo. Those sounds belong to their authors and stay on this machine. A file already in `sounds/` is always used, so you can drop your own over any name.
+Shows and the web page play effects on the Mac through `afplay` (`sound.volume`, 0.5 by default). Sound files live in `sounds/` and are git-ignored. Some are generated (`lib/synth.mjs`, an impression, not a recording of an EF210); the rest are real clips copied from two sibling projects by `python3 -I import-sounds.py`, which needs `../e235-sounds` (a BVE sound archive for the JR East E235) and `../eki-pi` next to this repo. Those sounds belong to their authors and stay on this machine. A file already in `sounds/` is always used, so you can drop your own over any name.
+
+The table is the `full-lap` example show's sound design:
 
 | When | Sound |
 |---|---|
 | Red, before departure | idle blower hum, then a chime |
 | Yellow | the E235 departure brake release (yellow lasts until it ends) |
-| Green | JR horn and the E235 inverter start-up clip; the loco creeps out at 10% for 3 s (`--creep-out=<s>`) before climbing to cruise, then a steady inverter hum while running |
-| Each pass of the beam | a 2.3 s horn |
-| Curves | flange squeals, a different clip each time (four clips, random order, slight volume variation), cut 0.1 s before the curve ends |
+| Green | JR horn and the E235 inverter start-up clip, then a steady inverter hum while running |
+| Bends | flange squeals filling each bend (a different clip each time, random order), cut 0.1 s before the bend ends |
 | Slowing | the E235 slow-down clip, then a quieter hum while creeping |
 | Creeping | a brake squeal as it drops to creep |
 | Parked | air release and the brake loosening, then a chime when the light goes blue |
@@ -174,19 +177,6 @@ step is at the top of `lib/show/schema.mjs`; the validator names the path of eve
 - It only answers `127.0.0.1`/`localhost` and only JSON posts, so a web page open in your browser cannot start the train.
   The API (`lib/web/server.mjs`) is plain JSON plus an event stream; it is tested against the simulator (`test/web.test.mjs`).
 
-## Show settings
-
-Every number, distance and clip name in `signal-show.mjs` (pauses, creep-out time, curve positions, sound gains, which clip plays at which moment) lives in `lib/show-config.mjs`. Change them without editing the script:
-
-```bash
-node lib/show-config.mjs                              # print every setting and its default (no hardware)
-node signal-show.mjs --loco --sound --creep-out=5     # short aliases: --volume --creep --cruise --creep-out --curves
-node signal-show.mjs --loco --sound --soundSet.gain.hum=0.3 --hold.redStartMs=6000   # dotted keys reach any setting
-node signal-show.mjs --loco --sound --config=my_show.json   # a JSON file of overrides, deep-merged over the defaults
-```
-
-Unknown settings are rejected, so a typo cannot silently do nothing.
-
 ## Room light
 
 `light-test.mjs` measured the sensor under a desk lamp (an IKEA LED lamp, which gives off almost no 940 nm light): far away, near the track, and aimed straight at the receiver. Nothing moved: clear 340, blocked 29 to 30, noise sd under 2 counts, and a pass time that repeats to about 10 ms (about 0.03" of loco travel at creep). Incandescent bulbs and sunlight were not tested. The beam is steady (not modulated), so strong IR from those would add directly to the clear reading. The kit's 38 kHz receivers would ignore it, but need the emitter pulsed at 38 kHz.
@@ -194,11 +184,11 @@ Unknown settings are rejected, so a typo cannot silently do nothing.
 ## How the stops work
 
 - **Clear beam** is a flat plateau (within 6 counts) above half the blocked-to-clear span for 0.6 s. The level drifts a few counts, so it is measured, not fixed.
-- **Nose** needs two consecutive low readings in `signal-show.mjs`, so one stray sample is not counted as a train. With a solid loco the tail counts as cleared after four readings back above the nose level, so the pass LED follows the loco closely.
+- **Nose** needs two consecutive low readings, so one stray sample is not counted as a train.
 - **Nose** is the first reading well below the clear level after a clear beam. **Joins and the middle car** are skipped by requiring a long clean run of windows (1.0 s) before a wall, and by ignoring the first 3.2 s after the nose.
 - **Final-approach check.** Before the ramp-down, every one of the last 30 readings must be at least 20 above the stop level. It does not ask for a flat line: the clear reading wobbles a few percent while the train runs (338 to 352 seen), and the earlier flat-line version aborted a show.
 - **A wall** needs two or more consecutive readings below the wall level (72% of the span, 256 at the current levels). A single stray low sample is ignored.
-- **Final approach.** `signal-show.mjs` measures the lap period between the loop-1 and loop-2 passes, then starts the ramp-down so the train creeps for about 6 s before reaching the beam. Lap speed varies by about ±3%, which moves the creep length by about ±2 s.
+- **Final approach.** A show starts slowing when the nose enters a layout zone (the position estimate is good to about an inch at creep and drifts at speed), then ramps down to creep and creeps until the beam breaks. The beam, never a timer, does the stopping, so the zone only has to leave room to slow down (about 10 in from 0.3 to creep, more for a faster lap) plus a margin for the drift.
 
 ## Measured numbers
 
@@ -234,13 +224,11 @@ Solid body with no windows, 3.00" (76 mm) long as measured with the IR beam (the
 
 Fit over the whole range: `v = -0.49 + 28.65 x throttle` (in/s). It never stalled down to 8% and carried on 0" after a stop at 8%, 9% and 10% throttle (9 trials, 0 to 20 ms response). The tools cap the target speed at 9 in/s as a derailment guard.
 
-`laps.mjs` carries calibration constants fitted when the loop was assumed to be 158.5". The fit absorbed the error, so its timed laps still land close, but its in/s figures are not true speeds.
-
 ## Controller behaviour these scripts rely on
 
 - The firmware stops the motor after 30 s with no message, so every script pings every 5 s.
 - The status LED is optional (firmware `HAS_STATUS_LED`, default on). The controller reports it as `features.led`; `lib/controller` skips `led` and `led_auto` when it is false. The notes below apply when one is fitted.
-- `stop` blinks the status LED magenta four times. The signal show uses `speed 0` for its final stop to avoid hiding the red.
+- `stop` blinks the status LED magenta four times. Shows use `speed 0` for stopping to avoid hiding the colour they set.
 - The `direction` command resets the LED to its status colour, so set LED colours after it.
 - With no client connected the status LED is blue. Disconnecting returns it there.
 
