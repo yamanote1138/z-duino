@@ -49,7 +49,7 @@ The Wemos has no idea the Mac exists: a Mac script is just another WebSocket cli
 - **Motor care is enforced by the clients, not the firmware.** The firmware applies whatever speed it receives; its only protection is the 30 s safety timeout (it stops the motor if no message arrives for 30 s) and the build-time PWM limits.
   - `frontend/`: ramps speed changes (about 1 s per 0.1 of throttle) and pauses on direction changes.
   - `tools/train/lib/controller`: ramps the same way, refuses abrupt stops and reversals above creep speed (`MotorCareError`), and only allows a move without a ramp when a beam event guards it (`guardedMove`). Show runs and the web page go through it.
-  - The older standalone scripts in `tools/train` carry their own ramps (being replaced; see below).
+  - Every script in `tools/train` goes through that module, so the rules apply to all of them.
 - **Keepalive.** Every client must keep talking: the Mac controller module pings every 5 s, the browser every 10 s. The firmware's limit is 30 s.
 - **The Mac web page** (`serve.mjs`) only listens on `127.0.0.1`, checks the Host header, accepts JSON posts only, runs one show at a time, and has STOP (ramps down) and E-STOP (the controller's `stop` command) always available.
 
@@ -99,7 +99,7 @@ Only one program at a time can hold the sensor's serial port: stop `serve.mjs` b
 
 - **Modules** (`lib/`): `sensor` (events from the beam, calibration), `sound` (library, packs, engines), `controller` (WebSocket client with the motor-care rules), `show` (the `z-show/1` JSON runtime, layout zones, simulator), `web` (the page's service), `config` (settings), `paths` (the `local/` folder). Each takes its dependencies as arguments, so everything is tested without hardware.
 - **Scripts** (top level): thin command-line front ends over the modules (`show.mjs`, `serve.mjs`, `calibrate.mjs`, `creep-stop.mjs`, `measure-zones.mjs`, `sound-test.mjs`, `sensor-watch.mjs`, `config.mjs`).
-- **Older standalone scripts** (`signal-show`, `ramp-loops`, `learn-loco`, ...) predate the modules and still carry their own serial, WebSocket and threshold code. They are being replaced by example shows or moved onto the modules.
+- The jobs of the earlier hand-written scripts (`signal-show`, `ramp-loops`, `tail-stop`, ...) are now example shows in `examples/shows/`; the ones that are not shows (`learn-loco`, `light-test`, `nudge`, ...) are written on the modules too, so there is one serial reader, one controller client and one set of beam thresholds (`DETECTOR_DEFAULTS`).
 - The throttle app (`frontend/`) and the Mac web page share no code. The Mac page imitates the throttle app's look so the two read as one product.
 
 ## Open questions

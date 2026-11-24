@@ -10,7 +10,7 @@ Your own files. Everything in this folder except this README is git-ignored, so 
 | `loco_profile.json` | speeds, length and stopping behaviour of your locomotive | `node learn-loco.mjs` |
 | `layout.json` | your track: the lap length and named zones (curves, approaches) as inches past the beam | `node measure-zones.mjs`, or by hand |
 | `shows/` | shows (`z-show/1` JSON) you write or import | you, or the web page's Import |
-| `results/` | `light_test_results.csv`, `speedtrap_results.json` | `light-test.mjs`, `speed-trap.mjs` |
+| `results/` | `light_test_results.csv` | `light-test.mjs` |
 | `traces/` | raw sensor traces (`*.csv`) and run logs, for replaying through the sensor module | the test scripts |
 | `packs/` | your own sound packs; list one in `sound.packs` as `local:packs/<name>` | you |
 
@@ -18,8 +18,6 @@ Move to a new machine or share a setup by copying this folder. To keep several s
 folder: `TRAIN_LOCAL=~/train-kitchen node calibrate.mjs`.
 
 Without `sensor_levels.json` the sensor module (`calibrate.mjs`, `sensor-watch.mjs`, `creep-stop.mjs`, `show.mjs`) refuses
-to start and tells you to calibrate. `BEAM_CLEAR` and `BEAM_BLOCKED` in the environment override the file. The older scripts
-still on `lib/levels.mjs` fall back to built-in defaults (clear 344, blocked 30), which are wrong for most setups, so
-calibrate first.
+to start and tells you to calibrate. `BEAM_CLEAR` and `BEAM_BLOCKED` in the environment override the file.
 
 `node config.mjs` shows which settings are in effect and where each came from.

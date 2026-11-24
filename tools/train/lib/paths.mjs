@@ -4,9 +4,9 @@
 //   <tools/train>/local/            (override with the TRAIN_LOCAL environment variable)
 //     sensor_levels.json            written by calibrate.mjs
 //     loco_profile.json             written by learn-loco.mjs
-//     results/                      light_test_results.csv, speedtrap_results.json
+//     results/                      light_test_results.csv
 //     traces/                       raw sensor traces (*.csv) and run logs
-//     shows/  layout.json           shows and layout you author (coming with the show runtime)
+//     shows/  layout.json           shows and layout you author
 //     sounds/ packs/                your own sound files and sound packs
 //
 // local/README.md describes the folder; nothing else in it is committed.

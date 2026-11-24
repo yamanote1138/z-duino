@@ -9,7 +9,9 @@
 //   break    { t, h, level, edge }             the beam was broken (edge is "nose"/"tail" only if the direction is known)
 //   restore  { t, h, edge }                    the beam is open again
 //   nose / tail                                 the same two events, named, when the direction is known
-//   pass     { t0, t1, durationMs, minLevel, meanLevel, direction, firstEdge }   one object crossed the beam
+//   pass     { t0, t1, durationMs, minLevel, meanLevel, maxLevel, h0, h1, direction, firstEdge }   one object crossed the beam
+//            (t0/t1: the interpolated edges on the source clock; h0/h1: the host clock at the edges; maxLevel: the highest
+//            reading inside it, so a solid object stays low all the way through and one with windows does not)
 //   drift    { kind: "low"|"high"|"noisy"|"partial", estimate, calibrated, sd }   the open-beam level no longer matches calibration.
 //            "partial" = the beam sits steadily between blocked and clear: something is half in it, or the clear level has sagged
 //            (the sensor cannot tell which, but a solid object reads near the blocked level, so this is worth a look)
@@ -124,6 +126,7 @@ export class Detector extends EventEmitter {
     for (let k = S.length - 2; k >= 0; k--) if (S[k].v < mid && S[k + 1].v >= mid) { const a = S[k], b = S[k + 1]; rise = a.t + ((mid - a.v) / (b.v - a.v)) * (b.t - a.t); break; }
     const inside = S.filter((x) => x.t >= fall && x.t <= rise).map((x) => x.v);
     return { t0: fall, t1: rise, durationMs: rise - fall, minLevel: min, meanLevel: inside.length ? mean(inside) : min,
+             maxLevel: inside.length ? Math.max(...inside) : min, h0: (S[1] || S[0]).h, h1: last.h,
              direction: this.direction, firstEdge: this._edge(true), clearLevel: clear };
   }
 

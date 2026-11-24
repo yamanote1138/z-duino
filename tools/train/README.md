@@ -23,13 +23,13 @@ Without one, position is dead-reckoning (speed x time), which lands within about
 
 ## Beam levels
 
-No script hard-codes a reading. `lib/levels.mjs` scales every threshold (clear plateau, nose drop, trip, wall, solid-pass limit) from two numbers in `sensor_levels.json`:
+No script hard-codes a reading. The sensor module (`lib/sensor/detector.mjs`) scales every threshold from two numbers in `local/sensor_levels.json`, as fractions of the span between them (`DETECTOR_DEFAULTS` is the one place those fractions live: break below 70% of the span, restore at 80% and above, and so on):
 
 ```json
 { "clear": 340, "blocked": 73 }
 ```
 
-`clear` is the open beam, `blocked` is the solid loco in the beam. Update both after moving or re-aiming the sensor (`node calibrate.mjs` measures both and writes `local/sensor_levels.json`), or override with `BEAM_CLEAR` and `BEAM_BLOCKED` in the environment. The fractions are the old photoresistor thresholds re-expressed on the same scale, so behaviour matches what the scripts were tuned for.
+`clear` is the open beam, `blocked` is the solid loco in the beam. Update both after moving or re-aiming the sensor (`node calibrate.mjs` measures both and writes `local/sensor_levels.json`), or override with `BEAM_CLEAR` and `BEAM_BLOCKED` in the environment.
 
 ## Sensor firmware
 
@@ -40,7 +40,7 @@ cd tools/train/sensor
 pio run -t upload        # add upload_port to platformio.ini if it picks the wrong port
 ```
 
-The scripts open the port with `stty` (macOS syntax). The Arduino must be plugged straight into the Mac: through a hub with a USB-C to USB-A adapter it only got power and never enumerated.
+The sensor module opens the port with `stty` (macOS syntax). The Arduino must be plugged straight into the Mac: through a hub with a USB-C to USB-A adapter it only got power and never enumerated.
 
 ## Scripts
 
@@ -59,14 +59,13 @@ All scripts need Node 22+ (global `WebSocket`). The controller's address and the
 | `config.mjs` | Print the settings in effect and where each came from (`--example` prints the documented template). |
 | `light-test.mjs` | Shuttles the loco across the beam (about 1" past it each way, at 10%) and reports clear and blocked levels, noise and pass-time repeatability; appends a row to `light_test_results.csv`. Use `--label=` to name the lighting condition. |
 | `import-sounds.py` | Copies real sounds from the sibling `e235-sounds` and `eki-pi` projects into `sounds/`. |
-| `speed-trap.mjs` | Times the train past the beam at several throttle settings and reports speed in scale mph, plus the loop length. |
-| `learn-loco.mjs` | Learns a new locomotive on its own: finds it, measures its length and speed table, and learns how it stops. Writes `local/loco_profile.json`. Uses `lib/beam.mjs`. `--resume` and `--stages=find,length,speeds,stops` run parts of it. `--in-beam` starts with the nose already in the beam. |
+| `learn-loco.mjs` | Learns a new locomotive on its own: finds it, measures its length and speed table, and learns how it stops. Writes `local/loco_profile.json`. The speed table it writes is also the old `speed-trap`'s job (its log gives scale mph). `--resume` and `--stages=find,length,speeds,stops` run parts of it. `--in-beam` starts with the nose already in the beam. |
 
 The jobs of the earlier hand-written scripts are now example shows in `examples/shows/`: `park-on-tail` (was `tail-stop`), `shuttle` (was `tail-nose`), `ramp-loops` (was `ramp-loops.mjs`), `full-lap` (was `signal-show`), with `lap`. They need your layout and loco profile where they use zones; `node show.mjs sim <name>` checks them without moving anything. Timed laps (`laps.mjs`) are gone: a move without a beam to stop it is not something these tools do (`nudge.mjs` is the guarded replacement).
 
 ## Settings
 
-Defaults live in the code (`lib/config/index.mjs`). To change any, copy `config.example.jsonc` to `local/config.jsonc`, uncomment what you want and edit it; the example documents every key. Precedence, lowest to highest: **defaults, `local/config.jsonc`, environment variables (`TRAIN_HOST`, `SENSOR_PORT`, `TRAIN_LOCAL`), command-line flags** (`--host=`, `--sensor-port=`, `--port=`, `--volume=`, `--engine=`, `--packs=`, `--invert=`). A mistyped key or a wrong value is an error that names it. `node config.mjs` prints what is in effect and where each value came from. The file is JSON with `//` comments and trailing commas allowed; nothing in it is executed. The scripts that use the modules read it; the older scripts honour the host and port only.
+Defaults live in the code (`lib/config/index.mjs`). To change any, copy `config.example.jsonc` to `local/config.jsonc`, uncomment what you want and edit it; the example documents every key. Precedence, lowest to highest: **defaults, `local/config.jsonc`, environment variables (`TRAIN_HOST`, `SENSOR_PORT`, `TRAIN_LOCAL`), command-line flags** (`--host=`, `--sensor-port=`, `--port=`, `--volume=`, `--engine=`, `--packs=`, `--invert=`). A mistyped key or a wrong value is an error that names it. `node config.mjs` prints what is in effect and where each value came from. The file is JSON with `//` comments and trailing commas allowed; nothing in it is executed. Every script reads it.
 
 `controller.invert` is sent to the controller when a tool connects. Left unset, nothing is sent: the controller forgets the flag on every reboot, the web app sets it per browser, and the controller has one flag, so whoever connected last wins.
 
@@ -94,9 +93,9 @@ Everything specific to your layout, loco and room lives in `local/`, which is gi
 sensor calibration, the loco profile, results and raw traces (see `local/README.md`). `lib/paths.mjs` is the one place
 that knows where it is; set `TRAIN_LOCAL` to keep several setups side by side.
 
-## Modules (work in progress)
+## Modules
 
-The scripts above predate a cleaner split into reusable modules. Two exist so far; both are tested without hardware (`node --test test/*.test.mjs`), and the older scripts do not use them yet.
+The scripts above are thin front ends over reusable modules in `lib/`, all tested without hardware (`node --test --test-timeout=30000 test/*.test.mjs`).
 
 **Sensor (`lib/sensor/`)** turns beam readings into events and owns calibration.
 - `createSensor({ source })`: sources are `SerialSource` (the Arduino) and `ReplaySource` (a recorded or synthetic trace); anything with `start(cb)` / `stop()` works.
