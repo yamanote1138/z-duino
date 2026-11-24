@@ -1,7 +1,7 @@
 {
   "format": "z-show/1",
   "name": "Ramp loops",
-  "description": "Nose on the mark. Three laps, each a little faster than the last, then slow down in the approach zone and creep onto the mark. Needs a layout with an 'approach' zone and a loco profile. The approach zone must leave room to slow down: ramping from the last lap's speed to creep takes about 10 inches at 0.3 (1 s per 0.1 of throttle), plus a margin for the position estimate drifting, so the faster the last lap the earlier the zone must start.",
+  "description": "Nose on the mark. Three laps, each a little faster than the last, then slow down and creep onto the mark. Needs a layout with a loop length and a loco profile. The slow-down point comes from the speed table (wait-approach): about 10 inches to ramp from 0.3 to creep, 5 of creep, and a margin.",
   "start": "blocked",
   "settings": {
     "lap1": 0.2,
@@ -84,11 +84,7 @@
             "event": "restore",
             "timeoutMs": "$lapTimeoutMs"
           },
-          {
-            "do": "wait-zone",
-            "zone": "approach",
-            "edge": "enter"
-          },
+          { "do": "wait-approach", "from": "$lap3" },
           {
             "do": "ramp",
             "to": "$creep"

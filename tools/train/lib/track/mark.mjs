@@ -1,4 +1,5 @@
-// Put the loco back on the mark: the nose just breaking the beam. "The mark" is where every show starts.
+// Put the loco back on the mark: the nose just breaking the beam. "The mark" is where every show starts. `end: "tail"` is the
+// mark for a reverse run: the same, then the loco is seated the other way round (the tail just breaking the beam).
 //
 //   const r = await returnToMark({ controller, sensor, signal, onLog });   // r = { ok, how, legs, elapsedMs, error }
 //
@@ -13,7 +14,7 @@
 
 import { realClock } from "../show/clock.mjs";
 
-export const MARK_DEFAULTS = { nearS: 5, afterMs: 450, approachMs: 8000, creepInS: 2.35, loopIn: 134 };
+export const MARK_DEFAULTS = { nearS: 5, afterMs: 450, approachMs: 8000, creepInS: 2.35, loopIn: 134, end: "nose" };
 
 export async function returnToMark({ controller: ctl, sensor, signal = null, onLog = () => {}, clock = realClock, ...opts }) {
   const o = { ...MARK_DEFAULTS, ...opts };
@@ -39,7 +40,20 @@ export async function returnToMark({ controller: ctl, sensor, signal = null, onL
     return r.result;
   }
   const approach = (what) => leg(what, true, { chain: ["break"], maxMs: o.approachMs });
-  const onMark = async (how) => (sensor.state === "blocked" ? (say(`on the mark (${how})`), done(true, how)) : done(false, how, `finished ${how} but the beam is ${sensor.state}`));
+  const onMark = async (how) => {
+    if (sensor.state !== "blocked") return done(false, how, `finished ${how} but the beam is ${sensor.state}`);
+    say(`on the mark (${how})`);
+    if (o.end !== "tail") return done(true, how);
+    // the tail mark: forward until the tail clears the beam, then back until the tail breaks it
+    const f = await leg("seating the tail: forward until the tail clears the beam", true, { chain: ["restore"], maxMs: o.approachMs });
+    if (reason) return aborted();
+    if (f !== "guard") return done(false, how, "could not clear the beam with the tail");
+    const b = await leg("back until the tail breaks the beam", false, { chain: ["break"], maxMs: o.approachMs });
+    if (reason) return aborted();
+    if (b !== "guard") return done(false, how, "cleared the beam but could not find it again with the tail");
+    say("tail on the mark");
+    return done(true, how);
+  };
   const aborted = () => done(false, null, reason);
 
   try {

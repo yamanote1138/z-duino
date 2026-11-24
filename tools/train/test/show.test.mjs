@@ -9,6 +9,7 @@ import {
   VirtualClock, GhostSensor, SimSound, SimSocket, simulateShow, runShow, validateShow, validateLayout,
   loadShow, saveShow, stringifyShow, soundsUsed, Position, speedModel, inZone,
 } from "../lib/show/index.mjs";
+import { rampDistanceIn } from "../lib/show/position.mjs";
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const LOCO = { lengthIn: 3, fit: { inPerSecPerUnitThrottle: 28.65, offsetInS: -0.49 }, points: [{ thr: 0.1, v: 2.35 }, { thr: 0.2, v: 5.4 }, { thr: 0.3, v: 8.1 }] };
@@ -252,14 +253,71 @@ test("a failing step reports where, and still stops", async () => {
   assert.ok(err.result.log.some((e) => /stopped: creep ended/.test(e.text)));
 });
 
+// ---------- wait-approach: where to start slowing for a beam stop ----------
+test("rampDistanceIn: from 0.3 to creep at 1 s per 0.1 takes about 10 inches, and a ramp of nothing takes none", () => {
+  const v = speedModel(LOCO);
+  const d = rampDistanceIn(v, 0.3, 0.1, 1);
+  assert.ok(d > 9.5 && d < 11, `${d}`);
+  assert.equal(rampDistanceIn(v, 0.1, 0.1, 1), 0);
+  assert.ok(Math.abs(rampDistanceIn(v, 0.1, 0.3, 1) - d) < 1e-6, "up or down covers the same ground");
+});
+test("wait-approach starts slowing ramp + 5 in of creep + margin before the beam, measured from the leading end (nose forward, tail in reverse)", async () => {
+  const run = async (forward) => simulateShow(show([
+    { do: "direction", forward },
+    { do: "parallel", branches: [[{ do: "ramp", to: 0.2 }], [{ do: "wait-for", event: "restore", timeoutMs: 15000 }, { do: "wait-approach", from: 0.2 }, { do: "ramp", to: 0.1 }, { do: "creep", forward, speed: 0.1, until: "break", maxMs: 30000 }]] },
+  ], { start: "blocked" }), { layout: LAYOUT, loco: LOCO });
+  const ramp = rampDistanceIn(speedModel(LOCO), 0.2, 0.1, 1), d = ramp + 5 + 3;
+  for (const forward of [true, false]) {
+    const r = await run(forward);
+    assert.equal(r.ok, true, r.error);
+    const line = r.log.map((e) => e.text).find((t) => t.startsWith("approach: start slowing"));
+    assert.ok(line, "the step says where it will slow down");
+    const at = +line.match(/at (-?[\d.]+) in/)[1];
+    // forward: the nose reaches the beam at x = 134 (one lap on); reverse: the tail does, with the nose still 3 in past it
+    const beam = forward ? 134 : -134 + 3;
+    assert.ok(Math.abs(Math.abs(at - beam) - d) < 0.2 || Math.abs(Math.abs(at - (forward ? 0 : 3)) - d) < 0.2, `${forward ? "forward" : "reverse"}: ${line}`);
+    assert.ok(r.log.some((e) => e.text === "approach: slow down now"));
+  }
+});
+test("wait-approach is checked: it needs the loop length, and it counts as a beam wait for the blind-run rule", () => {
+  const s = show([{ do: "direction", forward: true }, { do: "parallel", branches: [[{ do: "ramp", to: 0.3 }], [{ do: "wait-approach", from: 0.3 }, { do: "ramp", to: 0.1 }]] }, { do: "creep", forward: true, speed: 0.1, until: "break", maxMs: 9000 }]);
+  assert.deepEqual(valid(s, { layout: LAYOUT, loco: LOCO }).errors, []);
+  assert.match(valid(s, { layout: { ...LAYOUT, loopIn: undefined }, loco: LOCO }).errors.join("\n"), /needs layout.loopIn/);
+  assert.match(valid(show([{ do: "wait-approach" }]), { layout: LAYOUT, loco: LOCO }).errors.join("\n"), /needs from/);
+});
+
+test("the position estimate is brought up to date when the loco stops, so a pause does not carry on integrating the creep", async () => {
+  // creep forward until the tail clears (anchors x = 3), wait 4 s standing still, then move off and wait for the curve at 5.5 in:
+  // with the stale-speed bug the estimate had run on to about 12 in during the wait and the curve was a lap away
+  const s = show([{ do: "direction", forward: true }, { do: "creep", forward: true, speed: 0.1, until: "restore", maxMs: 8000 }, { do: "wait", ms: 4000 },
+    { do: "parallel", branches: [[{ do: "ramp", to: 0.1 }], [{ do: "wait-zone", zone: "curve", edge: "enter", timeoutMs: 5000 }]] }, { do: "creep", forward: true, speed: 0.1, until: "break", maxMs: 8000 }], { start: "blocked" });
+  const r = await simulateShow(s, { layout: LAYOUT, loco: LOCO });
+  assert.equal(r.ok, true, r.error);
+  assert.ok(r.log.some((e) => /^zone "curve" enter/.test(e.text)), r.log.map((e) => e.text).join(" | "));
+});
+
+test("loop afterMs starts a loop later without holding the show up, and stop-loop (or the end of the show) cancels it", async () => {
+  const loops = (r) => r.sounds.filter((c) => c.kind === "loop");
+  const late = await simulateShow(show([{ do: "loop", slot: "m", id: "motion.run", afterMs: 1000 }, { do: "log", message: "not held up" }, { do: "wait", ms: 3000 }]), {});
+  assert.equal(late.ok, true, late.error);
+  assert.equal(loops(late).length, 1); assert.equal(loops(late)[0].t, 1000);
+  assert.equal(late.log.find((e) => e.text === "not held up").t, 0, "the next step ran at once");
+  const cancelled = await simulateShow(show([{ do: "loop", slot: "m", id: "motion.run", afterMs: 5000 }, { do: "wait", ms: 1000 }, { do: "stop-loop", slot: "m" }, { do: "wait", ms: 6000 }]), {});
+  assert.equal(loops(cancelled).length, 0, "stopped before it started: it never starts");
+  const ended = await simulateShow(show([{ do: "loop", slot: "m", id: "motion.run", afterMs: 5000 }, { do: "wait", ms: 1000 }]), {});
+  assert.equal(loops(ended).length, 0, "the end of the show cancels it too");
+  const replaced = await simulateShow(show([{ do: "loop", slot: "m", id: "a", afterMs: 2000 }, { do: "loop", slot: "m", id: "b" }, { do: "wait", ms: 3000 }]), {});
+  assert.deepEqual(loops(replaced).map((c) => c.id), ["b"], "a later loop in the slot replaces the waiting one");
+});
+
 // ---------- the simulator ----------
 test("simulateShow runs the example show end to end and reports the timeline", async () => {
   const s = loadShow(here("../examples/shows/lap.json"));
   const r = await simulateShow(s, { layout: LAYOUT, loco: LOCO });
   assert.equal(r.ok, true, r.error);
   const text = r.log.map((e) => e.text);
-  for (const want of ["sound brake.release", "waiting for restore", "zone \"approach\" enter", "ramp to 0.1", "creep forward until break", "finished"]) assert.ok(text.some((t) => t.startsWith(want)), `missing "${want}" in ${text.join(" | ")}`);
-  assert.ok(text.findIndex((t) => t.startsWith("restore")) < text.findIndex((t) => t.startsWith("zone \"approach\"")), "restore comes before the approach zone (the ramp does not block the wait)");
+  for (const want of ["sound brake.release", "waiting for restore", "approach: slow down now", "ramp to 0.1", "creep forward until break", "finished"]) assert.ok(text.some((t) => t.startsWith(want)), `missing "${want}" in ${text.join(" | ")}`);
+  assert.ok(text.findIndex((t) => t.startsWith("restore")) < text.findIndex((t) => t.startsWith("approach: slow down now")), "restore comes before the approach point (the ramp does not block the wait)");
   assert.equal(r.maxSpeed, 0.25);
   assert.ok(r.commands.every((c, i, a) => c.cmd !== "speed" || i === 0 || true));
   assert.ok(r.sounds.some((c) => c.kind === "fill" && c.id === "flange"));

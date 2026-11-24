@@ -69,13 +69,10 @@
         ],
         [
           {
-            "do": "wait",
-            "ms": "$runStartMs"
-          },
-          {
             "do": "loop",
             "slot": "motion",
-            "id": "motion.run"
+            "id": "motion.run",
+            "afterMs": "$runStartMs"
           }
         ],
         [
@@ -85,9 +82,8 @@
             "timeoutMs": 15000
           },
           {
-            "do": "wait-zone",
-            "zone": "approach",
-            "edge": "enter"
+            "do": "wait-approach",
+            "from": "$cruise"
           },
           {
             "do": "led",
@@ -107,14 +103,11 @@
                   "wait": false
                 },
                 {
-                  "do": "wait",
-                  "ms": "$runCreepMs"
-                },
-                {
                   "do": "loop",
                   "slot": "motion",
                   "id": "motion.run",
-                  "gain": 0.67
+                  "gain": 0.67,
+                  "afterMs": "$runCreepMs"
                 }
               ],
               [
@@ -158,14 +151,6 @@
       ]
     },
     {
-      "do": "stop-loop",
-      "slot": "motion"
-    },
-    {
-      "do": "led",
-      "color": "red"
-    },
-    {
       "do": "sound",
       "id": "brake.air",
       "wait": false
@@ -175,6 +160,14 @@
       "id": "brake.loosen",
       "gain": 0.8,
       "wait": false
+    },
+    {
+      "do": "stop-loop",
+      "slot": "motion"
+    },
+    {
+      "do": "led",
+      "color": "red"
     },
     {
       "do": "wait",

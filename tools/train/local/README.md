@@ -8,6 +8,7 @@ Your own files. Everything in this folder except this README is git-ignored, so 
 | `config.jsonc` | your settings (controller address, sensor port, sound volume and packs, ...); start from `../config.example.jsonc` | you |
 | `sensor_levels.json` | the open-beam and blocked readings for your emitter and receiver | `node calibrate.mjs` |
 | `loco_profile.json` | speeds, length and stopping behaviour of your locomotive | `node learn-loco.mjs` |
+| `orientation.json` | which way forward is: the controller's invert flag that makes the nose lead, and whether forward moves right or left as you face the layout | `node orient.mjs` |
 | `layout.json` | your track: the lap length and named zones (curves, approaches) as inches past the beam | `node measure-zones.mjs`, or by hand |
 | `shows/` | shows (`z-show/1` JSON) you write or import | you, or the web page's Import |
 | `results/` | `light_test_results.csv` | `light-test.mjs` |

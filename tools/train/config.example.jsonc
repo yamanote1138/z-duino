@@ -3,7 +3,7 @@
 // Copy this file to local/config.jsonc and uncomment (remove the leading //) what you want to change; anything left
 // commented out keeps its default. Comments and trailing commas are fine in this file.
 //
-// Precedence: built-in defaults < this file < environment variables < command-line flags.
+// Precedence: built-in defaults < local/orientation.json (node orient.mjs) < this file < environment variables < command-line flags.
 // `node config.mjs` prints what is in effect and where each value came from.
 {
   "controller": {

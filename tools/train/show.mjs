@@ -10,15 +10,18 @@
 // Options: --layout=<file> (default local/layout.json)   --loco=<file> (default local/loco_profile.json)
 //          --packs=packs/synth,packs/jr-east   --engine=afplay|null (run)   --volume=0.5   --set=name=value (repeatable)
 //          --no-sound (run: same as --engine=null)
-//          --reset (run: put the loco on the mark first: back off and come forward, search nearby, or run the loop; see lib/track)
+//          --direction=forward|reverse   which way round (default forward): forward is the way the show was written, nose leading and
+//                               leaving the mark; reverse is its mirror image, tail leading and tail on the mark (see lib/show/orient.mjs)
+//          --reset (run: put the loco on the mark first: back off and come forward, search nearby, or run the loop; see lib/track;
+//                               with --direction=reverse the mark is the tail's)
 // Ctrl-C during a run stops the show and ramps the loco down; a second Ctrl-C is an emergency stop.
 
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadShow, loadLayout, loadLoco, validateLayout, validateShow, simulateShow, runShow, usesZones, soundsUsed } from "./lib/show/index.mjs";
+import { loadShow, loadLayout, loadLoco, validateLayout, validateShow, simulateShow, runShow, usesZones, soundsUsed, orientShow, checkDirection } from "./lib/show/index.mjs";
 import { defaultSounds } from "./lib/sound/defaults.mjs";
-import { loadConfigOrExit } from "./lib/config/index.mjs";
+import { loadConfigOrExit, travelLabel } from "./lib/config/index.mjs";
 import { localPath } from "./lib/paths.mjs";
 
 const root = dirname(fileURLToPath(import.meta.url)) + "/";
@@ -69,13 +72,17 @@ if (cmd === "list") {
     for (const f of files) { try { const s = loadShow(join(d, f)); console.log(`  ${f.replace(/\.json$/, "").padEnd(18)} ${s.name}${s.description ? ` — ${s.description.slice(0, 80)}` : ""}`); } catch (e) { console.log(`  ${f.padEnd(18)} (unreadable: ${e.message})`); } }
   }
 } else if (cmd === "validate" || cmd === "sim" || cmd === "run") {
-  const file = findShow(which), show = loadShow(file), settings = parseSettings();
+  const file = findShow(which), authored = loadShow(file), settings = parseSettings();
   const { layout, loco } = context();
+  let direction; try { direction = checkDirection(flags.direction ?? "forward"); } catch (e) { fail(`--direction: ${e.message}`); }
+  const show = orientShow(authored, direction, { layout });
+  const way = travelLabel(config.orientation, direction);
   const engine = cmd !== "run" || argv.includes("--no-sound") ? "null" : config.sound.engine;
   const sounds = soundLibrary(engine);
   const check = validateShow(show, { sounds, layout, loco, settings, soundFiles: cmd === "run" });
   if (cmd !== "run") { const miss = sounds.missingFiles(soundsUsed(show)); if (miss.length) check.warnings.push(`${miss.length} sound file${miss.length > 1 ? "s are" : " is"} not on this machine (a real run needs ${miss.length > 1 ? "them" : "it"}; see import-sounds.py): ${[...new Set(miss.map((m) => m.split(" ")[0]))].join(", ")}`); }
   console.log(`${show.name}  (${file.replace(root, "")})`);
+  if (direction === "reverse" || way) console.log(`direction: ${direction}${way ? ` (${way})` : ""}`);
   report(check);
   if (cmd === "validate") console.log(`ok: ${check.warnings.length ? `${check.warnings.length} warning(s)` : "no problems"}`);
   else if (cmd === "sim") {
@@ -99,7 +106,7 @@ if (cmd === "list") {
     if (argv.includes("--reset")) {
       const { returnToMark } = await import("./lib/track/index.mjs");
       console.log("--reset: putting the loco on the mark first");
-      const m = await returnToMark({ controller: ctl, sensor, loopIn: layout ? layout.loopIn : undefined, onLog: (e) => console.log(`${(e.t / 1000).toFixed(2).padStart(7)} s  ${e.text}`) });
+      const m = await returnToMark({ controller: ctl, sensor, loopIn: layout ? layout.loopIn : undefined, end: direction === "reverse" ? "tail" : "nose", onLog: (e) => console.log(`${(e.t / 1000).toFixed(2).padStart(7)} s  ${e.text}`) });
       if (!m.ok) { await ctl.close(); sensor.stop(); fail(`could not put the loco on the mark: ${m.error}`); }
     }
     let interrupts = 0;
@@ -113,5 +120,5 @@ if (cmd === "list") {
     process.exit(code);
   }
 } else {
-  console.log("usage: node show.mjs list | validate <show> | sim <show> | run <show>   (see the header of show.mjs for options)");
+  console.log("usage: node show.mjs list | validate <show> | sim <show> | run <show> [--direction=forward|reverse]   (see the header of show.mjs for options)");
 }

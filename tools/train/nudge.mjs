@@ -7,7 +7,8 @@
 //                                      beam blocked: back off and come forward onto the edge (works nose-in or tail-in)
 //                                      beam clear:   just short? creep forward a few seconds. just past? back over the beam and
 //                                                    forward onto it. neither? creep round the loop until the beam breaks
-//                                    Options: --near=5 (seconds to look nearby before the loop), --dry (only check the beam)
+//                                    Options: --near=5 (seconds to look nearby before the loop), --dry (only check the beam),
+//                                    --direction=reverse (the mark for a reverse run: the tail just breaking the beam)
 //
 // A move that ends on a beam event is the point: you cannot nudge the loco past the sensor without it stopping there.
 // Settings (controller address, sensor port) come from local/config.jsonc, env and flags (see `node config.mjs`).
@@ -27,7 +28,7 @@ const flag = (n, d) => { const a = argv.find((x) => x.startsWith(`--${n}=`)); re
 const dry = argv.includes("--dry");
 const CREEP = 0.1, MAX_NUDGE_S = 6;
 const fail = (m) => { console.error(`error: ${m}`); process.exit(1); };
-const usage = () => fail("usage: node nudge.mjs fwd <seconds> | back <seconds> | to-mark [--near=5] [--dry]");
+const usage = () => fail("usage: node nudge.mjs fwd <seconds> | back <seconds> | to-mark [--near=5] [--direction=forward|reverse] [--dry]");
 
 const [mode, secArg] = pos;
 if (!["fwd", "back", "to-mark"].includes(mode)) usage();
@@ -39,6 +40,8 @@ if (mode !== "to-mark") {
 }
 const nearS = Number(flag("near", 5));
 if (!(nearS > 0)) fail("--near must be a number of seconds");
+const direction = flag("direction", "forward");
+if (direction !== "forward" && direction !== "reverse") fail(`--direction must be forward or reverse, not "${direction}"`);
 
 const config = loadConfigOrExit(argv);
 const source = new SerialSource(config.sensor);
@@ -64,7 +67,7 @@ try {
     const creepInS = existsSync(locoFile) ? speedModel(loadLoco(locoFile))(CREEP) || undefined : undefined;
     const ac = new AbortController(); process.removeAllListeners("SIGINT");
     let hits = 0; process.on("SIGINT", () => { if (++hits === 1) { console.log("\nstopping"); ac.abort(); } else { ctl.emergencyStop(); process.exit(130); } });
-    const r = await returnToMark({ controller: ctl, sensor, signal: ac.signal, nearS, loopIn, creepInS, onLog: (e) => console.log(`  ${(e.t / 1000).toFixed(1).padStart(5)} s  ${e.text}`) });
+    const r = await returnToMark({ controller: ctl, sensor, signal: ac.signal, nearS, loopIn, creepInS, end: direction === "reverse" ? "tail" : "nose", onLog: (e) => console.log(`  ${(e.t / 1000).toFixed(1).padStart(5)} s  ${e.text}`) });
     await new Promise((res) => setTimeout(res, 500));
     if (!r.ok) throw new Error(r.error || "could not find the mark");
     console.log(`on the mark: ${where()}`);

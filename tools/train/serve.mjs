@@ -42,6 +42,7 @@ const web = createWebServer({
   dirs: { local: localPath("shows"), examples: root + "examples/shows" },
   layoutFile: localPath("layout.json"), locoFile: localPath("loco_profile.json"),
   fallback: { layoutFile: root + "examples/layout.example.json", locoFile: root + "examples/loco.example.json" },
+  orientation: config.orientation,
   log: (m) => console.error(m),
 });
 const { url } = await web.listen(config.web.port);

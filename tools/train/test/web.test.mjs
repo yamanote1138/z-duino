@@ -307,3 +307,46 @@ test("reset: refused with no sensor, or while a show is running", async () => {
     await t.api("POST", "/api/stop", {}); await t.idle();
   } finally { await t.web.close(); }
 });
+
+test("direction: reverse is passed to validate, sim and run, a bad value is a 400, and the page labels come from the orientation", async () => {
+  const { fileURLToPath } = await import("node:url");
+  const repo = (p) => fileURLToPath(new URL(p, import.meta.url));
+  const base = mkdtempSync(join(tmpdir(), "web-dir-"));
+  const dirs = { local: join(base, "local"), examples: repo("../examples/shows") }; mkdirSync(dirs.local);
+  const sounds = { play: defaultSounds({ engine: new RecordingEngine(), onSkip: () => {} }), dry: defaultSounds({ engine: "null" }) };
+  const sensor = Object.assign(new GhostSensor(realClock, { state: "blocked", eventMs: 5 }), { lastSampleAgeMs: 12 });
+  const web = createWebServer({
+    hardware: { sensor, connectController: async () => { throw new Error("must not connect"); } }, sounds, dirs, statusMs: 50,
+    layoutFile: join(base, "layout.json"), locoFile: join(base, "loco.json"), orientation: { invert: true, forwardMoves: "right" },
+    fallback: { layoutFile: repo("../examples/layout.example.json"), locoFile: repo("../examples/loco.example.json") },
+  });
+  const { port } = await web.listen(0);
+  const api = async (m, p, b) => { const r = await fetch(`http://127.0.0.1:${port}${p}`, { method: m, headers: b ? { "content-type": "application/json" } : {}, body: b ? JSON.stringify(b) : undefined }); return { status: r.status, data: await r.json().catch(() => null) }; };
+  try {
+    const fwd = await api("POST", "/api/sim", { id: "examples/lap" }), rev = await api("POST", "/api/sim", { id: "examples/lap", direction: "reverse" });
+    assert.equal(fwd.data.ok, true); assert.equal(rev.data.ok, true, rev.data.error);
+    assert.ok(rev.data.log.some((e) => /seating the tail/.test(e.text)), "the reverse run seats the tail first");
+    assert.ok(!fwd.data.log.some((e) => /seating the tail/.test(e.text)));
+    assert.equal((await api("POST", "/api/validate", { id: "examples/lap", direction: "reverse" })).data.ok, true);
+    for (const path of ["/api/sim", "/api/validate", "/api/run", "/api/reset"]) {
+      const bad = await api("POST", path, { id: "examples/lap", direction: "sideways" });
+      assert.equal(bad.status, 400, path); assert.match(bad.data.error, /forward or reverse/);
+    }
+    const lay = await api("GET", "/api/layout");
+    assert.deepEqual(lay.data.orientation, { invert: true, forwardMoves: "right" });
+  } finally { await web.close(); }
+});
+
+test("direction: reset in reverse seats the tail in the beam", async () => {
+  const w = await resetWorld(-0.3);
+  try {
+    const r = await w.api("POST", "/api/reset", { direction: "reverse" });
+    assert.equal(r.status, 202); assert.equal(r.data.run.name, "Return to the tail mark");
+    await w.idle();
+    const st = (await w.api("GET", "/api/status")).data;
+    assert.equal(st.lastRun.ok, true, JSON.stringify(st.lastRun));
+    assert.equal(w.track.state, "blocked");
+    assert.ok(w.track.noseIn > 2.6 && w.track.noseIn <= 3, `tail just in the beam (nose ${w.track.noseIn.toFixed(2)})`);
+    assert.equal(w.ctl.speed, 0);
+  } finally { w.track.stop(); await w.web.close(); }
+});

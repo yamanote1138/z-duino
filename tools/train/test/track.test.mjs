@@ -130,3 +130,14 @@ test("reset: losing the sensor stops it", async () => {
   const r = await finish(w, async () => { w.clock.sleep(2000).then(() => w.track.emit("lost", {})); return returnToMark({ controller: w.ctl, sensor: w.track, clock: w.clock }); });
   assert.equal(r.ok, false); assert.match(r.error, /sensor stopped reporting/); assert.equal(w.ctl.speed, 0);
 });
+
+test("returnToMark with end: tail seats the tail in the beam, from a nose mark, just past, just short and across the loop", async () => {
+  for (const nose of [0.2, 1.5, 6, 130, 60]) {
+    const w = await world({ nose });
+    const r = await finish(w, () => returnToMark({ controller: w.ctl, sensor: w.track, clock: w.clock, loopIn: LOOP, creepInS: 2.35, end: "tail" }));
+    assert.equal(r.ok, true, `from ${nose}: ${JSON.stringify(r)}`);
+    assert.equal(w.track.state, "blocked", `from ${nose}: the beam is blocked`);
+    assert.ok(w.track.noseIn > 2.6 && w.track.noseIn <= 3, `from ${nose}: the tail has just broken the beam (nose ${w.track.noseIn.toFixed(2)} in past it, the loco is 3 in long)`);
+    assert.equal(w.ctl.speed, 0);
+  }
+});

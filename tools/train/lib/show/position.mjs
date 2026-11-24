@@ -17,6 +17,19 @@ export function speedModel(profile) {
   };
 }
 
+/** Inches the loco covers while the throttle ramps linearly from `from` to `to` at `secondsPer01` per 0.1 (the controller's ramp). */
+export function rampDistanceIn(speed, from, to, secondsPer01 = 1) {
+  const T = (Math.abs(from - to) / 0.1) * secondsPer01;
+  if (!(T > 0)) return 0;
+  const N = 100;
+  let d = 0;
+  for (let i = 0; i < N; i++) d += speed(from + ((to - from) * (i + 0.5)) / N) * (T / N);
+  return d;
+}
+
+/** Defaults for the `wait-approach` step: inches of running at creep speed before the stop, and a margin for the position estimate (it runs 1 to 5 in behind the loco by the end of a lap). */
+export const APPROACH_CREEP_IN = 5, APPROACH_MARGIN_IN = 3;
+
 export class Position {
   /** @param getMotion () => ({ thr, forward })  @param now () => ms */
   constructor({ speed, lengthIn, loopIn = null, getMotion, now }) {

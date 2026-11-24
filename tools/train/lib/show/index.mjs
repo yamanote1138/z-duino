@@ -2,6 +2,7 @@
 export { SHOW_FORMAT, LAYOUT_FORMAT, loadShow, saveShow, parseShow, stringifyShow, loadLayout, validateLayout, loadLoco } from "./io.mjs";
 export { validateShow, soundsUsed, usesZones, STEP_KINDS, EVENTS, COLORS } from "./schema.mjs";
 export { runShow } from "./runtime.mjs";
+export { orientShow, checkDirection, DIRECTIONS } from "./orient.mjs";
 export { simulateShow, GhostSensor, SimSound, SimSocket } from "./sim.mjs";
 export { VirtualClock, realClock } from "./clock.mjs";
 export { Position, speedModel, inZone } from "./position.mjs";

@@ -107,6 +107,10 @@
         <span><b>Beam:</b> <span id="beam">…</span></span>
       </div>
       <div class="bar" id="bar"></div>
+      <div class="controls" style="margin-bottom:8px" id="dirrow">
+        <button class="btn outline sm on" id="dir-fwd" title="Run shows the way they were written: nose leading"></button>
+        <button class="btn outline sm" id="dir-rev" title="Run shows the other way round: tail leading, tail on the mark"></button>
+      </div>
       <div class="controls">
         <button class="btn" id="stop" title="Stop the show: the loco ramps down like Ctrl-C"></button>
         <button class="btn error" id="estop" title="Send the controller's stop command now"></button>
@@ -176,6 +180,8 @@ async function api(method, path, body) {
 const secs = (ms) => (ms / 1000).toFixed(2).padStart(7) + " s";
 
 let status = null, shows = [], selected = null, detail = null, sounds = null, chip = null;
+let direction = "forward", orientation = null;
+try { if (localStorage.getItem("direction") === "reverse") direction = "reverse"; } catch { /* no storage: forward */ }
 
 // ---------- static bits ----------
 fill($("#title"), ic("train"), "Z-Duino shows");
@@ -188,6 +194,16 @@ fill($("#snd-stop"), ic("stop"), "Stop all sounds");
 fill($("#import-btn"), ic("upload"), "Import a show");
 const bar = $("#bar");
 for (let i = 1; i <= 10; i++) bar.append(h("div", { class: "speed-segment" }, i));
+
+// ---------- direction: which way round shows run ----------
+const wayOf = (d) => { const f = orientation && orientation.forwardMoves; return !f ? "" : ` · ${d === "forward" ? f : f === "right" ? "left" : "right"}`; };
+function renderDirection() {
+  fill($("#dir-fwd"), null, `Forward${wayOf("forward")}`); fill($("#dir-rev"), null, `Reverse${wayOf("reverse")}`);
+  $("#dir-fwd").classList.toggle("on", direction === "forward"); $("#dir-rev").classList.toggle("on", direction === "reverse");
+  $("#reset").title = direction === "reverse" ? "Put the loco on the tail mark (the tail just breaking the beam), for a reverse run" : "Put the loco back on the mark (the nose just breaking the beam): it looks nearby first, then runs the loop at creep until the beam breaks";
+  updateButtons();
+}
+for (const [id, d] of [["#dir-fwd", "forward"], ["#dir-rev", "reverse"]]) $(id).addEventListener("click", () => { direction = d; try { localStorage.setItem("direction", d); } catch { /* not remembered */ } renderDirection(); });
 
 // ---------- status ----------
 function badge(id, kind, icon, text) { const b = $(id); b.className = "badge " + kind; fill(b, icon ? ic(icon) : null, text); }
@@ -218,7 +234,7 @@ function updateButtons() {
   else if (need !== "any" && s.state !== need) why = `the beam must be ${need} (it is ${s.state}): use Return to the mark, or put the loco there by hand`;
   else if (detail.errors.length) why = "fix the validation problems first";
   run.disabled = !!why;
-  $("#need").textContent = why || (need === "blocked" ? "Nose is on the mark: ready" : "Ready");
+  $("#need").textContent = why || (need === "blocked" ? (direction === "reverse" ? "On a mark: ready (it seats the tail first)" : "Nose is on the mark: ready") : "Ready");
   $("#need").style.color = why ? "var(--warning)" : "var(--primary)";
 }
 
@@ -272,12 +288,12 @@ function renderDetail() {
   updateButtons();
 }
 async function doValidate() {
-  const r = await api("POST", "/api/validate", { id: detail.id, settings: settingsValues() });
+  const r = await api("POST", "/api/validate", { id: detail.id, direction, settings: settingsValues() });
   if (!r.ok) return problems($("#result"), [r.data.error]);
   problems($("#result"), r.data.errors, r.data.warnings, "Valid: no problems");
 }
 async function doSim() {
-  const r = await api("POST", "/api/sim", { id: detail.id, settings: settingsValues() });
+  const r = await api("POST", "/api/sim", { id: detail.id, direction, settings: settingsValues() });
   const box = $("#result");
   if (!r.ok) return problems(box, r.data.errors || [r.data.error], r.data.warnings);
   const d = r.data; box.textContent = "";
@@ -288,7 +304,7 @@ async function doSim() {
 }
 async function doRun() {
   logClear(); $("#result").textContent = "";
-  const r = await api("POST", "/api/run", { id: detail.id, settings: settingsValues() });
+  const r = await api("POST", "/api/run", { id: detail.id, direction, settings: settingsValues() });
   if (!r.ok) { if (r.data.errors) problems($("#result"), r.data.errors, r.data.warnings); logLine(r.data.error, "bad"); return; }
   logLine(`started: ${r.data.run.name}`, "good");
 }
@@ -335,9 +351,9 @@ $("#snd-stop").addEventListener("click", () => api("POST", "/api/sounds/stop", {
 // ---------- reset to the mark ----------
 $("#reset").addEventListener("click", async () => {
   logClear();
-  const r = await api("POST", "/api/reset", {});
+  const r = await api("POST", "/api/reset", { direction });
   if (!r.ok) { logLine(r.data.error, "bad"); return; }
-  logLine("returning to the mark: looking nearby first, then round the loop", "good");
+  logLine(direction === "reverse" ? "returning to the tail mark: the mark first, then the tail seated" : "returning to the mark: looking nearby first, then round the loop", "good");
 });
 
 // ---------- stop buttons, views ----------
@@ -359,6 +375,8 @@ function connect() {
   es.addEventListener("log", (e) => { const l = JSON.parse(e.data); logLine(l.text, /^stopped|fail/i.test(l.text) ? "bad" : "", l.t); });
   es.addEventListener("run-end", (e) => { const r = JSON.parse(e.data); logLine(r.ok ? `finished in ${(r.elapsedMs / 1000).toFixed(1)} s` : `stopped: ${r.error}`, r.ok ? "good" : "bad"); api("GET", "/api/status").then((s) => s.ok && renderStatus(s.data)); });
 }
+renderDirection();
+api("GET", "/api/layout").then((r) => { if (r.ok && r.data.orientation) { orientation = r.data.orientation; renderDirection(); } });
 loadShows().then(() => { const id = decodeURIComponent(location.hash.slice(1)); if (shows.some((x) => x.id === id)) select(id); });
 connect();
 </script>

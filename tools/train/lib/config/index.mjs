@@ -3,7 +3,10 @@
 //   const config = loadConfig({ argv: process.argv.slice(2) });
 //   config.controller.port, config.sound.volume, ...
 //
-// Precedence, lowest to highest:   built-in defaults  <  local/config.jsonc  <  environment variables  <  command-line flags
+// Precedence, lowest to highest:   built-in defaults  <  local/orientation.json  <  local/config.jsonc  <  environment variables  <  command-line flags
+//
+//   local/orientation.json   written by `node orient.mjs`: which way "forward" is on your track. Only `controller.invert` comes from it
+//                        (so the motor polarity you calibrated is what the tools send), and `forwardMoves` ("right" or "left") is a label.
 //
 //   local/config.jsonc   your own settings: JSON with // and /* */ comments and trailing commas allowed (data only, nothing
 //                        in it is executed). config.example.jsonc documents every key; it is generated from the table below
@@ -22,6 +25,18 @@ import { join, resolve } from "node:path";
 import { LOCAL_DIR } from "../paths.mjs";
 
 export const CONFIG_FILE = "config.jsonc";
+export const ORIENTATION_FILE = "orientation.json", ORIENTATION_FORMAT = "z-orientation/1";
+
+/** Parse local/orientation.json: { format, invert: bool, forwardMoves: "right" | "left" } (forwardMoves is optional). */
+export function parseOrientation(text) {
+  const o = JSON.parse(text);
+  if (!o || o.format !== ORIENTATION_FORMAT) throw new Error(`format must be "${ORIENTATION_FORMAT}"`);
+  if (typeof o.invert !== "boolean") throw new Error("invert must be true or false");
+  if (o.forwardMoves !== undefined && o.forwardMoves !== "right" && o.forwardMoves !== "left") throw new Error('forwardMoves must be "right" or "left"');
+  return o;
+}
+/** Which way the loco travels for a direction on your track ("right" or "left"), or null if the calibration did not say. */
+export const travelLabel = (orientation, direction) => (orientation && orientation.forwardMoves ? (direction === "reverse" ? (orientation.forwardMoves === "right" ? "left" : "right") : orientation.forwardMoves) : null);
 
 const str = (doc, extra = {}) => ({ type: "string", nullable: true, default: null, doc, ...extra });
 const int = (def, min, max, doc, extra = {}) => ({ type: "integer", default: def, min, max, doc, ...extra });
@@ -126,7 +141,8 @@ const leaves = () => Object.entries(SCHEMA).flatMap(([g, keys]) => Object.entrie
 
 /**
  * Resolve the settings. Everything is injectable for tests. Returns a frozen object (config.sound.volume, ...) with a
- * non-enumerable `sources` map from "group.key" to "default" | "file" | "env" | "flag".
+ * non-enumerable `sources` map from "group.key" to "default" | "orientation" | "file" | "env" | "flag", and `orientation`
+ * (the parsed local/orientation.json, or null).
  */
 export function loadConfig({ env = process.env, argv = [], localDir = null, readFile = (p) => readFileSync(p, "utf8"), exists = existsSync } = {}) {
   const dir = localDir || (env.TRAIN_LOCAL ? resolve(env.TRAIN_LOCAL) : LOCAL_DIR);
@@ -136,6 +152,13 @@ export function loadConfig({ env = process.env, argv = [], localDir = null, read
   const sources = Object.fromEntries(leaves().map(({ path }) => [path, "default"]));
   const set = (path, spec, v, source, label) => { const bad = check(spec, v); if (bad) problems.push(`${label}: ${path} ${bad}${typeof v === "string" ? ` (got "${v}")` : ""}`); else { values[path] = v; sources[path] = source; } };
 
+  // what calibration found out about the track's polarity: below the file, the environment and the flags
+  const orientFile = join(dir, ORIENTATION_FILE);
+  let orientation = null;
+  if (exists(orientFile)) {
+    try { orientation = parseOrientation(readFile(orientFile)); } catch (e) { problems.push(`${orientFile}: ${e.message}`); }
+    if (orientation) set("controller.invert", SCHEMA.controller.invert, orientation.invert, "orientation", orientFile);
+  }
   // the file
   if (exists(file)) {
     let parsed = null;
@@ -164,6 +187,7 @@ export function loadConfig({ env = process.env, argv = [], localDir = null, read
   for (const g of Object.keys(config)) Object.freeze(config[g]);
   Object.defineProperty(config, "sources", { value: Object.freeze(sources), enumerable: false });
   Object.defineProperty(config, "file", { value: file, enumerable: false });
+  Object.defineProperty(config, "orientation", { value: orientation, enumerable: false });
   return Object.freeze(config);
 }
 
@@ -176,7 +200,7 @@ export function exampleConfigText() {
     "// Copy this file to local/config.jsonc and uncomment (remove the leading //) what you want to change; anything left",
     "// commented out keeps its default. Comments and trailing commas are fine in this file.",
     "//",
-    "// Precedence: built-in defaults < this file < environment variables < command-line flags.",
+    "// Precedence: built-in defaults < local/orientation.json (node orient.mjs) < this file < environment variables < command-line flags.",
     "// `node config.mjs` prints what is in effect and where each value came from.",
     "{",
   ];

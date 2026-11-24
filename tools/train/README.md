@@ -25,9 +25,10 @@ Without your own layout or loco profile, `validate` and `sim` use the examples i
 3. `node calibrate.mjs` measures the open-beam and blocked readings (interactive).
 4. Park the loco with its nose in the beam, "the mark": `node nudge.mjs to-mark` from wherever it is (see **Returning to the mark** below), or `node creep-stop.mjs` from a few inches short of the beam.
 5. `node learn-loco.mjs --in-beam` teaches the loco's length and speed table (about 8 minutes; it runs the loco around the loop at several speeds).
-6. Measure your track. Measure the length of one lap along the rails with a piece of string, then `node measure-zones.mjs --loop-in=<inches> --save` and press a key as the nose reaches the start and end of a bend. Repeat with `--marks=` for more zones.
-7. Run something: `node show.mjs run park-on-tail`, or `node serve.mjs --open` for the page.
-8. Settings (controller address, sensor port, sound volume, ...): `cp config.example.jsonc local/config.jsonc` and edit it. See **Settings**.
+6. `node orient.mjs` (in your own terminal) checks which way "forward" moves the loco: you say which end led and whether it went right or left, and it flips the controller's invert flag if the back led. It saves `local/orientation.json`, which is what makes `--direction=reverse` mean tail-first and tells the page which way is right and left.
+7. Measure your track. Measure the length of one lap along the rails with a piece of string, then `node measure-zones.mjs --loop-in=<inches> --save` and press a key as the nose reaches the start and end of a bend. Repeat with `--marks=` for more zones.
+8. Run something: `node show.mjs run park-on-tail`, or `node serve.mjs --open` for the page. Add `--direction=reverse` to run any show the other way round.
+9. Settings (controller address, sensor port, sound volume, ...): `cp config.example.jsonc local/config.jsonc` and edit it. See **Settings**.
 
 Everything you create (calibration, loco profile, layout, shows, results, settings) goes in `local/`, which git ignores.
 
@@ -77,12 +78,13 @@ All scripts need Node 22+ (global `WebSocket`). The controller's address and the
 
 | Script | What it does |
 |---|---|
-| `show.mjs` | Check, simulate and run a show (a JSON file): `node show.mjs list \| validate \| sim \| run <show>`. See **Shows**. `run --reset` puts the loco on the mark first. |
+| `show.mjs` | Check, simulate and run a show (a JSON file): `node show.mjs list \| validate \| sim \| run <show> [--direction=forward\|reverse]`. See **Shows**. `run --reset` puts the loco on the mark first. |
 | `serve.mjs` | The web page: run shows, audition sounds, import and export shows. See **The web page**. |
 | `calibrate.mjs` | Measure the open-beam and blocked readings and write `local/sensor_levels.json`. Interactive; needs the sensor only. |
 | `sensor-watch.mjs` | Print the sensor's events live, or replay a trace (`--replay=<csv>`). |
 | `creep-stop.mjs` | Creep forward at 10% and stop when the nose breaks the beam. Start with the nose a few inches short of the beam; it gives up after 8 s (`--max=<seconds>` for longer; a full lap at creep is about 56 s). This puts the train on "the mark". |
-| `nudge.mjs` | Move the loco by hand, with the beam as the safety: `fwd <s>` / `back <s>` creep for up to 6 s and stop at any beam event; `to-mark` puts the loco back on the mark from wherever it is (**Returning to the mark**). |
+| `orient.mjs` | Find out which way "forward" is (nose leading) and which way that is on the table; flips the invert flag if needed and writes `local/orientation.json`. Interactive; beam-guarded creeps only. See **Running a show the other way**. |
+| `nudge.mjs` | Move the loco by hand, with the beam as the safety: `fwd <s>` / `back <s>` creep for up to 6 s and stop at any beam event; `to-mark` puts the loco back on the mark from wherever it is (**Returning to the mark**; `--direction=reverse` seats the tail on it instead). |
 | `measure-zones.mjs` | Measure your layout's zones (curves, approach) by pressing a key as the nose reaches each mark during one slow lap. See **Shows**. |
 | `sound-test.mjs` | List, play and check the sound library, with no train. |
 | `config.mjs` | Print the settings in effect and where each came from (`--example` prints the documented template). |
@@ -162,7 +164,7 @@ node show.mjs run lap --no-sound  # for real (add --set=cruise=0.2 to override a
 ```
 
 Steps (`"do"`): `direction`, `ramp`, `halt`, `wait`, `wait-for` (a sensor event), `creep` (a guarded move that stops on a
-beam event, creep speed only; it does not move if the beam is already in that state), `wait-zone`, `sound`, `fill`, `loop`,
+beam event, creep speed only; it does not move if the beam is already in that state), `wait-zone`, `wait-approach`, `sound`, `fill`, `loop`,
 `stop-loop`, `stop-sounds`, `led`, `led-auto` (skipped, and logged as such, when the controller has no status LED: it is optional hardware, reported in the status message as `features.led`; `controller.led` in the settings can force it), `repeat`, `parallel` (branches run together), `log`. Numbers can be `"$name"`
 from the show's `settings`. `start: "blocked"` makes the runner check the nose is on the mark first. The field list for each
 step is at the top of `lib/show/schema.mjs`; the validator names the path of every mistake.
@@ -171,6 +173,27 @@ step is at the top of `lib/show/schema.mjs`; the validator names the path of eve
   listening. Put the ramp and the `wait-for` in separate `parallel` branches (see the example).
 - **The blind-run rule is checked.** Ramping above creep (0.10) with no `wait-for`, `creep` or `wait-zone` before the next
   slow-down is a validation error, and so is ending the show above creep.
+- **Running a show the other way: `--direction=reverse`.** A show is written once, the way the layout was measured: the nose leads, the
+  loco leaves the mark (the nose just in the beam) and travels one way (on Chad's layout, to the right). `--direction=reverse` on `show.mjs`
+  `validate`, `sim` and `run` (and a Forward/Reverse switch on the page) turns it into its mirror image: the tail leads, the loco leaves
+  the other way (to the left), and the tail is on the mark. `lib/show/orient.mjs` does it when the show is loaded: `direction` and
+  `creep` steps run the other way and a wait for the `nose` edge becomes one for the `tail`; runs of zone `fill` steps are put in the
+  order the loco meets the bends; and a show that starts on the mark first seats the tail there (forward until the tail clears the beam,
+  then back until it breaks it: a few inches at creep, stopped by the beam, from either mark). In a reverse run a zone is met one loco
+  length later, because the tail leads into each bend, and `wait-approach` measures from the end that leads. The show finishes with the
+  tail on the mark, so the next reverse run starts there; `node nudge.mjs to-mark --direction=reverse` (or `show.mjs run --reset
+  --direction=reverse`) puts the tail on it from anywhere. Write shows in the forward orientation only; a show written for reverse would be turned round twice.
+- **Which way is forward: `orient.mjs`.** "Forward" is the loco's front leading. Which way the controller's forward really moves the loco
+  depends on the track polarity and the motor leads, so `node orient.mjs` creeps forward a few inches (beam-guarded, either end first),
+  asks which end led and whether it went right or left as you face the layout, flips `controller.invert` and checks again if the back
+  led, and writes `local/orientation.json`. The tools send that invert whenever they connect (below `config.jsonc`, the environment
+  and the flags; `node config.mjs` shows the source), and the page labels Forward and Reverse with the way they move. The controller has
+  one invert flag and the throttle app sends its own, so whichever connected last wins: calibrate with the app's invert off.
+- **Slowing for a stop: `wait-approach`.** `{ "do": "wait-approach", "from": "$cruise" }` waits until it is time to start slowing for a beam stop,
+  then the show ramps to creep and `creep`s until the beam breaks. The point is worked out from the loco's speed table, not set by hand: the ground the
+  ramp from `from` down to creep covers (about 10 in from 0.3, about 4 in from 0.2), plus `creepIn` inches at creep speed (default 5), plus `marginIn`
+  (default 3) because the position estimate runs 1 to 5 in behind the loco by the end of a lap. It measures from the end that leads, so it works the
+  same going forward (nose breaks the beam) and in reverse (tail does). Needs `loopIn` in the layout.
 - **Zones** come from a layout file (`z-layout/1`: `loopIn` and named `zones` as inches of nose travel past the beam;
   `examples/layout.example.json`, yours is `local/layout.json`). The position is estimated from the loco's speed model and
   re-anchored on every beam edge, good to about an inch at creep and worse at speed, so use zones for effects (a squeal

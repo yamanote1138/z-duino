@@ -15,7 +15,7 @@
 //   - `start` ("blocked" = nose on the mark) is checked against the sensor before the first move
 
 import { realClock } from "./clock.mjs";
-import { Position, speedModel, inZone } from "./position.mjs";
+import { Position, speedModel, inZone, rampDistanceIn, APPROACH_CREEP_IN, APPROACH_MARGIN_IN } from "./position.mjs";
 import { COLORS, soundsUsed, usesZones, validateShow } from "./schema.mjs";
 
 export async function runShow(show, { controller: ctl, sensor, sound, layout = null, loco = null, clock = realClock, settings = {}, onLog = () => {}, signal = null, pollMs = 50 }) {
@@ -36,10 +36,18 @@ export async function runShow(show, { controller: ctl, sensor, sound, layout = n
   const ids = soundsUsed(show);
   if (ids.length && sound) sound.check(ids);
 
-  let pos = null;
+  let pos = null, restoreSend = () => {};
   if (needsZones) {
     pos = new Position({ speed: speedModel(loco), lengthIn: loco.lengthIn, loopIn: layout.loopIn || null, getMotion: () => ({ thr: ctl.speed, forward: ctl.forward }), now: () => clock.now() });
     if (start === "blocked") pos.anchor(0);
+    // Bring the estimate up to date whenever a command goes out (every state change in the controller follows its send), so a
+    // stop or a direction change is integrated at the speed it actually happened at, not carried on through the next wait.
+    const had = Object.prototype.hasOwnProperty.call(ctl, "send"), prev = ctl.send;
+    const send = ctl.send.bind(ctl);
+    // (before the send: integrate up to now at the old speed; in a microtask after it: pick up the new speed the caller sets next)
+    const refresh = () => { try { pos.update(); } catch { /* no speed model: the show would have been refused */ } };
+    ctl.send = (m) => { refresh(); const r = send(m); queueMicrotask(refresh); return r; };
+    restoreSend = () => { if (had) ctl.send = prev; else delete ctl.send; };
   }
   const onEdge = (e) => { if (pos && e) pos.anchorEdge(e.edge); };
   const label = () => sensor.setDirection(ctl.forward ? "forward" : "reverse");
@@ -53,22 +61,42 @@ export async function runShow(show, { controller: ctl, sensor, sound, layout = n
   const lostSignal = new Promise((res) => sensor.on("lost", res));
   const race = (p) => Promise.race([p, dead]);
   const handles = new Set();
+  const pendingLoops = new Map(), cancelLoop = (slot) => pendingLoops.delete(slot);   // loops waiting for their afterMs, by slot
 
+  /** Wait until the estimated nose position passes `target` in the direction of travel (`fwd`). */
+  async function waitPosition(target, fwd, timeoutMs, what) {
+    const giveUp = clock.now() + timeoutMs;
+    for (;;) {
+      await race(clock.sleep(pollMs));
+      if (clock.now() > giveUp) throw new Error(`${what} not reached within ${Math.round(timeoutMs / 1000)} s (estimated position ${pos.x.toFixed(1)} in, waiting for ${target.toFixed(1)} in): is the speed model right?`);
+      if (ctl.forward !== fwd) throw new Error(`the direction changed while waiting for ${what}`);
+      const x = pos.x;
+      if (fwd ? x >= target : x <= target) break;
+    }
+  }
+  // A zone as the nose meets it. Going the other way the tail leads into each bend, so the nose reaches it one loco length later.
+  const zoneOf = (name) => { const z = layout.zones[name]; return ctl.forward ? z : { ...z, fromIn: z.fromIn + loco.lengthIn, toIn: z.toIn + loco.lengthIn }; };
   async function waitZone(name, edge, timeoutMs) {
-    const z = layout.zones[name];
+    const z = zoneOf(name);
     if (!pos.known) throw new Error(`wait-zone "${name}": the position is not known yet (no beam edge seen: start with the nose on the mark, or wait for a beam event first)`);
     const fwd = ctl.forward;
     const want = edge === "enter" ? (fwd ? z.fromIn : z.toIn) : (fwd ? z.toIn : z.fromIn);
     if (edge === "enter" && inZone(pos.x, z, layout.loopIn)) { say(`already inside zone "${name}"`); return; }
-    const target = pos.target(want, fwd), giveUp = clock.now() + timeoutMs;
-    for (;;) {
-      await race(clock.sleep(pollMs));
-      if (clock.now() > giveUp) throw new Error(`zone "${name}" ${edge} not reached within ${Math.round(timeoutMs / 1000)} s (estimated position ${pos.x.toFixed(1)} in, waiting for ${target.toFixed(1)} in): is the speed model right?`);
-      if (ctl.forward !== fwd) throw new Error(`the direction changed while waiting for zone "${name}"`);
-      const x = pos.x;
-      if (fwd ? x >= target : x <= target) break;
-    }
+    await waitPosition(pos.target(want, fwd), fwd, timeoutMs, `zone "${name}" ${edge}`);
     say(`zone "${name}" ${edge}`);
+  }
+  // Slow-down point for a beam stop: ramp distance + creep run + margin before the beam, measured from the leading end
+  // (the nose going forward, the tail in reverse: that end is the one that breaks the beam).
+  async function waitApproach(s) {
+    if (!pos.known) throw new Error(`wait-approach: the position is not known yet (no beam edge seen: start with the nose on the mark, or wait for a beam event first)`);
+    const fwd = ctl.forward;
+    const from = n(s.from), to = n(s.to ?? ctl.config.creepMax ?? 0.1), secs = n(s.secondsPer01 ?? ctl.config.rampSecondsPer01 ?? 1);
+    const rampIn = rampDistanceIn(speedModel(loco), from, to, secs), creepIn = n(s.creepIn ?? APPROACH_CREEP_IN), marginIn = n(s.marginIn ?? APPROACH_MARGIN_IN);
+    const d = rampIn + creepIn + marginIn;
+    const target = pos.target(fwd ? -d : loco.lengthIn + d, fwd);
+    say(`approach: start slowing ${d.toFixed(1)} in before the beam (ramp ${rampIn.toFixed(1)} + creep ${creepIn} + margin ${marginIn}), at ${target.toFixed(1)} in`);
+    await waitPosition(target, fwd, n(s.timeoutMs ?? 60000), "the approach");
+    say("approach: slow down now");
   }
   const zoneMs = (name) => { const z = layout.zones[name]; const v = speedModel(loco)(ctl.speed); if (!(v > 0)) throw new Error(`fill zone "${name}": the loco is not moving`); return ((z.toIn - z.fromIn) / v) * 1000; };
 
@@ -92,6 +120,7 @@ export async function runShow(show, { controller: ctl, sensor, sound, layout = n
         if (r.result !== "guard") throw new Error(`creep ended without the beam event (${r.result})`);
         say(`creep done after ${r.elapsedMs} ms`, path); break;
       }
+      case "wait-approach": await waitApproach(s); break;
       case "wait-zone": say(`waiting for zone "${s.zone}" ${s.edge}`, path); await waitZone(s.zone, s.edge, n(s.timeoutMs ?? 60000)); break;
       case "sound": {
         const h = sound.play(s.id, { gain: s.gain != null ? n(s.gain) : 1, seconds: s.seconds != null ? n(s.seconds) : undefined });
@@ -107,9 +136,18 @@ export async function runShow(show, { controller: ctl, sensor, sound, layout = n
         if (s.wait !== false) await race(h.done);
         break;
       }
-      case "loop": sound.loop(s.slot, s.id, { gain: s.gain != null ? n(s.gain) : 1 }); say(`loop ${s.slot}: ${s.id}`, path); break;
-      case "stop-loop": sound.stop(s.slot); say(`stop loop ${s.slot}`, path); break;
-      case "stop-sounds": sound.stopAll(); say("stop all sounds", path); break;
+      case "loop": {
+        cancelLoop(s.slot);
+        const gain = s.gain != null ? n(s.gain) : 1, after = n(s.afterMs ?? 0);
+        if (!(after > 0)) { sound.loop(s.slot, s.id, { gain }); say(`loop ${s.slot}: ${s.id}`, path); break; }
+        // later, without holding anything up: a stop-loop for the slot (or the end of the show) cancels it, so the show never has to
+        // sit in a branch waiting for it
+        const token = {}; pendingLoops.set(s.slot, token);
+        clock.sleep(after).then(() => { if (pendingLoops.get(s.slot) !== token) return; pendingLoops.delete(s.slot); sound.loop(s.slot, s.id, { gain }); say(`loop ${s.slot}: ${s.id}`, path); }).catch(() => {});
+        say(`loop ${s.slot}: ${s.id} in ${after} ms`, path); break;
+      }
+      case "stop-loop": cancelLoop(s.slot); sound.stop(s.slot); say(`stop loop ${s.slot}`, path); break;
+      case "stop-sounds": pendingLoops.clear(); sound.stopAll(); say("stop all sounds", path); break;
       case "led": { const c = s.color ? COLORS[s.color] : [n(s.r), n(s.g), n(s.b)]; say(ctl.led(...c) === false ? "led skipped (no status LED)" : `led ${s.color || c.join(",")}`, path); break; }
       case "led-auto": say(ctl.ledAuto() === false ? "led skipped (no status LED)" : "led auto", path); break;
       case "log": say(s.message, path); break;
@@ -129,8 +167,10 @@ export async function runShow(show, { controller: ctl, sensor, sound, layout = n
   } catch (e) {
     failure = e; say(`stopped: ${e.message}`);
   } finally {
+    restoreSend();
     sensor.off?.("lost", onLost); sensor.off?.("break", onEdge); sensor.off?.("restore", onEdge);
     if (signal) signal.removeEventListener("abort", onAbort);
+    pendingLoops.clear();
     try { sound?.stopAll(); } catch { /* the sound engine is not worth failing a stop for */ }
     try { await safeStop(ctl, clock); } catch (e) { say(`could not stop quietly (${e.message}): emergency stop`); try { ctl.emergencyStop(); } catch { /* the link is gone; the firmware stops the motor itself after 30 s */ } }
   }

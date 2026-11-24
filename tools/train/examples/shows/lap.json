@@ -16,7 +16,7 @@
       [ { "do": "ramp", "to": "$cruise" } ],
       [
         { "do": "wait-for", "event": "restore", "timeoutMs": 15000 },
-        { "do": "wait-zone", "zone": "approach", "edge": "enter" },
+        { "do": "wait-approach", "from": "$cruise" },
         { "do": "ramp", "to": "$creep" }
       ],
       [

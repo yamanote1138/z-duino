@@ -10,9 +10,14 @@
 //   creep       forward*, speed*, until*: event, maxMs*, afterMs     (a move that stops on a beam event; creep speed only;
 //               if the beam is already in that state it does not move at all)
 //   wait-zone   zone*, edge*: enter|exit, timeoutMs     (needs a layout and a loco profile; default timeout 60 s)
+//   wait-approach from*: throttle you are running at, creepIn, marginIn, to, secondsPer01, timeoutMs
+//               waits until it is time to start slowing for a beam stop: the distance the ramp from `from` to creep takes (from the
+//               loco's speed table), plus `creepIn` inches of running at creep (default 5), plus `marginIn` (default 3) for the position
+//               estimate. Knows which end leads (nose forward, tail in reverse). Needs layout.loopIn and a loco profile.
 //   sound       id*, gain, seconds, wait               (wait defaults to true: the step ends when the sound does)
 //   fill        id*, ms or zone, cutMs, overlapMs, gain, wait
-//   loop        slot*, id*, gain          stop-loop  slot*          stop-sounds
+//   loop        slot*, id*, gain, afterMs  (afterMs starts it later without holding the show up; stop-loop on the slot cancels it)
+//   stop-loop   slot*          stop-sounds
 //   led         color or r, g, b          led-auto
 //   repeat      times*, steps*            parallel   branches*: [[steps], [steps]]        log   message*
 // Any number may be "$name", a value from the show's "settings" (overridable when the show is run).
@@ -22,7 +27,7 @@ import { SHOW_FORMAT } from "./io.mjs";
 export const EVENTS = ["break", "restore", "nose", "tail", "pass"];
 export const COLORS = { off: [0, 0, 0], red: [1000, 0, 0], yellow: [1000, 600, 0], green: [0, 1000, 0], blue: [0, 0, 1000], purple: [600, 0, 1000], magenta: [1000, 0, 1000], white: [1000, 1000, 1000] };
 const CREEP_MAX = 0.10;
-const BLIND = () => `ramps above creep speed (${CREEP_MAX}) and slows down again with no beam wait (wait-for, creep, wait-zone) in between: a blind run. Wait for a beam event while it runs`;
+const BLIND = () => `ramps above creep speed (${CREEP_MAX}) and slows down again with no beam wait (wait-for, creep, wait-zone, wait-approach) in between: a blind run. Wait for a beam event while it runs`;
 
 const num = (name, opts = {}) => ({ name, kind: "num", ...opts });
 const STEPS = {
@@ -33,9 +38,10 @@ const STEPS = {
   "wait-for": { req: { event: "event" }, opt: { timeoutMs: num("timeoutMs", { min: 1 }) } },
   creep: { req: { forward: "bool", speed: num("speed", { min: 0.01, max: CREEP_MAX }), until: "event", maxMs: num("maxMs", { min: 1 }) }, opt: { afterMs: num("afterMs", { min: 0 }) } },
   "wait-zone": { req: { zone: "string", edge: "edge" }, opt: { timeoutMs: num("timeoutMs", { min: 1 }) } },
+  "wait-approach": { req: { from: num("from", { min: 0.01, max: 1 }) }, opt: { creepIn: num("creepIn", { min: 0 }), marginIn: num("marginIn", { min: 0 }), to: num("to", { min: 0.01, max: CREEP_MAX }), secondsPer01: num("secondsPer01", { min: 0.1 }), timeoutMs: num("timeoutMs", { min: 1 }) } },
   sound: { req: { id: "string" }, opt: { gain: num("gain", { min: 0 }), seconds: num("seconds", { min: 0 }), wait: "bool" } },
   fill: { req: { id: "string" }, opt: { ms: num("ms", { min: 1 }), zone: "string", cutMs: num("cutMs", { min: 0 }), overlapMs: num("overlapMs", { min: 0 }), gain: num("gain", { min: 0 }), wait: "bool" } },
-  loop: { req: { slot: "string", id: "string" }, opt: { gain: num("gain", { min: 0 }) } },
+  loop: { req: { slot: "string", id: "string" }, opt: { gain: num("gain", { min: 0 }), afterMs: num("afterMs", { min: 0 }) } },
   "stop-loop": { req: { slot: "string" } },
   "stop-sounds": {},
   led: { opt: { color: "color", r: num("r", { min: 0, max: 1000 }), g: num("g", { min: 0, max: 1000 }), b: num("b", { min: 0, max: 1000 }) } },
@@ -52,7 +58,7 @@ export function soundsUsed(show) {
   walk(show.steps || [], (s) => { if (typeof s.id === "string" && ["sound", "fill", "loop"].includes(s.do)) ids.add(s.id); });
   return [...ids];
 }
-export const usesZones = (show) => { let u = false; walk(show.steps || [], (s) => { if (s.do === "wait-zone" || (s.do === "fill" && s.zone)) u = true; }); return u; };
+export const usesZones = (show) => { let u = false; walk(show.steps || [], (s) => { if (s.do === "wait-zone" || s.do === "wait-approach" || (s.do === "fill" && s.zone)) u = true; }); return u; };
 
 function walk(steps, fn) {
   for (const s of Array.isArray(steps) ? steps : []) {
@@ -125,12 +131,16 @@ export function validateShow(show, { sounds = null, layout = null, loco = null, 
       else if (!layout.zones?.[s.zone]) err(`${path}.zone`, `no zone "${s.zone}" in the layout (has: ${Object.keys(layout.zones || {}).join(", ") || "none"})`);
       if (!loco) warn(path, "zones need a loco profile for the position estimate");
     }
+    if (s.do === "wait-approach") {
+      if (layout && !layout.loopIn) err(path, "wait-approach needs layout.loopIn (the loop length) to know where the beam is");
+      if (!loco) warn(path, "wait-approach needs a loco profile for the speed table");
+    }
     if (["sound", "fill", "loop"].includes(s.do) && typeof s.id === "string" && sounds) {
       try { sounds.check([s.id], { files: soundFiles }); } catch (e) { err(`${path}.id`, e.message); }
     }
 
     // the blind-run lint
-    const guardWait = s.do === "wait-for" || s.do === "creep" || s.do === "wait-zone";
+    const guardWait = s.do === "wait-for" || s.do === "creep" || s.do === "wait-zone" || s.do === "wait-approach";
     if (s.do === "ramp" && value(s.to) > CREEP_MAX) { if (!state.fast) state = { ...state, fast: true, guarded: false, at: path }; }
     else if ((s.do === "ramp" && value(s.to) <= CREEP_MAX) || s.do === "halt") {
       if (state.fast && !state.guarded) err(state.at, BLIND(state.at));

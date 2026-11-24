@@ -58,7 +58,7 @@ The Wemos has no idea the Mac exists: a Mac script is just another WebSocket cli
 | State | Lives in | Notes |
 |---|---|---|
 | Speed, direction | Wemos RAM | Lost on reboot; the motor is stopped at boot. |
-| Invert (motor polarity) | Wemos RAM, set by `{cmd:"invert"}` | The browser re-sends its saved choice on connect. The Mac tools send `controller.invert` from their settings if you set it. The firmware has one flag, so **whichever client connected last wins**. |
+| Invert (motor polarity) | Wemos RAM, set by `{cmd:"invert"}` | The browser re-sends its saved choice on connect. The Mac tools send `controller.invert` from their settings, or from `local/orientation.json` if `node orient.mjs` has calibrated it. The firmware has one flag, so **whichever client connected last wins**. |
 | WiFi, hostname, railroad name, PWM limits | `secrets.ini`, compiled into the firmware | Changing them means re-flashing. |
 | Beam calibration, loco profile, layout, shows, results, traces, your settings | `tools/train/local/` (git-ignored) | Copy the folder to move a setup. `TRAIN_LOCAL` points the tools at another folder. |
 | Sound packs | `tools/train/packs/` (manifests, committed) and the audio files they name (generated into `packs/synth/`, or imported by you into `tools/train/local/sounds/`; neither is committed) | The `sound.packs` setting chooses which load. |
@@ -74,7 +74,7 @@ Two separate worlds, on purpose:
 |---|---|---|---|---|
 | Controller address | `controller.host` | `TRAIN_HOST` | `--host=` | resolves `ztrain.local` |
 | Controller port, keepalive | `controller.port`, `controller.pingMs` | | | 81, 5000 ms |
-| Motor invert on connect | `controller.invert` | | `--invert=` | not sent |
+| Motor invert on connect | `controller.invert` (from `local/orientation.json` if `node orient.mjs` has run) | | `--invert=` | not sent |
 | Sensor serial port | `sensor.port` | `SENSOR_PORT` | `--sensor-port=` | the only `/dev/cu.usbmodem*` |
 | Sensor baud | `sensor.baud` | | | 115200 (match the sketch) |
 | Web page port | `web.port` | | `--port=` | 4040 |

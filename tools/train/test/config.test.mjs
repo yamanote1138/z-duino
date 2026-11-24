@@ -133,3 +133,20 @@ test("the serial source explains why it has no port", () => {
   assert.equal(two.resolve(), null); assert.match(two.why(null), /several sensor ports.*sensor\.port in local\/config\.jsonc, or SENSOR_PORT/);
   assert.equal(new SerialSource({ port: null, detect: () => ["/dev/cu.usbmodem1"] }).resolve(), "/dev/cu.usbmodem1", "a single device is found without being named");
 });
+
+test("local/orientation.json supplies controller.invert below the file, the environment and the flags, and says which way forward moves", async () => {
+  const { parseOrientation, travelLabel, ORIENTATION_FORMAT } = await import("../lib/config/index.mjs");
+  const files = { "/l/orientation.json": JSON.stringify({ format: ORIENTATION_FORMAT, invert: true, forwardMoves: "right" }), "/l/config.jsonc": '{ "controller": { "invert": false } }' };
+  const load = (extra = {}, present = Object.keys(files)) => loadConfig({ localDir: "/l", env: {}, exists: (p) => present.includes(p), readFile: (p) => files[p], ...extra });
+  const c = load({}, ["/l/orientation.json"]);
+  assert.equal(c.controller.invert, true); assert.equal(c.sources["controller.invert"], "orientation");
+  assert.deepEqual(c.orientation, { format: ORIENTATION_FORMAT, invert: true, forwardMoves: "right" });
+  assert.equal(load().controller.invert, false, "config.jsonc wins over the calibration"); assert.equal(load().sources["controller.invert"], "file");
+  assert.equal(load({ argv: ["--invert=true"] }).sources["controller.invert"], "flag");
+  assert.equal(loadConfig({ localDir: "/nowhere", env: {}, exists: () => false }).orientation, null);
+  assert.equal(loadConfig({ localDir: "/nowhere", env: {}, exists: () => false }).controller.invert, null);
+  assert.equal(travelLabel(c.orientation, "forward"), "right"); assert.equal(travelLabel(c.orientation, "reverse"), "left"); assert.equal(travelLabel(null, "forward"), null);
+  assert.throws(() => parseOrientation('{"format":"z-orientation/1"}'), /invert must be/);
+  assert.throws(() => parseOrientation('{"format":"z-orientation/1","invert":false,"forwardMoves":"up"}'), /forwardMoves/);
+  assert.throws(() => load({ readFile: () => '{"format":"nope"}' }, ["/l/orientation.json"]), /orientation.json: format must be/);
+});

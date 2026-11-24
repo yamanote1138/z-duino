@@ -11,6 +11,8 @@
 //             used for validating and simulating so those never make a sound
 //   dirs      { local, examples }   folders of show files; saved/imported shows go to `local`
 //   fallback  { layoutFile, locoFile }   example layout and loco profile used to validate and simulate (never to run) until yours exist
+//   orientation  the parsed local/orientation.json (or null): labels the page's Forward/Reverse buttons with the way the loco moves
+//   POST /api/run, /api/validate, /api/sim and /api/reset take an optional "direction": "forward" | "reverse" (lib/show/orient.mjs)
 //
 // Rules the service enforces:
 //   - it only talks to this machine (the Host header must be 127.0.0.1/localhost on our port) and POSTs must be JSON, which a
@@ -26,7 +28,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { returnToMark } from "../track/index.mjs";
 import { speedModel } from "../show/position.mjs";
-import { SHOW_FORMAT, loadLayout, loadLoco, loadShow, simulateShow, stringifyShow, soundsUsed, usesZones, validateLayout, validateShow, runShow } from "../show/index.mjs";
+import { SHOW_FORMAT, loadLayout, loadLoco, loadShow, simulateShow, stringifyShow, soundsUsed, usesZones, validateLayout, validateShow, runShow, orientShow, checkDirection } from "../show/index.mjs";
 
 const PUBLIC = join(dirname(fileURLToPath(import.meta.url)), "public");
 const NAME = /^[a-z0-9][a-z0-9_-]{0,63}$/;
@@ -35,7 +37,7 @@ const MAX_BODY = 1024 * 1024;
 class HttpError extends Error { constructor(status, message, extra = {}) { super(message); this.status = status; this.extra = extra; } }
 const slug = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 64);
 
-export function createWebServer({ hardware = {}, sounds, dirs, layoutFile = null, locoFile = null, fallback = {}, log = () => {}, statusMs = 1000 }) {
+export function createWebServer({ hardware = {}, sounds, dirs, layoutFile = null, locoFile = null, fallback = {}, orientation = null, log = () => {}, statusMs = 1000 }) {
   const sensor = hardware.sensor || null;
   let run = null, lastRun = null, port = null;
   const clients = new Set();
@@ -86,6 +88,9 @@ export function createWebServer({ hardware = {}, sounds, dirs, layoutFile = null
     if ((example.layout || example.loco) && usesZones(show)) c.warnings.push(`checked against the example ${example.layout ? "layout" : ""}${example.layout && example.loco ? " and " : ""}${example.loco ? "loco profile" : ""}, because yours ${example.layout && example.loco ? "are" : "is"} not set up yet (node measure-zones.mjs, node learn-loco.mjs)`);
     return c;
   };
+  // which way round: "forward" (the way the show was written) or "reverse" (tail leading, tail on the mark); see lib/show/orient.mjs
+  const directionFrom = (body) => { try { return checkDirection((body && body.direction) ?? "forward"); } catch (e) { throw new HttpError(400, e.message); } };
+  const orient = (show, direction, dry) => orientShow(show, direction, { layout: context(dry).layout });
   // a show in the request: by id, or inline (validate/sim of something not saved yet)
   const showFrom = (body) => {
     if (body && body.show) return body.show;
@@ -121,13 +126,13 @@ export function createWebServer({ hardware = {}, sounds, dirs, layoutFile = null
     } });
   }
   // Put the loco back on the mark (lib/track): simplest thing first, then wider; stoppable like a show.
-  function startReset() {
+  function startReset(direction = "forward") {
     if (!sensor) throw new HttpError(409, "no sensor connected: nothing to find the mark with");
     if (sensor.state === "lost") throw new HttpError(409, "the sensor stopped reporting (check the USB cable)");
     const { layout, loco } = context(false);
     const opts = { ...(layout && layout.loopIn ? { loopIn: layout.loopIn } : {}), ...(loco ? { creepInS: speedModel(loco)(0.1) || undefined } : {}) };
-    return startJob({ id: "reset", name: "Return to the mark", work: async (r, say) => {
-      const out = await returnToMark({ controller: r.ctl, sensor, signal: r.ac.signal, onLog: say, ...opts });
+    return startJob({ id: "reset", name: direction === "reverse" ? "Return to the tail mark" : "Return to the mark", work: async (r, say) => {
+      const out = await returnToMark({ controller: r.ctl, sensor, signal: r.ac.signal, onLog: say, end: direction === "reverse" ? "tail" : "nose", ...opts });
       if (!out.ok) throw new Error(out.error || "could not find the mark");
       return { elapsedMs: out.elapsedMs, how: out.how };
     } });
@@ -191,7 +196,7 @@ export function createWebServer({ hardware = {}, sounds, dirs, layoutFile = null
       return;
     }
     if (m === "GET" && p === "/api/shows") return ok({ shows: listShows() });
-    if (m === "GET" && p === "/api/layout") { const { layout, loco } = context(true); return ok({ layout, loco: loco && { lengthIn: loco.lengthIn } }); }
+    if (m === "GET" && p === "/api/layout") { const { layout, loco } = context(true); return ok({ layout, loco: loco && { lengthIn: loco.lengthIn }, orientation: orientation && { invert: orientation.invert, forwardMoves: orientation.forwardMoves } }); }
     if (m === "GET" && p === "/api/show") {
       const id = url.searchParams.get("id"), show = loadById(id), c = check(show);
       return ok({ id, show, errors: c.errors, warnings: c.warnings });
@@ -214,16 +219,16 @@ export function createWebServer({ hardware = {}, sounds, dirs, layoutFile = null
       writeFileSync(file, stringifyShow(show));
       return ok({ id: `local/${name}`, warnings: c.warnings }, 201);
     }
-    if (m === "POST" && p === "/api/validate") { const show = showFrom(body), c = check(show, settingsFrom(body, show)); return ok({ ok: !c.errors.length, errors: c.errors, warnings: c.warnings }); }
+    if (m === "POST" && p === "/api/validate") { const authored = showFrom(body), settings = settingsFrom(body, authored), c = check(orient(authored, directionFrom(body), true), settings); return ok({ ok: !c.errors.length, errors: c.errors, warnings: c.warnings }); }
     if (m === "POST" && p === "/api/sim") {
-      const show = showFrom(body), settings = settingsFrom(body, show), c = check(show, settings);
+      const authored = showFrom(body), settings = settingsFrom(body, authored), show = orient(authored, directionFrom(body), true), c = check(show, settings);
       if (c.errors.length) throw new HttpError(400, "the show is not valid", { errors: c.errors, warnings: c.warnings });
       const { layout, loco } = context(true);
       const r = await simulateShow(show, { layout, loco, sounds: sounds.dry, settings });
       return ok({ ...r, warnings: c.warnings, commands: r.commands.length, sounds: r.sounds.length });
     }
-    if (m === "POST" && p === "/api/run") { const show = loadById(body && body.id); return ok({ run: startRun(body.id, show, settingsFrom(body, show)) }, 202); }
-    if (m === "POST" && p === "/api/reset") return ok({ run: startReset() }, 202);
+    if (m === "POST" && p === "/api/run") { const authored = loadById(body && body.id), settings = settingsFrom(body, authored); return ok({ run: startRun(body.id, orient(authored, directionFrom(body), false), settings) }, 202); }
+    if (m === "POST" && p === "/api/reset") return ok({ run: startReset(directionFrom(body)) }, 202);
     if (m === "POST" && p === "/api/stop") {
       if (!run) throw new HttpError(409, "nothing is running");
       run.ac.abort(); return ok({ message: "stopping: the loco ramps down" }, 202);
