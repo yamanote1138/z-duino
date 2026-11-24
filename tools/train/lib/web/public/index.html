@@ -314,7 +314,7 @@ async function loadSounds() {
 function renderSounds() {
   const chips = $("#chips"); chips.textContent = "";
   const mk = (label, val) => h("button", { class: "btn outline sm" + (chip === val ? " on" : ""), onclick: () => { chip = val; renderSounds(); } }, label);
-  chips.append(mk("all", null), sounds.categories.map((c) => mk(c, c)));
+  chips.append(mk("all", null), ...sounds.categories.map((c) => mk(c, c)));
   const grid = $("#sound-grid"); grid.textContent = "";
   for (const s of sounds.sounds.filter((x) => !chip || x.category === chip)) {
     grid.append(h("div", { class: "snd" },
