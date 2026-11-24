@@ -1,134 +1,160 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Train control</title>
+<title>Z-Duino Shows</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<meta name="theme-color" content="#80C241">
 <style>
+  /* The look of the controller app (frontend/): Nuxt UI over Tailwind, dark only, slate neutrals, green primary. The values
+     below are the ones that app computes (--ui-* tokens), so the two pages read as one product. */
   :root {
-    --bg: #f4f1ea; --panel: #fffdf8; --ink: #23201b; --muted: #6c655a; --line: #d9d2c3;
-    --red: #c4342d; --amber: #c98a0a; --green: #2c8a4a; --blue: #2d62a8; --accent: #2d62a8;
-    --code-bg: #efe9dc; --shadow: 0 1px 2px rgba(0,0,0,.08);
+    color-scheme: dark;
+    --bg: oklch(20.8% 0.042 265.755);          /* slate-900  (bg-default)  */
+    --elevated: oklch(27.9% 0.041 260.031);    /* slate-800  (bg-elevated, border) */
+    --accented: oklch(37.2% 0.044 257.287);    /* slate-700  (ring-accented, idle speed segment) */
+    --text: oklch(92.9% 0.013 255.508);        /* slate-200 */
+    --muted: oklch(70.4% 0.04 256.788);        /* slate-400 */
+    --dimmed: oklch(55.4% 0.046 257.417);      /* slate-500 */
+    --primary: oklch(79.2% 0.209 151.711);     /* green-400 */
+    --error: oklch(70.4% 0.191 22.216);        /* red-400 */
+    --warning: oklch(85.2% 0.199 91.936);      /* yellow-300 */
+    --info: oklch(70.7% 0.165 254.624);        /* blue-400 */
+    --seg-red: oklch(63.7% 0.237 25.331); --seg-yellow: oklch(79.5% 0.184 86.047); --seg-green: oklch(72.3% 0.219 149.579);
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
   }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-    --bg: #15171a; --panel: #1e2125; --ink: #e8e4dc; --muted: #9a958a; --line: #343840;
-    --red: #e5534b; --amber: #e0a526; --green: #4cb36d; --blue: #6aa0e8; --accent: #6aa0e8;
-    --code-bg: #101215; --shadow: none; color-scheme: dark; } }
-  :root[data-theme="dark"] {
-    --bg: #15171a; --panel: #1e2125; --ink: #e8e4dc; --muted: #9a958a; --line: #343840;
-    --red: #e5534b; --amber: #e0a526; --green: #4cb36d; --blue: #6aa0e8; --accent: #6aa0e8;
-    --code-bg: #101215; --shadow: none; color-scheme: dark; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  header { position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--line); box-shadow: var(--shadow); }
-  .bar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; padding: 10px max(16px, env(safe-area-inset-left)); max-width: 1200px; margin: 0 auto; }
-  h1 { font-size: 17px; margin: 0; letter-spacing: .02em; }
-  .pills { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; min-width: 0; }
-  .pill { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px; font-size: 13px; background: var(--bg); }
-  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none; }
-  .dot.red { background: var(--red); } .dot.green { background: var(--green); } .dot.amber { background: var(--amber); } .dot.blue { background: var(--blue); }
-  .stops { display: flex; gap: 8px; }
-  button, .btn { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 8px; padding: 7px 14px; cursor: pointer; text-decoration: none; display: inline-block; }
-  button:hover:not(:disabled), .btn:hover { border-color: var(--accent); }
-  button:disabled { opacity: .45; cursor: not-allowed; }
-  button.primary { background: var(--green); border-color: var(--green); color: #fff; font-weight: 600; }
-  button.stop { background: var(--amber); border-color: var(--amber); color: #1c1500; font-weight: 700; }
-  button.estop { background: var(--red); border-color: var(--red); color: #fff; font-weight: 700; }
-  nav { display: flex; gap: 4px; max-width: 1200px; margin: 0 auto; padding: 0 max(16px, env(safe-area-inset-left)); }
-  nav button { border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 8px 14px; }
-  nav button[aria-selected="true"] { border-bottom-color: var(--accent); font-weight: 600; }
-  main { max-width: 1200px; margin: 0 auto; padding: 16px max(16px, env(safe-area-inset-left)) 40px; }
-  .cols { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 16px; }
+  body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font: 16px/1.5 var(--font); }
+  .wrap { max-width: 56rem; margin: 0 auto; padding: 16px max(16px, env(safe-area-inset-left)) 40px; display: flex; flex-direction: column; gap: 16px; }
+  .card { border-radius: 8px; background: var(--bg); box-shadow: 0 0 0 1px var(--elevated); overflow: hidden; min-width: 0; }
+  .card > .sec { padding: 16px 24px; }
+  .card > .sec + .sec { border-top: 1px solid var(--elevated); }
+  @media (max-width: 640px) { .card > .sec { padding: 16px; } }
+  h4 { margin: 0; font-size: 18px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 8px; line-height: 1.5; }
+  h4 .ic { width: 20px; height: 20px; }
+  h5 { margin: 0 0 8px; font-size: 14px; font-weight: 600; color: var(--muted); }
+  .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .badges { display: flex; gap: 8px; flex-wrap: wrap; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; border-radius: 6px; padding: 4px 8px; font-size: 12px; line-height: 1rem; font-weight: 500; color: var(--bg); background: #fff; }
+  .badge.success { background: var(--primary); } .badge.error { background: var(--error); } .badge.warning { background: var(--warning); } .badge.info { background: var(--info); }
+  .ic { width: 1.25em; height: 1.25em; fill: currentColor; flex: none; }
+  .statusrow { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 14px; color: var(--muted); margin-bottom: 4px; }
+  .statusrow b { font-weight: 700; }
+  .bar { display: flex; width: 100%; margin-bottom: 12px; }
+  .speed-segment { flex: 1; font-weight: 700; font-size: .85rem; padding: .5rem 0; text-align: center; background: var(--accented); color: var(--muted); opacity: .5; transition: all .15s ease; user-select: none; }
+  .speed-segment:first-child { border-top-left-radius: .375rem; border-bottom-left-radius: .375rem; }
+  .speed-segment:last-child { border-top-right-radius: .375rem; border-bottom-right-radius: .375rem; }
+  .speed-segment.red { background: var(--seg-red); color: #fff; opacity: 1; } .speed-segment.yellow { background: var(--seg-yellow); color: #000; opacity: 1; } .speed-segment.green { background: var(--seg-green); color: #fff; opacity: 1; }
+  .controls { display: flex; gap: 8px; }
+  .controls .btn { flex: 1; justify-content: center; }
+  .foot { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+
+  .btn { font: inherit; font-size: 14px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 6px; padding: 6px 10px; cursor: pointer; text-decoration: none; color: var(--bg); background: #fff; transition: background-color .15s; outline: 0 solid transparent; }
+  .btn:focus-visible { outline: 3px solid color-mix(in oklab, #fff 25%, transparent); }
+  .btn.primary { background: var(--primary); } .btn.error { background: var(--error); } .btn.warning { background: var(--warning); }
+  .btn:hover:not(:disabled) { opacity: .75; }
+  .btn:disabled { cursor: not-allowed; opacity: .75; }
+  .btn.primary:disabled, .btn.error:disabled { opacity: .75; }
+  .btn.outline { color: var(--text); background: var(--bg); box-shadow: inset 0 0 0 1px var(--accented); }
+  .btn.outline:hover:not(:disabled) { opacity: 1; background: var(--elevated); }
+  .btn.outline.on { color: var(--primary); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--primary) 50%, transparent); }
+  .btn.outline.on:hover:not(:disabled) { background: color-mix(in oklab, var(--primary) 10%, transparent); }
+  .btn.sm { font-size: 12px; }
+  .btn.item { width: 100%; justify-content: flex-start; text-align: left; flex-direction: column; align-items: flex-start; gap: 0; padding: 8px 12px; }
+  .btn.item small { font-size: 12px; font-weight: 400; color: var(--muted); overflow-wrap: break-word; }
+  .btn.item[aria-current="true"] { box-shadow: inset 0 0 0 2px var(--primary); }
+
+  .cols { display: grid; grid-template-columns: minmax(200px, 270px) minmax(0, 1fr); gap: 16px; align-items: start; }
   @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; box-shadow: var(--shadow); min-width: 0; }
-  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; }
-  h3 { font-size: 18px; margin: 0 0 4px; }
-  .list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
-  .item { text-align: left; width: 100%; display: block; }
-  .item[aria-current="true"] { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
-  .item small { display: block; color: var(--muted); }
-  .muted { color: var(--muted); }
-  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
-  label.set { display: inline-flex; gap: 6px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; background: var(--bg); }
-  input[type=number], input[type=text] { font: inherit; width: 6.5em; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); }
-  pre, .log { background: var(--code-bg); border-radius: 8px; padding: 10px 12px; margin: 8px 0; font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; overflow: auto; max-height: 340px; white-space: pre-wrap; word-break: break-word; }
-  .log { min-height: 90px; }
-  .log .t { color: var(--muted); display: inline-block; min-width: 6.5em; }
-  .log .bad { color: var(--red); } .log .good { color: var(--green); }
-  .msg { padding: 8px 12px; border-radius: 8px; margin: 8px 0; border: 1px solid var(--line); }
-  .msg.bad { border-color: var(--red); } .msg.warn { border-color: var(--amber); } .msg.good { border-color: var(--green); }
-  .msg ul { margin: 4px 0 0 18px; padding: 0; }
-  .need { font-size: 13px; }
-  .sounds { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
-  .snd { display: flex; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--panel); min-width: 0; }
-  .snd .info { flex: 1; min-width: 0; } .snd .info b { word-break: break-all; } .snd .info small { display: block; color: var(--muted); }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
-  .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
-  details summary { cursor: pointer; color: var(--muted); }
+  .list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+  .list:last-child { margin-bottom: 0; }
+  .muted { color: var(--muted); } .small { font-size: 14px; } .tiny { font-size: 12px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+  .field { display: inline-flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 500; color: var(--muted); }
+  input[type=number], input[type=text] { font: inherit; font-size: 14px; width: 7em; color: var(--text); background: var(--bg); border: 0; border-radius: 6px; padding: 6px 10px; box-shadow: inset 0 0 0 1px var(--accented); outline: 0; }
+  input[type=number]:focus, input[type=text]:focus { box-shadow: inset 0 0 0 2px var(--primary); }
+  input[type=range] { accent-color: var(--primary); }
+  .log, pre { background: color-mix(in oklab, var(--elevated) 50%, transparent); border-radius: 6px; padding: 10px 12px; margin: 8px 0 0; font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; overflow: auto; max-height: 340px; white-space: pre-wrap; word-break: break-word; }
+  .log { min-height: 96px; }
+  .log .t { color: var(--dimmed); display: inline-block; min-width: 6.5em; }
+  .log .bad { color: var(--error); } .log .good { color: var(--primary); }
+  .alert { border-radius: 6px; padding: 8px 12px; font-size: 14px; margin-top: 12px; color: var(--c); background: color-mix(in oklab, var(--c) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--c) 25%, transparent); }
+  .alert.good { --c: var(--primary); } .alert.bad { --c: var(--error); } .alert.warn { --c: var(--warning); }
+  .alert ul { margin: 4px 0 0 18px; padding: 0; color: var(--text); }
+  .need { font-size: 12px; }
+  details { margin-top: 12px; } details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+  .sounds { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; margin-top: 12px; }
+  .snd { display: flex; gap: 10px; align-items: center; border-radius: 6px; padding: 8px 10px; box-shadow: inset 0 0 0 1px var(--elevated); min-width: 0; }
+  .snd .info { flex: 1; min-width: 0; } .snd .info b { font-size: 14px; color: #fff; word-break: break-all; } .snd .info small { display: block; font-size: 12px; color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
   [hidden] { display: none !important; }
 </style>
 </head>
 <body>
-<header>
-  <div class="bar">
-    <h1>Train control</h1>
-    <div class="pills">
-      <span class="pill" id="p-sensor"><span class="dot"></span><span>sensor …</span></span>
-      <span class="pill" id="p-run"><span class="dot"></span><span>idle</span></span>
-      <span class="pill" id="p-link"><span class="dot"></span><span>connecting …</span></span>
+<div class="wrap">
+  <div class="card">
+    <div class="sec head">
+      <h4 id="title"></h4>
+      <div class="badges">
+        <span class="badge" id="p-run"></span>
+        <span class="badge" id="p-link"></span>
+      </div>
     </div>
-    <div class="stops">
-      <button class="stop" id="stop" title="Stop the show: the loco ramps down like Ctrl-C">STOP</button>
-      <button class="estop" id="estop" title="Send the controller's stop command now">E-STOP</button>
+    <div class="sec">
+      <div class="statusrow">
+        <span><b>Speed:</b> <span id="speed">stopped</span> <span id="dir"></span></span>
+        <span><b>Beam:</b> <span id="beam">…</span></span>
+      </div>
+      <div class="bar" id="bar"></div>
+      <div class="controls">
+        <button class="btn" id="stop" title="Stop the show: the loco ramps down like Ctrl-C"></button>
+        <button class="btn error" id="estop" title="Send the controller's stop command now"></button>
+      </div>
+    </div>
+    <div class="sec foot">
+      <button class="btn outline sm on" id="tab-shows"></button>
+      <button class="btn outline sm" id="tab-sounds"></button>
     </div>
   </div>
-  <nav role="tablist">
-    <button role="tab" id="tab-shows" aria-selected="true">Shows</button>
-    <button role="tab" id="tab-sounds" aria-selected="false">Sounds</button>
-  </nav>
-</header>
 
-<main>
   <section id="shows">
     <div class="cols">
-      <div>
-        <div class="card">
-          <h2>Yours</h2><div class="list" id="list-local"></div>
-          <h2>Examples</h2><div class="list" id="list-examples"></div>
-          <div class="row">
-            <label class="btn" for="import-file">Import a show…</label>
-            <input type="file" id="import-file" accept="application/json,.json" hidden>
-          </div>
-          <div id="import-msg"></div>
+      <div class="card"><div class="sec">
+        <h5>Yours</h5><div class="list" id="list-local"></div>
+        <h5>Examples</h5><div class="list" id="list-examples"></div>
+        <div class="row" style="margin-top:0">
+          <label class="btn outline sm" for="import-file" id="import-btn"></label>
+          <input type="file" id="import-file" accept="application/json,.json" hidden>
         </div>
-      </div>
-      <div>
-        <div class="card" id="detail"><span class="muted">Pick a show.</span></div>
-        <div class="card" style="margin-top:16px">
-          <h2>Log</h2>
-          <div class="log" id="log" aria-live="polite"></div>
-        </div>
+        <div id="import-msg"></div>
+      </div></div>
+      <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+        <div class="card"><div class="sec" id="detail"><span class="muted">Pick a show.</span></div></div>
+        <div class="card"><div class="sec"><h5>Log</h5><div class="log" id="log" aria-live="polite"></div></div></div>
       </div>
     </div>
   </section>
 
   <section id="sounds" hidden>
-    <div class="card">
-      <div class="row">
-        <label class="set">gain <input type="range" id="gain" min="0" max="1.5" step="0.05" value="1"> <span id="gain-v">1.0</span></label>
-        <label class="set">cut after <input type="number" id="secs" min="0" step="0.5" placeholder="whole"> s</label>
-        <button id="snd-stop">Stop all sounds</button>
-        <span class="muted need" id="snd-note"></span>
+    <div class="card"><div class="sec">
+      <div class="row" style="margin-top:0">
+        <label class="field">gain <span style="display:flex;gap:8px;align-items:center"><input type="range" id="gain" min="0" max="1.5" step="0.05" value="1"><span id="gain-v" class="muted small">1.0</span></span></label>
+        <label class="field">cut after (s) <input type="number" id="secs" min="0" step="0.5" placeholder="whole"></label>
+        <button class="btn outline sm" id="snd-stop" style="align-self:flex-end"></button>
+        <span class="muted need" id="snd-note" style="align-self:flex-end"></span>
       </div>
       <div class="chips" id="chips"></div>
       <div class="sounds" id="sound-grid"></div>
-    </div>
+    </div></div>
   </section>
-</main>
+</div>
 
 <script>
 "use strict";
+const ICONS = {"train":"M12 2c-4 0-8 .5-8 4v9.5A3.5 3.5 0 0 0 7.5 19L6 20.5v.5h2.23l2-2H14l2 2h2v-.5L16.5 19a3.5 3.5 0 0 0 3.5-3.5V6c0-3.5-3.58-4-8-4M7.5 17A1.5 1.5 0 0 1 6 15.5A1.5 1.5 0 0 1 7.5 14A1.5 1.5 0 0 1 9 15.5A1.5 1.5 0 0 1 7.5 17m3.5-7H6V6h5zm2 0V6h5v4zm3.5 7a1.5 1.5 0 0 1-1.5-1.5a1.5 1.5 0 0 1 1.5-1.5a1.5 1.5 0 0 1 1.5 1.5a1.5 1.5 0 0 1-1.5 1.5","wifi":"m12 21l3.6-4.8c-1-.75-2.25-1.2-3.6-1.2s-2.6.45-3.6 1.2zm0-18C7.95 3 4.21 4.34 1.2 6.6L3 9c2.5-1.88 5.62-3 9-3s6.5 1.12 9 3l1.8-2.4C19.79 4.34 16.05 3 12 3m0 6c-2.7 0-5.19.89-7.2 2.4l1.8 2.4C8.1 12.67 9.97 12 12 12s3.9.67 5.4 1.8l1.8-2.4C17.19 9.89 14.7 9 12 9","wifi-off":"M2.28 3L1 4.27l1.47 1.47c-.43.26-.86.55-1.27.86L3 9c.53-.4 1.08-.75 1.66-1.07l2.23 2.23c-.74.34-1.45.75-2.09 1.24l1.8 2.4c.78-.58 1.66-1.03 2.6-1.33L11.75 15c-1.25.07-2.41.5-3.35 1.2L12 21l2.46-3.27L17.74 21L19 19.72M12 3c-2.15 0-4.2.38-6.1 1.07l2.39 2.4C9.5 6.16 10.72 6 12 6c3.38 0 6.5 1.11 9 3l1.8-2.4C19.79 4.34 16.06 3 12 3m0 6c-.38 0-.75 0-1.12.05l3.19 3.2c1.22.28 2.36.82 3.33 1.55l1.8-2.4C17.2 9.89 14.7 9 12 9","play":"M8 5.14v14l11-7z","pause":"M14 19h4V5h-4M6 19h4V5H6z","stop":"M18 18H6V6h12z","hand-back-left":"M3 16V5.75a1.25 1.25 0 0 1 2.5 0V12h1V2.75a1.25 1.25 0 0 1 2.5 0V12h1V1.25a1.25 1.25 0 0 1 2.5 0V12h1V3.25a1.25 1.25 0 0 1 2.5 0V15h.75l1.41-3.53c.22-.55.68-.97 1.24-1.16l.79-.26a1 1 0 0 1 1.24 1.32L18.4 19c-1.21 3-4.14 5-7.4 5c-4.42 0-8-3.58-8-8","check-circle-outline":"M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10s10-4.5 10-10S17.5 2 12 2m0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8s8 3.59 8 8s-3.59 8-8 8m4.59-12.42L10 14.17l-2.59-2.58L6 13l4 4l8-8z","flask-outline":"M5 19a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1c0-.21-.07-.41-.18-.57L13 8.35V4h-2v4.35L5.18 18.43c-.11.16-.18.36-.18.57m1 3a3 3 0 0 1-3-3c0-.6.18-1.16.5-1.63L9 7.81V6a1 1 0 0 1-1-1V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1a1 1 0 0 1-1 1v1.81l5.5 9.56c.32.47.5 1.03.5 1.63a3 3 0 0 1-3 3zm7-6l1.34-1.34L16.27 18H7.73l2.66-4.61zm-.5-4a.5.5 0 0 1 .5.5a.5.5 0 0 1-.5.5a.5.5 0 0 1-.5-.5a.5.5 0 0 1 .5-.5","download":"M5 20h14v-2H5m14-9h-4V3H9v6H5l7 7z","upload":"M9 16v-6H5l7-7l7 7h-4v6zm-4 4v-2h14v2z","volume-high":"M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.84-5 6.7v2.07c4-.91 7-4.49 7-8.77s-3-7.86-7-8.77M16.5 12c0-1.77-1-3.29-2.5-4.03V16c1.5-.71 2.5-2.24 2.5-4M3 9v6h4l5 5V4L7 9z","arrow-right-bold":"M4 15V9h8V4.16L19.84 12L12 19.84V15z","arrow-left-bold":"M20 9v6h-8v4.84L4.16 12L12 4.16V9z","alert-circle-outline":"M11 15h2v2h-2zm0-8h2v6h-2zm1-5C6.47 2 2 6.5 2 12a10 10 0 0 0 10 10a10 10 0 0 0 10-10A10 10 0 0 0 12 2m0 18a8 8 0 0 1-8-8a8 8 0 0 1 8-8a8 8 0 0 1 8 8a8 8 0 0 1-8 8","file-document-outline":"M6 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm0 2h7v5h5v11H6zm2 8v2h8v-2zm0 4v2h5v-2z","music-note":"M12 3v10.55c-.59-.34-1.27-.55-2-.55c-2.21 0-4 1.79-4 4s1.79 4 4 4s4-1.79 4-4V7h4V3z","chevron-down":"M7.41 8.58L12 13.17l4.59-4.59L18 10l-6 6l-6-6z","close":"M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12z","timer-sand":"M6 2h12v6l-4 4l4 4v6H6v-6l4-4l-4-4zm10 14.5l-4-4l-4 4V20h8zm-4-5l4-4V4H8v3.5zM10 6h4v.75l-2 2l-2-2z"};   // Material Design Icons (the set the controller app uses), by name
 const $ = (s, el = document) => el.querySelector(s);
+const ic = (name) => { const s = document.createElementNS("http://www.w3.org/2000/svg", "svg"); s.setAttribute("viewBox", "0 0 24 24"); s.setAttribute("class", "ic"); s.setAttribute("aria-hidden", "true"); const p = document.createElementNS("http://www.w3.org/2000/svg", "path"); p.setAttribute("d", ICONS[name]); s.append(p); return s; };
 const h = (tag, props = {}, ...kids) => {
   const e = document.createElement(tag);
   for (const [k, v] of Object.entries(props)) {
@@ -138,6 +164,7 @@ const h = (tag, props = {}, ...kids) => {
   for (const kid of kids.flat()) if (kid != null) e.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
   return e;
 };
+const fill = (el, ...kids) => { el.textContent = ""; el.append(...kids.flat().filter((k) => k != null).map((k) => (k.nodeType ? k : document.createTextNode(String(k))))); };
 async function api(method, path, body) {
   try {
     const r = await fetch(path, { method, headers: body !== undefined ? { "content-type": "application/json" } : {}, body: body !== undefined ? JSON.stringify(body) : undefined });
@@ -149,18 +176,30 @@ const secs = (ms) => (ms / 1000).toFixed(2).padStart(7) + " s";
 
 let status = null, shows = [], selected = null, detail = null, sounds = null, chip = null;
 
+// ---------- static bits ----------
+fill($("#title"), ic("train"), "Z-Duino shows");
+fill($("#stop"), ic("pause"), "Stop show");
+fill($("#estop"), ic("hand-back-left"), "E-Stop");
+fill($("#tab-shows"), ic("file-document-outline"), "Shows");
+fill($("#tab-sounds"), ic("volume-high"), "Sounds");
+fill($("#snd-stop"), ic("stop"), "Stop all sounds");
+fill($("#import-btn"), ic("upload"), "Import a show");
+const bar = $("#bar");
+for (let i = 1; i <= 10; i++) bar.append(h("div", { class: "speed-segment" }, i));
+
 // ---------- status ----------
-function setPill(id, color, text) { const p = $(id); p.querySelector(".dot").className = "dot " + color; p.querySelector("span:last-child").textContent = text; }
+function badge(id, kind, icon, text) { const b = $(id); b.className = "badge " + kind; fill(b, icon ? ic(icon) : null, text); }
 function renderStatus(st) {
   status = st;
-  const s = st.sensor;
-  if (!s) setPill("#p-sensor", "", "no sensor");
-  else if (s.state === "lost") setPill("#p-sensor", "red", "sensor lost");
-  else setPill("#p-sensor", s.state === "blocked" ? "amber" : "green", `beam ${s.state}${s.reading != null ? ` (${s.reading})` : ""}`);
-  if (st.run) {
-    const c = st.controller;
-    setPill("#p-run", "blue", `${st.run.state}: ${st.run.name}${c && c.connected ? ` · speed ${c.speed.toFixed(2)} ${c.forward ? "▶" : "◀"}` : ""}`);
-  } else setPill("#p-run", "", st.lastRun ? `idle · last: ${st.lastRun.ok ? "finished" : "stopped"}` : "idle");
+  const s = st.sensor, c = st.controller;
+  $("#beam").textContent = !s ? "no sensor" : s.state === "lost" ? "sensor lost" : `${s.state}${s.reading != null ? ` (${s.reading})` : ""}`;
+  $("#beam").style.color = !s ? "" : s.state === "lost" ? "var(--error)" : s.state === "blocked" ? "var(--warning)" : "";
+  const speed = c && c.connected ? c.speed : 0;
+  $("#speed").textContent = speed === 0 ? "stopped" : Math.round(speed * 100) + "%";
+  $("#dir").textContent = c && c.connected && speed > 0 ? (c.forward ? "FWD" : "REV") : "";
+  [...bar.children].forEach((seg, i) => { const on = speed >= (i + 1) / 10 - 0.005; seg.className = "speed-segment" + (on ? (i <= 2 ? " red" : i <= 6 ? " yellow" : " green") : ""); });
+  if (st.run) badge("#p-run", "info", "play", `${st.run.state === "starting" ? "Starting" : "Running"}: ${st.run.name}`);
+  else badge("#p-run", st.lastRun && !st.lastRun.ok ? "warning" : "", null, st.lastRun ? `Idle · last ${st.lastRun.ok ? "finished" : "stopped"}` : "Idle");
   $("#stop").disabled = !st.run;
   updateButtons();
   $("#snd-note").textContent = st.run ? "sounds are off while a show runs" : "";
@@ -176,8 +215,8 @@ function updateButtons() {
   else if (need !== "any" && s.state !== need) why = `the beam must be ${need} (it is ${s.state}): put the loco on the mark first`;
   else if (detail.errors.length) why = "fix the validation problems first";
   run.disabled = !!why;
-  $("#need").textContent = why || (need === "blocked" ? "✓ nose is on the mark" : "ready");
-  $("#need").style.color = why ? "var(--amber)" : "var(--green)";
+  $("#need").textContent = why || (need === "blocked" ? "Nose is on the mark: ready" : "Ready");
+  $("#need").style.color = why ? "var(--warning)" : "var(--primary)";
 }
 
 // ---------- log ----------
@@ -192,8 +231,8 @@ async function loadShows() {
   for (const where of ["local", "examples"]) {
     const box = $("#list-" + where); box.textContent = "";
     const mine = shows.filter((s) => s.where === where);
-    if (!mine.length) box.append(h("span", { class: "muted" }, where === "local" ? "none yet: import one, or copy an example into local/shows/" : "none"));
-    for (const s of mine) box.append(h("button", { class: "item", "aria-current": s.id === selected ? "true" : null, onclick: () => select(s.id) }, s.title, h("small", {}, s.unreadable ? `unreadable: ${s.unreadable}` : `${s.id} · ${s.steps} steps${s.start === "blocked" ? " · starts on the mark" : ""}`)));
+    if (!mine.length) box.append(h("span", { class: "muted small" }, where === "local" ? "None yet: import one, or copy an example into local/shows/" : "None"));
+    for (const s of mine) box.append(h("button", { class: "btn outline item", "aria-current": s.id === selected ? "true" : null, onclick: () => select(s.id) }, s.title, h("small", {}, s.unreadable ? `unreadable: ${s.unreadable}` : `${s.id} · ${s.steps} steps${s.start === "blocked" ? " · starts on the mark" : ""}`)));
   }
 }
 async function select(id) {
@@ -208,23 +247,24 @@ function settingsValues() {
 }
 function problems(box, errors, warnings, okText) {
   box.textContent = "";
-  if (errors && errors.length) box.append(h("div", { class: "msg bad" }, `${errors.length} problem${errors.length > 1 ? "s" : ""}`, h("ul", {}, errors.map((e) => h("li", {}, e)))));
-  else if (okText) box.append(h("div", { class: "msg good" }, okText));
-  if (warnings && warnings.length) box.append(h("div", { class: "msg warn" }, "warnings", h("ul", {}, warnings.map((e) => h("li", {}, e)))));
+  if (errors && errors.length) box.append(h("div", { class: "alert bad" }, `${errors.length} problem${errors.length > 1 ? "s" : ""}`, h("ul", {}, errors.map((e) => h("li", {}, e)))));
+  else if (okText) box.append(h("div", { class: "alert good" }, okText));
+  if (warnings && warnings.length) box.append(h("div", { class: "alert warn" }, "Warnings", h("ul", {}, warnings.map((e) => h("li", {}, e)))));
 }
 function renderDetail() {
   const { id, show } = detail, box = $("#detail"); box.textContent = "";
   const sets = Object.entries(show.settings || {});
   box.append(
-    h("h3", {}, show.name || id), h("div", { class: "muted" }, show.description || ""),
-    h("div", { class: "row" }, sets.length ? sets.map(([k, v]) => h("label", { class: "set" }, k, h("input", { type: "number", step: "any", value: v, "data-set": k }))) : h("span", { class: "muted" }, "no settings")),
+    h("h4", {}, show.name || id), h("p", { class: "muted small", style: "margin:4px 0 0" }, show.description || ""),
+    h("div", { class: "row" }, sets.length ? sets.map(([k, v]) => h("label", { class: "field" }, k, h("input", { type: "number", step: "any", value: v, "data-set": k }))) : h("span", { class: "muted small" }, "No settings")),
     h("div", { class: "row" },
-      h("button", { onclick: doValidate }, "Validate"), h("button", { onclick: doSim }, "Simulate"),
-      h("button", { class: "primary", id: "run", onclick: doRun }, "Run on the train"),
-      h("a", { class: "btn", href: `/api/export?id=${encodeURIComponent(id)}`, download: `${id.split("/")[1]}.json` }, "Export"),
+      h("button", { class: "btn primary", id: "run", onclick: doRun }, ic("play"), "Run on the train"),
+      h("button", { class: "btn outline", onclick: doValidate }, ic("check-circle-outline"), "Validate"),
+      h("button", { class: "btn outline", onclick: doSim }, ic("flask-outline"), "Simulate"),
+      h("a", { class: "btn outline", href: `/api/export?id=${encodeURIComponent(id)}`, download: `${id.split("/")[1]}.json` }, ic("download"), "Export"),
       h("span", { class: "need", id: "need" })),
     h("div", { id: "result" }),
-    h("details", {}, h("summary", {}, `Steps (${(show.steps || []).length}) — the show as JSON`), h("pre", {}, JSON.stringify(show, null, 2))));
+    h("details", {}, h("summary", {}, `Steps (${(show.steps || []).length}): the show as JSON`), h("pre", {}, JSON.stringify(show, null, 2))));
   problems($("#result"), detail.errors, detail.warnings, null);
   updateButtons();
 }
@@ -238,9 +278,9 @@ async function doSim() {
   const box = $("#result");
   if (!r.ok) return problems(box, r.data.errors || [r.data.error], r.data.warnings);
   const d = r.data; box.textContent = "";
-  box.append(h("div", { class: `msg ${d.ok ? "good" : "bad"}` }, `${d.ok ? "Finished" : `FAILED: ${d.error}`} after ${(d.elapsedMs / 1000).toFixed(1)} simulated seconds · top throttle ${d.maxSpeed} · ${d.commands} controller commands · ${d.sounds} sound calls`));
+  box.append(h("div", { class: `alert ${d.ok ? "good" : "bad"}` }, `${d.ok ? "Finished" : `FAILED: ${d.error}`} after ${(d.elapsedMs / 1000).toFixed(1)} simulated seconds · top throttle ${d.maxSpeed} · ${d.commands} controller commands · ${d.sounds} sound calls`));
   box.append(h("div", { class: "log" }, d.log.map((e) => h("div", {}, h("span", { class: "t" }, secs(e.t)), " ", e.text))));
-  box.append(h("div", { class: "muted need" }, "Simulated with a ghost sensor: the order and the commands are real, the timing is not."));
+  box.append(h("div", { class: "muted need", style: "margin-top:8px" }, "Simulated with a ghost sensor: the order and the commands are real, the timing is not."));
   if (d.warnings.length) { const w = h("div"); problems(w, [], d.warnings); box.append(w); }
 }
 async function doRun() {
@@ -254,13 +294,13 @@ async function doRun() {
 $("#import-file").addEventListener("change", async (ev) => {
   const f = ev.target.files[0]; ev.target.value = ""; if (!f) return;
   const box = $("#import-msg"); box.textContent = "";
-  let show; try { show = JSON.parse(await f.text()); } catch (e) { return box.append(h("div", { class: "msg bad" }, `${f.name} is not valid JSON`)); }
+  let show; try { show = JSON.parse(await f.text()); } catch (e) { return box.append(h("div", { class: "alert bad" }, `${f.name} is not valid JSON`)); }
   const name = f.name.replace(/\.json$/i, "");
   const save = async (overwrite) => {
     const r = await api("POST", "/api/show", { name, show, overwrite });
     box.textContent = "";
-    if (r.ok) { box.append(h("div", { class: "msg good" }, `Saved as ${r.data.id}`)); await loadShows(); return select(r.data.id); }
-    if (r.status === 409 && r.data.exists) return box.append(h("div", { class: "msg warn" }, `${r.data.id} already exists. `, h("button", { onclick: () => save(true) }, "Replace it")));
+    if (r.ok) { box.append(h("div", { class: "alert good" }, `Saved as ${r.data.id}`)); await loadShows(); return select(r.data.id); }
+    if (r.status === 409 && r.data.exists) return box.append(h("div", { class: "alert warn" }, `${r.data.id} already exists. `, h("button", { class: "btn warning sm", onclick: () => save(true) }, "Replace it")));
     problems(box, r.data.errors || [r.data.error]);
   };
   save(false);
@@ -273,35 +313,36 @@ async function loadSounds() {
 }
 function renderSounds() {
   const chips = $("#chips"); chips.textContent = "";
-  chips.append(h("button", { class: "chip", "aria-pressed": String(chip === null), onclick: () => { chip = null; renderSounds(); } }, "all"));
-  for (const c of sounds.categories) chips.append(h("button", { class: "chip", "aria-pressed": String(chip === c), onclick: () => { chip = c; renderSounds(); } }, c));
+  const mk = (label, val) => h("button", { class: "btn outline sm" + (chip === val ? " on" : ""), onclick: () => { chip = val; renderSounds(); } }, label);
+  chips.append(mk("all", null), sounds.categories.map((c) => mk(c, c)));
   const grid = $("#sound-grid"); grid.textContent = "";
   for (const s of sounds.sounds.filter((x) => !chip || x.category === chip)) {
     grid.append(h("div", { class: "snd" },
-      h("button", { title: "play", onclick: () => playSound(s.id) }, "▶"),
+      h("button", { class: "btn outline sm", title: "play", onclick: () => playSound(s.id) }, ic("play")),
       h("div", { class: "info" }, h("b", {}, s.id), h("small", {}, [s.durationMs ? `${(s.durationMs / 1000).toFixed(1)} s` : "", s.variants > 1 ? `${s.variants} variants` : "", s.description].filter(Boolean).join(" · ")))));
   }
 }
 async function playSound(id) {
   const secs = $("#secs").value; const body = { id, gain: Number($("#gain").value) }; if (secs) body.seconds = Number(secs);
-  const r = await api("POST", "/api/sounds/play", body); if (!r.ok) $("#snd-note").textContent = r.data.error;
+  const r = await api("POST", "/api/sounds/play", body); $("#snd-note").textContent = r.ok ? "" : r.data.error;
 }
 $("#gain").addEventListener("input", (e) => { $("#gain-v").textContent = Number(e.target.value).toFixed(1); });
 $("#snd-stop").addEventListener("click", () => api("POST", "/api/sounds/stop", {}));
 
-// ---------- stop buttons, tabs ----------
+// ---------- stop buttons, views ----------
 $("#stop").addEventListener("click", async () => { const r = await api("POST", "/api/stop", {}); logLine(r.ok ? r.data.message : r.data.error, r.ok ? "" : "bad"); });
 $("#estop").addEventListener("click", async () => { const r = await api("POST", "/api/estop", {}); logLine(r.ok ? `E-STOP: ${r.data.message}` : `E-STOP failed: ${r.data.error}`, "bad"); });
 for (const t of ["shows", "sounds"]) $("#tab-" + t).addEventListener("click", () => {
-  for (const u of ["shows", "sounds"]) { $("#tab-" + u).setAttribute("aria-selected", u === t); $("#" + u).hidden = u !== t; }
+  for (const u of ["shows", "sounds"]) { $("#tab-" + u).classList.toggle("on", u === t); $("#" + u).hidden = u !== t; }
   if (t === "sounds" && !sounds) loadSounds();
 });
 
 // ---------- live events ----------
 function connect() {
+  badge("#p-link", "error", "wifi-off", "Connecting");
   const es = new EventSource("/api/events");
-  es.onopen = () => setPill("#p-link", "green", "live");
-  es.onerror = () => setPill("#p-link", "red", "disconnected: retrying");
+  es.onopen = () => badge("#p-link", "success", "wifi", "Connected");
+  es.onerror = () => badge("#p-link", "error", "wifi-off", "Disconnected");
   es.addEventListener("status", (e) => renderStatus(JSON.parse(e.data)));
   es.addEventListener("run", (e) => { const r = JSON.parse(e.data); if (r.log && r.log.length && !logEl.children.length) for (const l of r.log) logLine(l.text, "", l.t); });
   es.addEventListener("log", (e) => { const l = JSON.parse(e.data); logLine(l.text, /^stopped|fail/i.test(l.text) ? "bad" : "", l.t); });

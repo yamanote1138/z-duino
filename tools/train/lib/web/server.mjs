@@ -149,6 +149,7 @@ export function createWebServer({ hardware = {}, sounds, dirs, layoutFile = null
     const m = req.method, p = url.pathname;
     const ok = (data, code = 200) => json(res, code, data);
     if (m === "GET" && (p === "/" || p === "/index.html")) { res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }); return res.end(readFileSync(join(PUBLIC, "index.html"))); }
+    if (m === "GET" && p === "/favicon.svg") { res.writeHead(200, { "content-type": "image/svg+xml", "cache-control": "max-age=3600" }); return res.end(readFileSync(join(PUBLIC, "favicon.svg"))); }
     if (m === "GET" && p === "/api/status") return ok(status());
     if (m === "GET" && p === "/api/events") {
       res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive" });

@@ -53,6 +53,7 @@ test("status, shows list and show details", async () => {
     assert.equal((await t.api("GET", "/api/show?id=local/nope")).status, 404);
     for (const bad of ["../etc/passwd", "local/../x", "local/a/b", "other/x", "local/UP", ""]) assert.equal((await t.api("GET", `/api/show?id=${encodeURIComponent(bad)}`)).status, 400, bad);
     assert.equal((await t.api("GET", "/")).status, 200);
+    assert.equal((await t.api("GET", "/favicon.svg")).status, 200);
   } finally { await t.web.close(); }
 });
 

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Train body — Yamanote green -->
+  <rect x="2" y="1" width="28" height="30" rx="4" ry="4" fill="#80C241"/>
+  <!-- Windshield — dark panoramic window -->
+  <rect x="4" y="3" width="24" height="9" rx="2" ry="2" fill="#1A1A2E"/>
+  <!-- Lower body accent line -->
+  <rect x="2" y="25" width="28" height="1" fill="#666666"/>
+  <!-- Left headlight -->
+  <circle cx="7" cy="22" r="1.8" fill="#FFFDE7"/>
+  <!-- Right headlight -->
+  <circle cx="25" cy="22" r="1.8" fill="#FFFDE7"/>
+  <!-- Door indication lines -->
+  <line x1="12" y1="14" x2="12" y2="24" stroke="#666666" stroke-width="0.5"/>
+  <line x1="20" y1="14" x2="20" y2="24" stroke="#666666" stroke-width="0.5"/>
+  <!-- Z logo badge — grey circle with Z -->
+  <circle cx="16" cy="20" r="3.5" fill="#999999"/>
+  <text x="16" y="20" font-family="Arial, Helvetica, sans-serif" font-size="6" font-weight="bold" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central">Z</text>
+</svg>
