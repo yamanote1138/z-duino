@@ -251,3 +251,59 @@ test("with no layout or loco of your own, validate and simulate use the examples
     assert.match(run.data.error, /uses zones/);
   } finally { await web.close(); }
 });
+
+// ---- return to the mark, through the web service, with the physics model as the sensor ----
+async function resetWorld(nose) {
+  const { PhysicsTrack } = await import("../lib/track/index.mjs");
+  const base = mkdtempSync(join(tmpdir(), "web-rs-"));
+  const dirs = { local: join(base, "local"), examples: join(base, "examples") }; mkdirSync(dirs.local); mkdirSync(dirs.examples);
+  saveShow(QUICK, join(dirs.examples, "quick.json"));
+  const sounds = { play: defaultSounds({ engine: new RecordingEngine(), onSkip: () => {} }), dry: defaultSounds({ engine: "null" }) };
+  const LOCO = { lengthIn: 3, fit: { inPerSecPerUnitThrottle: 28.65, offsetInS: -0.49 }, points: [{ thr: 0.1, v: 2.35 }, { thr: 0.2, v: 5.4 }] };
+  let current = null;
+  const track = new PhysicsTrack({ clock: realClock, controller: () => current, loco: LOCO, loopIn: 134, nose });
+  const connectController = async () => { current = await new Controller({ host: "sim", WebSocketImpl: SimSocket, config: { pingMs: 2e9, directionSettleMs: 5 } }).connect(); return current; };
+  const web = createWebServer({ hardware: { sensor: track, connectController }, sounds, dirs, statusMs: 50 });
+  const { port } = await web.listen(0);
+  const api = async (m, p, b) => { const r = await fetch(`http://127.0.0.1:${port}${p}`, { method: m, headers: b !== undefined ? { "content-type": "application/json" } : {}, body: b !== undefined ? JSON.stringify(b) : undefined }); return { status: r.status, data: await r.json() }; };
+  const idle = async () => { for (let i = 0; i < 400; i++) { if (!(await api("GET", "/api/status")).data.run) return; await new Promise((r) => setTimeout(r, 50)); } throw new Error("did not finish"); };
+  return { web, track, api, idle, get ctl() { return current; } };
+}
+
+test("reset: POST /api/reset puts the loco back on the mark and says how", async () => {
+  const w = await resetWorld(-0.3);   // just short of the mark
+  try {
+    const r = await w.api("POST", "/api/reset", {});
+    assert.equal(r.status, 202); assert.equal(r.data.run.name, "Return to the mark");
+    assert.equal((await w.api("POST", "/api/reset", {})).status, 409, "one thing at a time");
+    await w.idle();
+    const st = (await w.api("GET", "/api/status")).data;
+    assert.equal(st.lastRun.ok, true); assert.equal(st.lastRun.how, "just short"); assert.equal(st.lastRun.id, "reset");
+    assert.equal(w.track.state, "blocked"); assert.equal(w.ctl.speed, 0);
+  } finally { w.track.stop(); await w.web.close(); }
+});
+
+test("reset: STOP aborts it and the loco is stopped", async () => {
+  const w = await resetWorld(67);   // far away: it would take a lap
+  try {
+    assert.equal((await w.api("POST", "/api/reset", {})).status, 202);
+    for (let i = 0; i < 100 && !(w.ctl && w.ctl.connected); i++) await new Promise((r) => setTimeout(r, 20));
+    await new Promise((r) => setTimeout(r, 400));
+    assert.equal((await w.api("POST", "/api/stop", {})).status, 202);
+    await w.idle();
+    const st = (await w.api("GET", "/api/status")).data;
+    assert.equal(st.lastRun.ok, false); assert.match(st.lastRun.error, /aborted/); assert.equal(w.ctl.speed, 0);
+  } finally { w.track.stop(); await w.web.close(); }
+});
+
+test("reset: refused with no sensor, or while a show is running", async () => {
+  const noSensor = await setup({ withSensor: false });
+  try { const r = await noSensor.api("POST", "/api/reset", {}); assert.equal(r.status, 409); assert.match(r.data.error, /no sensor/); } finally { await noSensor.web.close(); }
+  const t = await setup();
+  try {
+    await t.api("POST", "/api/run", { id: "local/long" });
+    const r = await t.api("POST", "/api/reset", {});
+    assert.equal(r.status, 409); assert.match(r.data.error, /already running/);
+    await t.api("POST", "/api/stop", {}); await t.idle();
+  } finally { await t.web.close(); }
+});

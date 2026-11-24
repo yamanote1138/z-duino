@@ -24,6 +24,8 @@ import http from "node:http";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { returnToMark } from "../track/index.mjs";
+import { speedModel } from "../show/position.mjs";
 import { SHOW_FORMAT, loadLayout, loadLoco, loadShow, simulateShow, stringifyShow, soundsUsed, usesZones, validateLayout, validateShow, runShow } from "../show/index.mjs";
 
 const PUBLIC = join(dirname(fileURLToPath(import.meta.url)), "public");
@@ -113,17 +115,38 @@ export function createWebServer({ hardware = {}, sounds, dirs, layoutFile = null
     if (c.errors.length) throw new HttpError(400, "the show is not valid", { errors: c.errors, warnings: c.warnings });
     const { layout, loco } = context(false);
     if (usesZones(show) && !(layout && loco)) throw new HttpError(400, "this show uses zones, so it needs your layout and loco profile first (node measure-zones.mjs writes local/layout.json, node learn-loco.mjs writes local/loco_profile.json)", { errors: [`missing: ${[!layout && "local/layout.json", !loco && "local/loco_profile.json"].filter(Boolean).join(", ")}`] });
-    const r = run = { id, name: show.name || id, state: "starting", startedAt: Date.now(), log: [], ac: new AbortController(), ctl: null, estop: false };
+    return startJob({ id, name: show.name || id, work: async (r, say) => {
+      const out = await runShow(show, { controller: r.ctl, sensor, sound: sounds.play, layout, loco, settings, signal: r.ac.signal, onLog: say });
+      return { elapsedMs: out.elapsedMs };
+    } });
+  }
+  // Put the loco back on the mark (lib/track): simplest thing first, then wider; stoppable like a show.
+  function startReset() {
+    if (!sensor) throw new HttpError(409, "no sensor connected: nothing to find the mark with");
+    if (sensor.state === "lost") throw new HttpError(409, "the sensor stopped reporting (check the USB cable)");
+    const { layout, loco } = context(false);
+    const opts = { ...(layout && layout.loopIn ? { loopIn: layout.loopIn } : {}), ...(loco ? { creepInS: speedModel(loco)(0.1) || undefined } : {}) };
+    return startJob({ id: "reset", name: "Return to the mark", work: async (r, say) => {
+      const out = await returnToMark({ controller: r.ctl, sensor, signal: r.ac.signal, onLog: say, ...opts });
+      if (!out.ok) throw new Error(out.error || "could not find the mark");
+      return { elapsedMs: out.elapsedMs, how: out.how };
+    } });
+  }
+  // One thing at a time (a show or a reset). `work(job, say)` runs with the controller connected; it returns the result or throws.
+  function startJob({ id, name, work }) {
+    if (run) throw new HttpError(409, `"${run.name}" is already running`);
+    const r = run = { id, name, state: "starting", startedAt: Date.now(), log: [], ac: new AbortController(), ctl: null, estop: false };
     handles.clear();
     broadcast("run", publicRun());
+    const say = (e) => { r.log.push(e); broadcast("log", e); };
     (async () => {
       let result;
       try {
         r.ctl = await hardware.connectController();
         if (r.estop) r.ctl.emergencyStop();
         r.state = "running"; broadcast("run", publicRun());
-        const out = await runShow(show, { controller: r.ctl, sensor, sound: sounds.play, layout, loco, settings, signal: r.ac.signal, onLog: (e) => { r.log.push(e); broadcast("log", e); } });
-        result = { ok: true, elapsedMs: out.elapsedMs };
+        const out = await work(r, say);
+        result = { ok: true, ...out };
       } catch (e) {
         result = { ok: false, error: e.message, elapsedMs: e.result ? e.result.elapsedMs : null };
         if (!r.log.length || !String(r.log.at(-1).text).startsWith("stopped")) { const ev = { t: Date.now() - r.startedAt, text: `stopped: ${e.message}` }; r.log.push(ev); broadcast("log", ev); }
@@ -200,6 +223,7 @@ export function createWebServer({ hardware = {}, sounds, dirs, layoutFile = null
       return ok({ ...r, warnings: c.warnings, commands: r.commands.length, sounds: r.sounds.length });
     }
     if (m === "POST" && p === "/api/run") { const show = loadById(body && body.id); return ok({ run: startRun(body.id, show, settingsFrom(body, show)) }, 202); }
+    if (m === "POST" && p === "/api/reset") return ok({ run: startReset() }, 202);
     if (m === "POST" && p === "/api/stop") {
       if (!run) throw new HttpError(409, "nothing is running");
       run.ac.abort(); return ok({ message: "stopping: the loco ramps down" }, 202);

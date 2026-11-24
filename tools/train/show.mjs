@@ -10,6 +10,7 @@
 // Options: --layout=<file> (default local/layout.json)   --loco=<file> (default local/loco_profile.json)
 //          --packs=packs/synth,packs/jr-east   --engine=afplay|null (run)   --volume=0.5   --set=name=value (repeatable)
 //          --no-sound (run: same as --engine=null)
+//          --reset (run: put the loco on the mark first: back off and come forward, search nearby, or run the loop; see lib/track)
 // Ctrl-C during a run stops the show and ramps the loco down; a second Ctrl-C is an emergency stop.
 
 import { existsSync, readdirSync, statSync } from "node:fs";
@@ -95,6 +96,12 @@ if (cmd === "list") {
     console.log(`sensor: ${sensor.state}, reading ${sensor.lastReading}`);
     const ctl = await connectController({ config });
     const ac = new AbortController();
+    if (argv.includes("--reset")) {
+      const { returnToMark } = await import("./lib/track/index.mjs");
+      console.log("--reset: putting the loco on the mark first");
+      const m = await returnToMark({ controller: ctl, sensor, loopIn: layout ? layout.loopIn : undefined, onLog: (e) => console.log(`${(e.t / 1000).toFixed(2).padStart(7)} s  ${e.text}`) });
+      if (!m.ok) { await ctl.close(); sensor.stop(); fail(`could not put the loco on the mark: ${m.error}`); }
+    }
     let interrupts = 0;
     process.on("SIGINT", () => { if (++interrupts === 1) { console.log("\nstopping the show (ramping down); Ctrl-C again for an emergency stop"); ac.abort(); } else { ctl.emergencyStop(); process.exit(130); } });
     let code = 0;

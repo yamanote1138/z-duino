@@ -3,9 +3,11 @@
 //
 //   node nudge.mjs fwd <seconds>     creep forward for up to <seconds> (at most 6), stopping early at any beam event
 //   node nudge.mjs back <seconds>    the same, in reverse
-//   node nudge.mjs to-mark           from anywhere clear of the beam: back over the beam, then forward until the nose
-//                                    breaks it again (the mark). Gives up after --max=<seconds> (default 75: a lap at creep)
-//   node nudge.mjs to-mark --dry     only check the beam, move nothing
+//   node nudge.mjs to-mark           put the loco back on the mark, from wherever it is (the nose just breaking the beam):
+//                                      beam blocked: back off and come forward onto the edge (works nose-in or tail-in)
+//                                      beam clear:   just short? creep forward a few seconds. just past? back over the beam and
+//                                                    forward onto it. neither? creep round the loop until the beam breaks
+//                                    Options: --near=5 (seconds to look nearby before the loop), --dry (only check the beam)
 //
 // A move that ends on a beam event is the point: you cannot nudge the loco past the sensor without it stopping there.
 // Settings (controller address, sensor port) come from local/config.jsonc, env and flags (see `node config.mjs`).
@@ -14,6 +16,10 @@
 import { createSensor, SerialSource } from "./lib/sensor/index.mjs";
 import { connectController } from "./lib/controller/index.mjs";
 import { loadConfigOrExit } from "./lib/config/index.mjs";
+import { returnToMark } from "./lib/track/index.mjs";
+import { loadLayout, loadLoco, speedModel } from "./lib/show/index.mjs";
+import { localPath } from "./lib/paths.mjs";
+import { existsSync } from "node:fs";
 
 const argv = process.argv.slice(2);
 const pos = argv.filter((a) => !a.startsWith("--"));
@@ -21,7 +27,7 @@ const flag = (n, d) => { const a = argv.find((x) => x.startsWith(`--${n}=`)); re
 const dry = argv.includes("--dry");
 const CREEP = 0.1, MAX_NUDGE_S = 6;
 const fail = (m) => { console.error(`error: ${m}`); process.exit(1); };
-const usage = () => fail("usage: node nudge.mjs fwd <seconds> | back <seconds> | to-mark [--max=75] [--dry]");
+const usage = () => fail("usage: node nudge.mjs fwd <seconds> | back <seconds> | to-mark [--near=5] [--dry]");
 
 const [mode, secArg] = pos;
 if (!["fwd", "back", "to-mark"].includes(mode)) usage();
@@ -31,8 +37,8 @@ if (mode !== "to-mark") {
   if (!(seconds > 0)) usage();
   if (seconds > MAX_NUDGE_S) fail(`at most ${MAX_NUDGE_S} s per nudge (about ${Math.round(MAX_NUDGE_S * 2.35)} in at creep): nudge again if you need more`);
 }
-const maxS = Number(flag("max", 75));
-if (!(maxS > 0)) fail("--max must be a number of seconds");
+const nearS = Number(flag("near", 5));
+if (!(nearS > 0)) fail("--near must be a number of seconds");
 
 const config = loadConfigOrExit(argv);
 const source = new SerialSource(config.sensor);
@@ -44,7 +50,6 @@ if (sensor.lastReading == null) fail(`no readings: ${source.lastError ? source.l
 const where = () => `beam ${sensor.state}, reading ${sensor.lastReading}`;
 console.log(`start: ${where()}`);
 
-if (mode === "to-mark" && sensor.state !== "clear") { sensor.stop(); fail(sensor.state === "blocked" ? "the beam is already blocked: the loco is on the beam (use fwd/back to move it)" : `the beam is ${sensor.state}`); }
 if (dry) { console.log("dry run: nothing moved"); sensor.stop(); process.exit(0); }
 
 const ctl = await connectController({ config });
@@ -54,19 +59,14 @@ const never = () => new Promise(() => {});
 let code = 0;
 try {
   if (mode === "to-mark") {
-    sensor.setDirection("reverse");
-    console.log("reversing at creep until the loco has passed back over the beam...");
-    let r = await ctl.guardedMove({
-      forward: false, speed: CREEP, maxMs: Math.round(maxS * 1000), afterMs: 450, abort: lost,
-      until: async () => { await sensor.waitFor("break", { timeoutMs: maxS * 1000 }); await sensor.waitFor("restore", { timeoutMs: 15000 }); },
-    });
-    if (r.result !== "guard") throw new Error(`stopped without passing over the beam (${r.result}); the loco is stopped, nothing more was tried`);
-    await new Promise((res) => setTimeout(res, 800));
-    if (sensor.state !== "clear") throw new Error(`the beam is ${sensor.state} after reversing; stopping here`);
-    sensor.setDirection("forward");
-    r = await ctl.guardedMove({ forward: true, speed: CREEP, maxMs: 8000, abort: lost, until: () => sensor.waitFor("break", { timeoutMs: 9000 }) });
-    if (r.result !== "guard") throw new Error(`did not reach the mark (${r.result})`);
-    await new Promise((res) => setTimeout(res, 600));
+    const layoutFile = localPath("layout.json"), locoFile = localPath("loco_profile.json");
+    const loopIn = existsSync(layoutFile) ? loadLayout(layoutFile).loopIn : undefined;
+    const creepInS = existsSync(locoFile) ? speedModel(loadLoco(locoFile))(CREEP) || undefined : undefined;
+    const ac = new AbortController(); process.removeAllListeners("SIGINT");
+    let hits = 0; process.on("SIGINT", () => { if (++hits === 1) { console.log("\nstopping"); ac.abort(); } else { ctl.emergencyStop(); process.exit(130); } });
+    const r = await returnToMark({ controller: ctl, sensor, signal: ac.signal, nearS, loopIn, creepInS, onLog: (e) => console.log(`  ${(e.t / 1000).toFixed(1).padStart(5)} s  ${e.text}`) });
+    await new Promise((res) => setTimeout(res, 500));
+    if (!r.ok) throw new Error(r.error || "could not find the mark");
     console.log(`on the mark: ${where()}`);
   } else {
     const forward = mode === "fwd";

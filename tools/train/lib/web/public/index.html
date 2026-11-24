@@ -115,6 +115,7 @@
     <div class="sec foot">
       <button class="btn outline sm on" id="tab-shows"></button>
       <button class="btn outline sm" id="tab-sounds"></button>
+      <button class="btn outline sm" id="reset" title="Put the loco back on the mark (the nose just breaking the beam): it looks nearby first, then runs the loop at creep until the beam breaks"></button>
     </div>
   </div>
 
@@ -152,7 +153,7 @@
 
 <script>
 "use strict";
-const ICONS = {"train":"M12 2c-4 0-8 .5-8 4v9.5A3.5 3.5 0 0 0 7.5 19L6 20.5v.5h2.23l2-2H14l2 2h2v-.5L16.5 19a3.5 3.5 0 0 0 3.5-3.5V6c0-3.5-3.58-4-8-4M7.5 17A1.5 1.5 0 0 1 6 15.5A1.5 1.5 0 0 1 7.5 14A1.5 1.5 0 0 1 9 15.5A1.5 1.5 0 0 1 7.5 17m3.5-7H6V6h5zm2 0V6h5v4zm3.5 7a1.5 1.5 0 0 1-1.5-1.5a1.5 1.5 0 0 1 1.5-1.5a1.5 1.5 0 0 1 1.5 1.5a1.5 1.5 0 0 1-1.5 1.5","wifi":"m12 21l3.6-4.8c-1-.75-2.25-1.2-3.6-1.2s-2.6.45-3.6 1.2zm0-18C7.95 3 4.21 4.34 1.2 6.6L3 9c2.5-1.88 5.62-3 9-3s6.5 1.12 9 3l1.8-2.4C19.79 4.34 16.05 3 12 3m0 6c-2.7 0-5.19.89-7.2 2.4l1.8 2.4C8.1 12.67 9.97 12 12 12s3.9.67 5.4 1.8l1.8-2.4C17.19 9.89 14.7 9 12 9","wifi-off":"M2.28 3L1 4.27l1.47 1.47c-.43.26-.86.55-1.27.86L3 9c.53-.4 1.08-.75 1.66-1.07l2.23 2.23c-.74.34-1.45.75-2.09 1.24l1.8 2.4c.78-.58 1.66-1.03 2.6-1.33L11.75 15c-1.25.07-2.41.5-3.35 1.2L12 21l2.46-3.27L17.74 21L19 19.72M12 3c-2.15 0-4.2.38-6.1 1.07l2.39 2.4C9.5 6.16 10.72 6 12 6c3.38 0 6.5 1.11 9 3l1.8-2.4C19.79 4.34 16.06 3 12 3m0 6c-.38 0-.75 0-1.12.05l3.19 3.2c1.22.28 2.36.82 3.33 1.55l1.8-2.4C17.2 9.89 14.7 9 12 9","play":"M8 5.14v14l11-7z","pause":"M14 19h4V5h-4M6 19h4V5H6z","stop":"M18 18H6V6h12z","hand-back-left":"M3 16V5.75a1.25 1.25 0 0 1 2.5 0V12h1V2.75a1.25 1.25 0 0 1 2.5 0V12h1V1.25a1.25 1.25 0 0 1 2.5 0V12h1V3.25a1.25 1.25 0 0 1 2.5 0V15h.75l1.41-3.53c.22-.55.68-.97 1.24-1.16l.79-.26a1 1 0 0 1 1.24 1.32L18.4 19c-1.21 3-4.14 5-7.4 5c-4.42 0-8-3.58-8-8","check-circle-outline":"M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10s10-4.5 10-10S17.5 2 12 2m0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8s8 3.59 8 8s-3.59 8-8 8m4.59-12.42L10 14.17l-2.59-2.58L6 13l4 4l8-8z","flask-outline":"M5 19a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1c0-.21-.07-.41-.18-.57L13 8.35V4h-2v4.35L5.18 18.43c-.11.16-.18.36-.18.57m1 3a3 3 0 0 1-3-3c0-.6.18-1.16.5-1.63L9 7.81V6a1 1 0 0 1-1-1V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1a1 1 0 0 1-1 1v1.81l5.5 9.56c.32.47.5 1.03.5 1.63a3 3 0 0 1-3 3zm7-6l1.34-1.34L16.27 18H7.73l2.66-4.61zm-.5-4a.5.5 0 0 1 .5.5a.5.5 0 0 1-.5.5a.5.5 0 0 1-.5-.5a.5.5 0 0 1 .5-.5","download":"M5 20h14v-2H5m14-9h-4V3H9v6H5l7 7z","upload":"M9 16v-6H5l7-7l7 7h-4v6zm-4 4v-2h14v2z","volume-high":"M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.84-5 6.7v2.07c4-.91 7-4.49 7-8.77s-3-7.86-7-8.77M16.5 12c0-1.77-1-3.29-2.5-4.03V16c1.5-.71 2.5-2.24 2.5-4M3 9v6h4l5 5V4L7 9z","arrow-right-bold":"M4 15V9h8V4.16L19.84 12L12 19.84V15z","arrow-left-bold":"M20 9v6h-8v4.84L4.16 12L12 4.16V9z","alert-circle-outline":"M11 15h2v2h-2zm0-8h2v6h-2zm1-5C6.47 2 2 6.5 2 12a10 10 0 0 0 10 10a10 10 0 0 0 10-10A10 10 0 0 0 12 2m0 18a8 8 0 0 1-8-8a8 8 0 0 1 8-8a8 8 0 0 1 8 8a8 8 0 0 1-8 8","file-document-outline":"M6 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm0 2h7v5h5v11H6zm2 8v2h8v-2zm0 4v2h5v-2z","music-note":"M12 3v10.55c-.59-.34-1.27-.55-2-.55c-2.21 0-4 1.79-4 4s1.79 4 4 4s4-1.79 4-4V7h4V3z","chevron-down":"M7.41 8.58L12 13.17l4.59-4.59L18 10l-6 6l-6-6z","close":"M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12z","timer-sand":"M6 2h12v6l-4 4l4 4v6H6v-6l4-4l-4-4zm10 14.5l-4-4l-4 4V20h8zm-4-5l4-4V4H8v3.5zM10 6h4v.75l-2 2l-2-2z"};   // Material Design Icons (the set the controller app uses), by name
+const ICONS = {"train": "M12 2c-4 0-8 .5-8 4v9.5A3.5 3.5 0 0 0 7.5 19L6 20.5v.5h2.23l2-2H14l2 2h2v-.5L16.5 19a3.5 3.5 0 0 0 3.5-3.5V6c0-3.5-3.58-4-8-4M7.5 17A1.5 1.5 0 0 1 6 15.5A1.5 1.5 0 0 1 7.5 14A1.5 1.5 0 0 1 9 15.5A1.5 1.5 0 0 1 7.5 17m3.5-7H6V6h5zm2 0V6h5v4zm3.5 7a1.5 1.5 0 0 1-1.5-1.5a1.5 1.5 0 0 1 1.5-1.5a1.5 1.5 0 0 1 1.5 1.5a1.5 1.5 0 0 1-1.5 1.5", "wifi": "m12 21l3.6-4.8c-1-.75-2.25-1.2-3.6-1.2s-2.6.45-3.6 1.2zm0-18C7.95 3 4.21 4.34 1.2 6.6L3 9c2.5-1.88 5.62-3 9-3s6.5 1.12 9 3l1.8-2.4C19.79 4.34 16.05 3 12 3m0 6c-2.7 0-5.19.89-7.2 2.4l1.8 2.4C8.1 12.67 9.97 12 12 12s3.9.67 5.4 1.8l1.8-2.4C17.19 9.89 14.7 9 12 9", "wifi-off": "M2.28 3L1 4.27l1.47 1.47c-.43.26-.86.55-1.27.86L3 9c.53-.4 1.08-.75 1.66-1.07l2.23 2.23c-.74.34-1.45.75-2.09 1.24l1.8 2.4c.78-.58 1.66-1.03 2.6-1.33L11.75 15c-1.25.07-2.41.5-3.35 1.2L12 21l2.46-3.27L17.74 21L19 19.72M12 3c-2.15 0-4.2.38-6.1 1.07l2.39 2.4C9.5 6.16 10.72 6 12 6c3.38 0 6.5 1.11 9 3l1.8-2.4C19.79 4.34 16.06 3 12 3m0 6c-.38 0-.75 0-1.12.05l3.19 3.2c1.22.28 2.36.82 3.33 1.55l1.8-2.4C17.2 9.89 14.7 9 12 9", "play": "M8 5.14v14l11-7z", "pause": "M14 19h4V5h-4M6 19h4V5H6z", "stop": "M18 18H6V6h12z", "hand-back-left": "M3 16V5.75a1.25 1.25 0 0 1 2.5 0V12h1V2.75a1.25 1.25 0 0 1 2.5 0V12h1V1.25a1.25 1.25 0 0 1 2.5 0V12h1V3.25a1.25 1.25 0 0 1 2.5 0V15h.75l1.41-3.53c.22-.55.68-.97 1.24-1.16l.79-.26a1 1 0 0 1 1.24 1.32L18.4 19c-1.21 3-4.14 5-7.4 5c-4.42 0-8-3.58-8-8", "check-circle-outline": "M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10s10-4.5 10-10S17.5 2 12 2m0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8s8 3.59 8 8s-3.59 8-8 8m4.59-12.42L10 14.17l-2.59-2.58L6 13l4 4l8-8z", "flask-outline": "M5 19a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1c0-.21-.07-.41-.18-.57L13 8.35V4h-2v4.35L5.18 18.43c-.11.16-.18.36-.18.57m1 3a3 3 0 0 1-3-3c0-.6.18-1.16.5-1.63L9 7.81V6a1 1 0 0 1-1-1V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1a1 1 0 0 1-1 1v1.81l5.5 9.56c.32.47.5 1.03.5 1.63a3 3 0 0 1-3 3zm7-6l1.34-1.34L16.27 18H7.73l2.66-4.61zm-.5-4a.5.5 0 0 1 .5.5a.5.5 0 0 1-.5.5a.5.5 0 0 1-.5-.5a.5.5 0 0 1 .5-.5", "download": "M5 20h14v-2H5m14-9h-4V3H9v6H5l7 7z", "upload": "M9 16v-6H5l7-7l7 7h-4v6zm-4 4v-2h14v2z", "volume-high": "M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.84-5 6.7v2.07c4-.91 7-4.49 7-8.77s-3-7.86-7-8.77M16.5 12c0-1.77-1-3.29-2.5-4.03V16c1.5-.71 2.5-2.24 2.5-4M3 9v6h4l5 5V4L7 9z", "arrow-right-bold": "M4 15V9h8V4.16L19.84 12L12 19.84V15z", "arrow-left-bold": "M20 9v6h-8v4.84L4.16 12L12 4.16V9z", "alert-circle-outline": "M11 15h2v2h-2zm0-8h2v6h-2zm1-5C6.47 2 2 6.5 2 12a10 10 0 0 0 10 10a10 10 0 0 0 10-10A10 10 0 0 0 12 2m0 18a8 8 0 0 1-8-8a8 8 0 0 1 8-8a8 8 0 0 1 8 8a8 8 0 0 1-8 8", "file-document-outline": "M6 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm0 2h7v5h5v11H6zm2 8v2h8v-2zm0 4v2h5v-2z", "music-note": "M12 3v10.55c-.59-.34-1.27-.55-2-.55c-2.21 0-4 1.79-4 4s1.79 4 4 4s4-1.79 4-4V7h4V3z", "chevron-down": "M7.41 8.58L12 13.17l4.59-4.59L18 10l-6 6l-6-6z", "close": "M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12z", "timer-sand": "M6 2h12v6l-4 4l4 4v6H6v-6l4-4l-4-4zm10 14.5l-4-4l-4 4V20h8zm-4-5l4-4V4H8v3.5zM10 6h4v.75l-2 2l-2-2z", "target": "M11 2v2.07A8 8 0 0 0 4.07 11H2v2h2.07A8 8 0 0 0 11 19.93V22h2v-2.07A8 8 0 0 0 19.93 13H22v-2h-2.07A8 8 0 0 0 13 4.07V2m-2 4.08V8h2V6.09c2.5.41 4.5 2.41 4.92 4.91H16v2h1.91c-.41 2.5-2.41 4.5-4.91 4.92V16h-2v1.91C8.5 17.5 6.5 15.5 6.08 13H8v-2H6.09C6.5 8.5 8.5 6.5 11 6.08M12 11a1 1 0 0 0-1 1a1 1 0 0 0 1 1a1 1 0 0 0 1-1a1 1 0 0 0-1-1"};   // Material Design Icons (the set the controller app uses), by name
 const $ = (s, el = document) => el.querySelector(s);
 const ic = (name) => { const s = document.createElementNS("http://www.w3.org/2000/svg", "svg"); s.setAttribute("viewBox", "0 0 24 24"); s.setAttribute("class", "ic"); s.setAttribute("aria-hidden", "true"); const p = document.createElementNS("http://www.w3.org/2000/svg", "path"); p.setAttribute("d", ICONS[name]); s.append(p); return s; };
 const h = (tag, props = {}, ...kids) => {
@@ -182,6 +183,7 @@ fill($("#stop"), ic("pause"), "Stop show");
 fill($("#estop"), ic("hand-back-left"), "E-Stop");
 fill($("#tab-shows"), ic("file-document-outline"), "Shows");
 fill($("#tab-sounds"), ic("volume-high"), "Sounds");
+fill($("#reset"), ic("target"), "Return to the mark");
 fill($("#snd-stop"), ic("stop"), "Stop all sounds");
 fill($("#import-btn"), ic("upload"), "Import a show");
 const bar = $("#bar");
@@ -201,6 +203,7 @@ function renderStatus(st) {
   if (st.run) badge("#p-run", "info", "play", `${st.run.state === "starting" ? "Starting" : "Running"}: ${st.run.name}`);
   else badge("#p-run", st.lastRun && !st.lastRun.ok ? "warning" : "", null, st.lastRun ? `Idle · last ${st.lastRun.ok ? "finished" : "stopped"}` : "Idle");
   $("#stop").disabled = !st.run;
+  $("#reset").disabled = !!st.run || !s || s.state === "lost";
   updateButtons();
   $("#snd-note").textContent = st.run ? "sounds are off while a show runs" : "";
 }
@@ -212,7 +215,7 @@ function updateButtons() {
   else if (st.run) why = "a show is running";
   else if (!s) why = "no sensor: shows can be simulated, not run";
   else if (s.state === "lost") why = "the sensor stopped reporting";
-  else if (need !== "any" && s.state !== need) why = `the beam must be ${need} (it is ${s.state}): put the loco on the mark first`;
+  else if (need !== "any" && s.state !== need) why = `the beam must be ${need} (it is ${s.state}): use Return to the mark, or put the loco there by hand`;
   else if (detail.errors.length) why = "fix the validation problems first";
   run.disabled = !!why;
   $("#need").textContent = why || (need === "blocked" ? "Nose is on the mark: ready" : "Ready");
@@ -328,6 +331,14 @@ async function playSound(id) {
 }
 $("#gain").addEventListener("input", (e) => { $("#gain-v").textContent = Number(e.target.value).toFixed(1); });
 $("#snd-stop").addEventListener("click", () => api("POST", "/api/sounds/stop", {}));
+
+// ---------- reset to the mark ----------
+$("#reset").addEventListener("click", async () => {
+  logClear();
+  const r = await api("POST", "/api/reset", {});
+  if (!r.ok) { logLine(r.data.error, "bad"); return; }
+  logLine("returning to the mark: looking nearby first, then round the loop", "good");
+});
 
 // ---------- stop buttons, views ----------
 $("#stop").addEventListener("click", async () => { const r = await api("POST", "/api/stop", {}); logLine(r.ok ? r.data.message : r.data.error, r.ok ? "" : "bad"); });
