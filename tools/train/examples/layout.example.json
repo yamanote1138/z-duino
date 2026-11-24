@@ -3,7 +3,20 @@
   "name": "Example layout",
   "loopIn": 134,
   "zones": {
-    "curve": { "fromIn": 5.5, "toIn": 12, "note": "positions are inches of nose travel past the beam, in the direction of travel; replace with your own" },
-    "approach": { "fromIn": 116, "toIn": 133, "note": "the stretch before the beam on the way round: slow down in here" }
+    "curve": {
+      "fromIn": 5.5,
+      "toIn": 12,
+      "note": "positions are inches of nose travel past the beam, in the direction of travel; replace with your own (node measure-zones.mjs measures them)"
+    },
+    "curve-2": {
+      "fromIn": 60,
+      "toIn": 72,
+      "note": "a second bend, further round the loop"
+    },
+    "approach": {
+      "fromIn": 116,
+      "toIn": 133,
+      "note": "the stretch before the beam on the way round: slow down in here"
+    }
   }
 }

@@ -1,0 +1,26 @@
+{
+  "format": "z-show/1",
+  "name": "Park on the tail",
+  "description": "Nose on the mark. Creep forward at creep speed and stop the moment the tail clears the beam. The beam stops it, and it gives up after 8 s if the beam never clears.",
+  "start": "blocked",
+  "settings": {
+    "creep": 0.1
+  },
+  "steps": [
+    {
+      "do": "direction",
+      "forward": true
+    },
+    {
+      "do": "creep",
+      "forward": true,
+      "speed": "$creep",
+      "until": "restore",
+      "maxMs": 8000
+    },
+    {
+      "do": "log",
+      "message": "tail has cleared the beam: parked"
+    }
+  ]
+}

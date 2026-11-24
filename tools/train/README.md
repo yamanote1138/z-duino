@@ -29,7 +29,7 @@ No script hard-codes a reading. `lib/levels.mjs` scales every threshold (clear p
 { "clear": 340, "blocked": 73 }
 ```
 
-`clear` is the open beam, `blocked` is the solid loco in the beam. Update both after moving or re-aiming the sensor (read them with `python3 -I read-a0.py 3`), or override with `BEAM_CLEAR` and `BEAM_BLOCKED` in the environment. The fractions are the old photoresistor thresholds re-expressed on the same scale, so behaviour matches what the scripts were tuned for.
+`clear` is the open beam, `blocked` is the solid loco in the beam. Update both after moving or re-aiming the sensor (`node calibrate.mjs` measures both and writes `local/sensor_levels.json`), or override with `BEAM_CLEAR` and `BEAM_BLOCKED` in the environment. The fractions are the old photoresistor thresholds re-expressed on the same scale, so behaviour matches what the scripts were tuned for.
 
 ## Sensor firmware
 
@@ -56,11 +56,9 @@ All scripts need Node 22+ (global `WebSocket`). The controller's address and the
 | `signal-show.mjs` | Two loops with the controller LED as a signal. Red, yellow, green go, purple at the pass (or `--party` for the beat show), yellow while slowing, red when parked, then blue. Ends parked on the nose. Start with the nose in the beam (on the mark); it refuses to run otherwise. Use `--loco` for the speeds in `loco_profile.json`, and `--sound` for sound effects (see Sound). The ramp-down is timed from the loop-1 lap, standing start included. |
 | `ramp-loops.mjs` | Three loops, a little faster each (`--start=0.40 --final=0.65`), then ramp to 30%, then creep onto the nose. Calibrated on loop 2, because speeds above 30% are extrapolated from the profile; needs `--allow-fast` above 9 in/s. `--plan` prints the final-loop plan. |
 | `light-test.mjs` | Shuttles the loco across the beam (about 1" past it each way, at 10%) and reports clear and blocked levels, noise and pass-time repeatability; appends a row to `light_test_results.csv`. Use `--label=` to name the lighting condition. |
-| `sound-demo.mjs` | Plays the sound set in the order a show uses it, with no train. |
 | `import-sounds.py` | Copies real sounds from the sibling `e235-sounds` and `eki-pi` projects into `sounds/`. |
 | `speed-trap.mjs` | Times the train past the beam at several throttle settings and reports speed in scale mph, plus the loop length. |
 | `learn-loco.mjs` | Learns a new locomotive on its own: finds it, measures its length and speed table, and learns how it stops. Writes `local/loco_profile.json`. Uses `lib/beam.mjs`. `--resume` and `--stages=find,length,speeds,stops` run parts of it. `--in-beam` starts with the nose already in the beam. |
-| `read-a0.py` | Bench helper: `python3 -I read-a0.py 3` prints min, max and mean of A0 over 3 s. |
 
 The scripts are deliberately standalone, so the sensor and connection helpers repeat across files.
 

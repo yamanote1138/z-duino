@@ -1,0 +1,111 @@
+{
+  "format": "z-show/1",
+  "name": "Ramp loops",
+  "description": "Nose on the mark. Three laps, each a little faster than the last, then slow down in the approach zone and creep onto the mark. Needs a layout with an 'approach' zone and a loco profile.",
+  "start": "blocked",
+  "settings": {
+    "lap1": 0.2,
+    "lap2": 0.3,
+    "lap3": 0.4,
+    "creep": 0.1,
+    "lapTimeoutMs": 45000
+  },
+  "steps": [
+    {
+      "do": "direction",
+      "forward": true
+    },
+    {
+      "do": "parallel",
+      "branches": [
+        [
+          {
+            "do": "ramp",
+            "to": "$lap1"
+          }
+        ],
+        [
+          {
+            "do": "wait-for",
+            "event": "restore",
+            "timeoutMs": "$lapTimeoutMs"
+          },
+          {
+            "do": "wait-for",
+            "event": "nose",
+            "timeoutMs": "$lapTimeoutMs"
+          },
+          {
+            "do": "log",
+            "message": "lap 1 done"
+          }
+        ]
+      ]
+    },
+    {
+      "do": "parallel",
+      "branches": [
+        [
+          {
+            "do": "ramp",
+            "to": "$lap2"
+          }
+        ],
+        [
+          {
+            "do": "wait-for",
+            "event": "restore",
+            "timeoutMs": "$lapTimeoutMs"
+          },
+          {
+            "do": "wait-for",
+            "event": "nose",
+            "timeoutMs": "$lapTimeoutMs"
+          },
+          {
+            "do": "log",
+            "message": "lap 2 done"
+          }
+        ]
+      ]
+    },
+    {
+      "do": "parallel",
+      "branches": [
+        [
+          {
+            "do": "ramp",
+            "to": "$lap3"
+          }
+        ],
+        [
+          {
+            "do": "wait-for",
+            "event": "restore",
+            "timeoutMs": "$lapTimeoutMs"
+          },
+          {
+            "do": "wait-zone",
+            "zone": "approach",
+            "edge": "enter"
+          },
+          {
+            "do": "ramp",
+            "to": "$creep"
+          },
+          {
+            "do": "creep",
+            "forward": true,
+            "speed": "$creep",
+            "until": "break",
+            "maxMs": 30000
+          }
+        ]
+      ]
+    },
+    {
+      "do": "log",
+      "message": "parked on the mark"
+    }
+  ]
+}

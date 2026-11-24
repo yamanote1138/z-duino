@@ -1,0 +1,57 @@
+{
+  "format": "z-show/1",
+  "name": "Shuttle",
+  "description": "Nose on the mark. Creep forward until the tail clears the beam, wait, then creep back over the beam and forward again onto the mark. Every move is stopped by a beam event.",
+  "start": "blocked",
+  "settings": {
+    "creep": 0.1,
+    "pauseMs": 4000
+  },
+  "steps": [
+    {
+      "do": "direction",
+      "forward": true
+    },
+    {
+      "do": "creep",
+      "forward": true,
+      "speed": "$creep",
+      "until": "restore",
+      "maxMs": 8000
+    },
+    {
+      "do": "log",
+      "message": "tail clear: waiting"
+    },
+    {
+      "do": "wait",
+      "ms": "$pauseMs"
+    },
+    {
+      "do": "creep",
+      "forward": false,
+      "speed": "$creep",
+      "until": "break",
+      "maxMs": 8000
+    },
+    {
+      "do": "creep",
+      "forward": false,
+      "speed": "$creep",
+      "until": "restore",
+      "maxMs": 8000,
+      "afterMs": 450
+    },
+    {
+      "do": "creep",
+      "forward": true,
+      "speed": "$creep",
+      "until": "break",
+      "maxMs": 8000
+    },
+    {
+      "do": "log",
+      "message": "back on the mark"
+    }
+  ]
+}

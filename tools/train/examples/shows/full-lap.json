@@ -1,0 +1,195 @@
+{
+  "format": "z-show/1",
+  "name": "Full lap with sound",
+  "description": "Nose on the mark. One lap with a full sound design: idle hum and chime at red, brake release at yellow, horn and start-up at green, flange squeals on two bends, slow-down and brake squeal on the approach, then air release, brake loosen, red, and a blue chime. Uses the 'curve', 'curve-2' and 'approach' zones; the signal colours are skipped on a controller with no status LED.",
+  "start": "blocked",
+  "settings": {
+    "cruise": 0.2,
+    "creep": 0.1,
+    "runStartMs": 6800,
+    "runCreepMs": 4800
+  },
+  "steps": [
+    {
+      "do": "led",
+      "color": "red"
+    },
+    {
+      "do": "loop",
+      "slot": "idle",
+      "id": "idle.hum"
+    },
+    {
+      "do": "sound",
+      "id": "chime.station",
+      "wait": false
+    },
+    {
+      "do": "wait",
+      "ms": 3000
+    },
+    {
+      "do": "led",
+      "color": "yellow"
+    },
+    {
+      "do": "sound",
+      "id": "brake.departure"
+    },
+    {
+      "do": "direction",
+      "forward": true
+    },
+    {
+      "do": "led",
+      "color": "green"
+    },
+    {
+      "do": "stop-loop",
+      "slot": "idle"
+    },
+    {
+      "do": "sound",
+      "id": "horn.depart",
+      "wait": false
+    },
+    {
+      "do": "sound",
+      "id": "motion.accelerate",
+      "wait": false
+    },
+    {
+      "do": "parallel",
+      "branches": [
+        [
+          {
+            "do": "ramp",
+            "to": "$cruise"
+          }
+        ],
+        [
+          {
+            "do": "wait",
+            "ms": "$runStartMs"
+          },
+          {
+            "do": "loop",
+            "slot": "motion",
+            "id": "motion.run"
+          }
+        ],
+        [
+          {
+            "do": "wait-for",
+            "event": "restore",
+            "timeoutMs": 15000
+          },
+          {
+            "do": "wait-zone",
+            "zone": "approach",
+            "edge": "enter"
+          },
+          {
+            "do": "led",
+            "color": "yellow"
+          },
+          {
+            "do": "parallel",
+            "branches": [
+              [
+                {
+                  "do": "stop-loop",
+                  "slot": "motion"
+                },
+                {
+                  "do": "sound",
+                  "id": "motion.decelerate",
+                  "wait": false
+                },
+                {
+                  "do": "wait",
+                  "ms": "$runCreepMs"
+                },
+                {
+                  "do": "loop",
+                  "slot": "motion",
+                  "id": "motion.run",
+                  "gain": 0.67
+                }
+              ],
+              [
+                {
+                  "do": "ramp",
+                  "to": "$creep"
+                },
+                {
+                  "do": "sound",
+                  "id": "brake.squeal",
+                  "gain": 0.7,
+                  "wait": false
+                },
+                {
+                  "do": "creep",
+                  "forward": true,
+                  "speed": "$creep",
+                  "until": "break",
+                  "maxMs": 30000
+                }
+              ]
+            ]
+          }
+        ],
+        [
+          {
+            "do": "fill",
+            "id": "flange",
+            "zone": "curve",
+            "cutMs": 100,
+            "overlapMs": 100
+          },
+          {
+            "do": "fill",
+            "id": "flange",
+            "zone": "curve-2",
+            "cutMs": 100,
+            "overlapMs": 100
+          }
+        ]
+      ]
+    },
+    {
+      "do": "stop-loop",
+      "slot": "motion"
+    },
+    {
+      "do": "led",
+      "color": "red"
+    },
+    {
+      "do": "sound",
+      "id": "brake.air",
+      "wait": false
+    },
+    {
+      "do": "sound",
+      "id": "brake.loosen",
+      "gain": 0.8,
+      "wait": false
+    },
+    {
+      "do": "wait",
+      "ms": 4000
+    },
+    {
+      "do": "led",
+      "color": "blue"
+    },
+    {
+      "do": "sound",
+      "id": "chime.station"
+    },
+    {
+      "do": "led-auto"
+    }
+  ]
+}
