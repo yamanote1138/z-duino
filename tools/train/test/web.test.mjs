@@ -223,3 +223,31 @@ test("closing the service while a show runs stops the show first", async () => {
   assert.equal(t.controllers[0].speed, 0);
   assert.equal(t.controllers[0].connected, false);
 });
+
+test("with no layout or loco of your own, validate and simulate use the examples (and say so); a run does not", async () => {
+  const { fileURLToPath } = await import("node:url");
+  const repo = (p) => fileURLToPath(new URL(p, import.meta.url));
+  const base = mkdtempSync(join(tmpdir(), "web-fb-"));
+  const dirs = { local: join(base, "local"), examples: repo("../examples/shows") };
+  mkdirSync(dirs.local);
+  const sounds = { play: defaultSounds({ engine: new RecordingEngine(), onSkip: () => {} }), dry: defaultSounds({ engine: "null" }) };
+  const sensor = Object.assign(new GhostSensor(realClock, { state: "blocked", eventMs: 5 }), { lastSampleAgeMs: 12 });
+  const web = createWebServer({
+    hardware: { sensor, connectController: async () => { throw new Error("must not connect"); } }, sounds, dirs, statusMs: 50,
+    layoutFile: join(base, "layout.json"), locoFile: join(base, "loco.json"),
+    fallback: { layoutFile: repo("../examples/layout.example.json"), locoFile: repo("../examples/loco.example.json") },
+  });
+  const { port } = await web.listen(0);
+  const api = async (m, p, b) => { const r = await fetch(`http://127.0.0.1:${port}${p}`, { method: m, headers: b ? { "content-type": "application/json" } : {}, body: b ? JSON.stringify(b) : undefined }); return { status: r.status, data: await r.json() }; };
+  try {
+    const sim = await api("POST", "/api/sim", { id: "examples/ramp-loops" });
+    assert.equal(sim.status, 200); assert.equal(sim.data.ok, true);
+    assert.ok(sim.data.warnings.some((w) => /example layout and loco profile/.test(w)), sim.data.warnings.join("; "));
+    const val = await api("POST", "/api/validate", { id: "examples/ramp-loops" });
+    assert.equal(val.data.ok, true);
+    const run = await api("POST", "/api/run", { id: "examples/ramp-loops" });
+    assert.equal(run.status, 400, "a real run never borrows the examples");
+    assert.ok(run.data.errors.some((e) => /local\/layout\.json/.test(e)), run.data.errors.join("; "));
+    assert.match(run.data.error, /uses zones/);
+  } finally { await web.close(); }
+});

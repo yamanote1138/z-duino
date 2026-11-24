@@ -46,7 +46,7 @@ export class GhostSensor extends EventEmitter {
 export class SimSound {
   constructor(clock, library = null, onCall = () => {}) { this.clock = clock; this.library = library; this.calls = []; this.onCall = onCall; }
   _rec(c) { this.calls.push({ t: this.clock.now(), ...c }); this.onCall(c); }
-  check(ids) { if (this.library) this.library.check(ids); }
+  check(ids) { if (this.library) this.library.check(ids, { files: false }); }   // a simulation needs the names, not the audio files
   has(id) { return this.library ? this.library.has(id) : true; }
   _dur(id) { try { return this.library ? this.library.duration(id) : 1000; } catch { return 1000; } }
   play(id, { gain = 1, seconds } = {}) {

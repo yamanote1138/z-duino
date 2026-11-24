@@ -23,6 +23,21 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  train-tools:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ["22", "24"]
+    defaults:
+      run:
+        working-directory: tools/train
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm test
+
   firmware:
     runs-on: ubuntu-latest
     steps:

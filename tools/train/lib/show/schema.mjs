@@ -65,9 +65,9 @@ function walk(steps, fn) {
 
 /**
  * @param show   the parsed show
- * @param opts   { sounds: SoundLibrary (to check ids), layout, loco, settings: overrides }
+ * @param opts   { sounds: SoundLibrary (to check ids), layout, loco, settings: overrides, soundFiles: false to check the sound names only (dry runs) }
  */
-export function validateShow(show, { sounds = null, layout = null, loco = null, settings = {} } = {}) {
+export function validateShow(show, { sounds = null, layout = null, loco = null, settings = {}, soundFiles = true } = {}) {
   const errors = [], warnings = [];
   const err = (path, msg) => errors.push(`${path}: ${msg}`);
   const warn = (path, msg) => warnings.push(`${path}: ${msg}`);
@@ -126,7 +126,7 @@ export function validateShow(show, { sounds = null, layout = null, loco = null, 
       if (!loco) warn(path, "zones need a loco profile for the position estimate");
     }
     if (["sound", "fill", "loop"].includes(s.do) && typeof s.id === "string" && sounds) {
-      try { sounds.check([s.id]); } catch (e) { err(`${path}.id`, e.message); }
+      try { sounds.check([s.id], { files: soundFiles }); } catch (e) { err(`${path}.id`, e.message); }
     }
 
     // the blind-run lint

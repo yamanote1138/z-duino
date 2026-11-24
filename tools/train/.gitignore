@@ -1,6 +1,3 @@
-# Output written by the scripts and PlatformIO
+# Stray output and PlatformIO build files (everything the tools write for you goes in local/, which ignores itself)
 *.csv
-speedtrap_results.json
 sensor/.pio/
-learn_run.log
-loco_profile.json

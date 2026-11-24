@@ -1,0 +1,15 @@
+{
+  "name": "z-duino-train-tools",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mac-side tools for the Z-Duino train controller: beam sensor, sound, shows and a web page. No dependencies.",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test --test-timeout=30000 test/*.test.mjs",
+    "serve": "node serve.mjs",
+    "show": "node show.mjs",
+    "config": "node config.mjs"
+  },
+  "license": "MIT"
+}

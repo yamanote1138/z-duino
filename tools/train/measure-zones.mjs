@@ -1,29 +1,33 @@
 #!/usr/bin/env node
 // Measure the zones in your layout by hand: the loco creeps one lap and you press a key as the nose reaches each mark.
 //
+//   node measure-zones.mjs --loop-in=134 --save     first time: measure one bend ("bend-1") and create local/layout.json
+//   node measure-zones.mjs --marks=curve.from,curve.to,approach.from --save     any zones, in the order the nose meets them
 //   node measure-zones.mjs                 run it in your own terminal (it needs your keystrokes)
-//   node measure-zones.mjs --save          also write the result into local/layout.json
-// Options: --speed=0.08 (creep only, up to 0.10)   --lag-ms=0 (your reaction time, taken off every mark)
-//          --marks=slight-right.from,slight-right.to,...   (default: the start and end of all four bends, in track order:
-//            slight-right, slight-left, turn-left, turn-right; any zone name works, a new one is created when you --save)
+// Options: --loop-in=<inches>   the length of one lap along the track (a tape or a piece of string): needed when there is no
+//                               local/layout.json yet, and it overrides the file's value when given
+//          --save               write the result into local/layout.json (without it the numbers are only printed)
+//          --speed=0.08         creep speed for the lap (up to 0.10)    --lag-ms=0   your reaction time, taken off every mark
+//          --marks=zone.from,zone.to,...   what you will mark, in order (default: bend-1.from,bend-1.to). Any zone name
+//                               works, a new one is created when you --save. "a.to=b.from" is one press for two bends that
+//                               run straight into each other. Describe zones in the layout's "hints" to see them in the prompts.
 //
 // Start with the nose on the mark (beam blocked). The loco moves forward at creep speed and stops by itself when the nose
 // returns to the beam. Any key = a mark; q or Ctrl-C = stop the loco now.
 // Inches come from the lap time: the beam events at the start and the end of the lap fix the average speed (the layout's
 // loopIn is the lap length), so the speed model is not involved. If loopIn is wrong, every inch here scales with it.
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createSensor, SerialSource } from "./lib/sensor/index.mjs";
 import { connectController } from "./lib/controller/index.mjs";
 import { loadConfigOrExit } from "./lib/config/index.mjs";
 import { loadLayout, validateLayout } from "./lib/show/index.mjs";
-import { localPath } from "./lib/paths.mjs";
+import { localPath, localFile } from "./lib/paths.mjs";
 import { loadLoco, speedModel } from "./lib/show/index.mjs";
-import { existsSync } from "node:fs";
 
 const flags = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith("--")).map((a) => { const i = a.indexOf("="); return i < 0 ? [a.slice(2), true] : [a.slice(2, i), a.slice(i + 1)]; }));
 const speed = Number(flags.speed ?? 0.08), lagMs = Number(flags["lag-ms"] ?? 0);
-const DEFAULT_MARKS = ["slight-right.from", "slight-right.to=slight-left.from", "slight-left.to", "turn-left.from", "turn-left.to", "turn-right.from", "turn-right.to"].join(",");
+const DEFAULT_MARKS = "bend-1.from,bend-1.to";
 const names = (m) => m.split("=");   // "a.to=b.from": one press that counts for both edges (a curve that turns straight into the opposite curve: the point of reverse curvature)
 const marks = String(flags.marks || DEFAULT_MARKS).split(",");
 const fail = (m) => { console.error(`error: ${m}`); process.exit(1); };
@@ -31,7 +35,12 @@ if (!(speed > 0 && speed <= 0.1)) fail("--speed must be above 0 and at most 0.10
 if (!process.stdin.isTTY && !flags.preview) fail("run this in a terminal: it reads your key presses");
 
 const layoutFile = localPath("layout.json");
-const layout = loadLayout(layoutFile);
+const loopFlag = flags["loop-in"] !== undefined ? Number(flags["loop-in"]) : null;
+if (loopFlag !== null && !(loopFlag > 0)) fail("--loop-in must be a number of inches");
+let layout;
+if (existsSync(layoutFile)) { layout = loadLayout(layoutFile); if (loopFlag) layout.loopIn = loopFlag; }
+else if (loopFlag) layout = { format: "z-layout/1", name: "My layout", loopIn: loopFlag, zones: {} };
+else fail("no local/layout.json yet: pass --loop-in=<inches>, the length of one lap measured along the track (a tape or a piece of string), so the lap time can be turned into distances");
 const problems = validateLayout(layout);
 if (problems.length) fail(`layout:\n  ${problems.join("\n  ")}`);
 if (!layout.loopIn) fail("the layout needs loopIn (the lap length in inches)");
@@ -48,7 +57,7 @@ const printBanner = () => console.log(`
 The loco will creep forward at ${speed} for one lap (about ${Math.round(layout.loopIn / (speedModel(loco)(speed) || 1.8))} s) and stop by itself when the nose is back at the beam.
 You press ANY KEY at each of these moments, in this order ("nose" = the front of the loco):
 ${marks.map((m, i) => `   ${i + 1}. ${describe(m)}`).join("\n")}
-Each numbered line above is ONE key press: 7 in all. (Where one bend flows straight into the next, that is a single press for both.)
+Each numbered line above is ONE key press: ${marks.length} in all. (Where one bend flows straight into the next, that is a single press for both.)
 After the last one there is nothing more to do. q or Ctrl-C stops the loco at once.
 Every few seconds I print a rough position, so you know when a mark is coming.
 =====================================================================
@@ -129,7 +138,8 @@ else {
     console.log(`  ${label(m).padEnd(40)} ${inches.toFixed(1)} in  ->  ${Math.round(inches * 2) / 2} in`);
   });
   if (flags.save) {
-    const file = JSON.parse(readFileSync(layoutFile, "utf8"));
+    const file = existsSync(layoutFile) ? JSON.parse(readFileSync(layoutFile, "utf8")) : { format: "z-layout/1", name: "My layout", loopIn: layout.loopIn, zones: {} };
+    if (loopFlag) file.loopIn = loopFlag;
     for (const [m, x] of Object.entries(found)) { const [z, e] = m.split("."); (file.zones[z] ??= {})[e === "from" ? "fromIn" : "toIn"] = x; }
     for (const z of new Set(Object.keys(found).map((m) => m.split(".")[0]))) {
       const zz = file.zones[z];
@@ -138,9 +148,9 @@ else {
     }
     const problems2 = validateLayout(file);
     if (problems2.length) { console.log(`not saved:\n  ${problems2.join("\n  ")}`); process.exit(1); }
-    writeFileSync(layoutFile, JSON.stringify(file, null, 2) + "\n");
-    console.log(`\nSAVED to ${layoutFile}. Nothing more to do here: tell Claude it is done.`);
-  } else console.log("\nNOT SAVED. If these look right, run it again with --save (or tell Claude the numbers).");
+    writeFileSync(localFile("layout.json"), JSON.stringify(file, null, 2) + "\n");
+    console.log(`\nSAVED to ${layoutFile}. Nothing more to do here.`);
+  } else console.log("\nNOT SAVED. If these look right, run it again with --save (or write the numbers into local/layout.json by hand).");
 }
 await ctl.close(); sensor.stop();
 process.exit(0);

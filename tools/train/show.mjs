@@ -15,7 +15,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadShow, loadLayout, loadLoco, validateLayout, validateShow, simulateShow, runShow, usesZones } from "./lib/show/index.mjs";
+import { loadShow, loadLayout, loadLoco, validateLayout, validateShow, simulateShow, runShow, usesZones, soundsUsed } from "./lib/show/index.mjs";
 import { defaultSounds } from "./lib/sound/defaults.mjs";
 import { loadConfigOrExit } from "./lib/config/index.mjs";
 import { localPath } from "./lib/paths.mjs";
@@ -44,10 +44,13 @@ function parseSettings() {
 function context(needZones) {
   let layout = null, loco = null;
   const lf = flags.layout || localPath("layout.json"), cf = flags.loco || localPath("loco_profile.json");
+  const dry = cmd !== "run";   // validate and sim may use the example layout and loco until yours exist; a real run never does
   if (existsSync(lf)) { layout = loadLayout(lf); const e = validateLayout(layout); if (e.length) fail(`layout ${lf}:\n  ${e.join("\n  ")}`); }
   else if (flags.layout) fail(`no layout at ${lf}`);
+  else if (dry) { layout = loadLayout(root + "examples/layout.example.json"); console.log("(no local/layout.json yet: using the example layout)"); }
   if (existsSync(cf)) loco = loadLoco(cf);
   else if (flags.loco) fail(`no loco profile at ${cf}`);
+  else if (dry) { loco = loadLoco(root + "examples/loco.example.json"); console.log("(no local/loco_profile.json yet: using the example loco profile)"); }
   return { layout, loco };
 }
 function soundLibrary(engine) {
@@ -69,7 +72,8 @@ if (cmd === "list") {
   const { layout, loco } = context();
   const engine = cmd !== "run" || argv.includes("--no-sound") ? "null" : config.sound.engine;
   const sounds = soundLibrary(engine);
-  const check = validateShow(show, { sounds, layout, loco, settings });
+  const check = validateShow(show, { sounds, layout, loco, settings, soundFiles: cmd === "run" });
+  if (cmd !== "run") { const miss = sounds.missingFiles(soundsUsed(show)); if (miss.length) check.warnings.push(`${miss.length} sound file${miss.length > 1 ? "s are" : " is"} not on this machine (a real run needs ${miss.length > 1 ? "them" : "it"}; see import-sounds.py): ${[...new Set(miss.map((m) => m.split(" ")[0]))].join(", ")}`); }
   console.log(`${show.name}  (${file.replace(root, "")})`);
   report(check);
   if (cmd === "validate") console.log(`ok: ${check.warnings.length ? `${check.warnings.length} warning(s)` : "no problems"}`);

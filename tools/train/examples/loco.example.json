@@ -1,0 +1,39 @@
+{
+ "_note": "An example loco profile so shows with zones can be validated and simulated before you have measured your own (node learn-loco.mjs writes local/loco_profile.json). A real run never uses this file.",
+ "lengthIn": 3,
+ "lengthMm": 76,
+ "points": [
+  {
+   "thr": 0.08,
+   "v": 1.8
+  },
+  {
+   "thr": 0.1,
+   "v": 2.35
+  },
+  {
+   "thr": 0.12,
+   "v": 2.9
+  },
+  {
+   "thr": 0.15,
+   "v": 3.75
+  },
+  {
+   "thr": 0.2,
+   "v": 5.4
+  },
+  {
+   "thr": 0.25,
+   "v": 6.6
+  },
+  {
+   "thr": 0.3,
+   "v": 8.1
+  }
+ ],
+ "fit": {
+  "inPerSecPerUnitThrottle": 28.65,
+  "offsetInS": -0.49
+ }
+}

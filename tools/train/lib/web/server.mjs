@@ -10,6 +10,7 @@
 //   sounds    { play, dry }   two sound libraries: `play` makes noise (afplay), `dry` is the same packs on the null engine,
 //             used for validating and simulating so those never make a sound
 //   dirs      { local, examples }   folders of show files; saved/imported shows go to `local`
+//   fallback  { layoutFile, locoFile }   example layout and loco profile used to validate and simulate (never to run) until yours exist
 //
 // Rules the service enforces:
 //   - it only talks to this machine (the Host header must be 127.0.0.1/localhost on our port) and POSTs must be JSON, which a
@@ -23,7 +24,7 @@ import http from "node:http";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { SHOW_FORMAT, loadLayout, loadLoco, loadShow, simulateShow, stringifyShow, validateLayout, validateShow, runShow } from "../show/index.mjs";
+import { SHOW_FORMAT, loadLayout, loadLoco, loadShow, simulateShow, stringifyShow, soundsUsed, usesZones, validateLayout, validateShow, runShow } from "../show/index.mjs";
 
 const PUBLIC = join(dirname(fileURLToPath(import.meta.url)), "public");
 const NAME = /^[a-z0-9][a-z0-9_-]{0,63}$/;
@@ -32,7 +33,7 @@ const MAX_BODY = 1024 * 1024;
 class HttpError extends Error { constructor(status, message, extra = {}) { super(message); this.status = status; this.extra = extra; } }
 const slug = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 64);
 
-export function createWebServer({ hardware = {}, sounds, dirs, layoutFile = null, locoFile = null, log = () => {}, statusMs = 1000 }) {
+export function createWebServer({ hardware = {}, sounds, dirs, layoutFile = null, locoFile = null, fallback = {}, log = () => {}, statusMs = 1000 }) {
   const sensor = hardware.sensor || null;
   let run = null, lastRun = null, port = null;
   const clients = new Set();
@@ -52,11 +53,15 @@ export function createWebServer({ hardware = {}, sounds, dirs, layoutFile = null
       catch (e) { return { id: `${where}/${name}`, where, name, title: name, description: "", unreadable: e.message }; }
     });
   });
-  const context = () => {
-    let layout = null, loco = null;
+  // Your layout and loco profile. For validating and simulating only (`dry`), the example ones stand in until you have your own, so a
+  // fresh clone can try every show; a real run never uses them.
+  const context = (dry = false) => {
+    let layout = null, loco = null, example = { layout: false, loco: false };
     if (layoutFile && existsSync(layoutFile)) { layout = loadLayout(layoutFile); if (validateLayout(layout).length) layout = null; }
+    else if (dry && fallback.layoutFile && existsSync(fallback.layoutFile)) { layout = loadLayout(fallback.layoutFile); example.layout = true; }
     if (locoFile && existsSync(locoFile)) loco = loadLoco(locoFile);
-    return { layout, loco };
+    else if (dry && fallback.locoFile && existsSync(fallback.locoFile)) { loco = loadLoco(fallback.locoFile); example.loco = true; }
+    return { layout, loco, example };
   };
   const loadById = (id) => {
     const { file } = showFile(id);
@@ -72,9 +77,12 @@ export function createWebServer({ hardware = {}, sounds, dirs, layoutFile = null
     }
     return out;
   };
-  const check = (show, settings = {}) => {
-    const { layout, loco } = context();
-    return validateShow(show, { sounds: sounds.dry, layout, loco, settings });
+  const check = (show, settings = {}, dry = true) => {
+    const { layout, loco, example } = context(dry);
+    const c = validateShow(show, { sounds: sounds.dry, layout, loco, settings, soundFiles: !dry });
+    if (dry) { const miss = sounds.dry.missingFiles(soundsUsed(show)); if (miss.length) c.warnings.push(`${miss.length} sound file${miss.length > 1 ? "s are" : " is"} not on this machine (a real run needs ${miss.length > 1 ? "them" : "it"}; see import-sounds.py): ${[...new Set(miss.map((m) => m.split(" ")[0]))].join(", ")}`); }
+    if ((example.layout || example.loco) && usesZones(show)) c.warnings.push(`checked against the example ${example.layout ? "layout" : ""}${example.layout && example.loco ? " and " : ""}${example.loco ? "loco profile" : ""}, because yours ${example.layout && example.loco ? "are" : "is"} not set up yet (node measure-zones.mjs, node learn-loco.mjs)`);
+    return c;
   };
   // a show in the request: by id, or inline (validate/sim of something not saved yet)
   const showFrom = (body) => {
@@ -101,9 +109,10 @@ export function createWebServer({ hardware = {}, sounds, dirs, layoutFile = null
     if (sensor.state === "lost") throw new HttpError(409, "the sensor stopped reporting (check the USB cable)");
     const start = show.start || "any";
     if (start !== "any" && sensor.state !== start) throw new HttpError(409, `this show starts with the beam ${start}, but the sensor says ${sensor.state} (reading ${sensor.lastReading ?? "?"}): put the loco in place first`);
-    const c = check(show, settings);
+    const c = check(show, settings, false);
     if (c.errors.length) throw new HttpError(400, "the show is not valid", { errors: c.errors, warnings: c.warnings });
-    const { layout, loco } = context();
+    const { layout, loco } = context(false);
+    if (usesZones(show) && !(layout && loco)) throw new HttpError(400, "this show uses zones, so it needs your layout and loco profile first (node measure-zones.mjs writes local/layout.json, node learn-loco.mjs writes local/loco_profile.json)", { errors: [`missing: ${[!layout && "local/layout.json", !loco && "local/loco_profile.json"].filter(Boolean).join(", ")}`] });
     const r = run = { id, name: show.name || id, state: "starting", startedAt: Date.now(), log: [], ac: new AbortController(), ctl: null, estop: false };
     handles.clear();
     broadcast("run", publicRun());
@@ -159,7 +168,7 @@ export function createWebServer({ hardware = {}, sounds, dirs, layoutFile = null
       return;
     }
     if (m === "GET" && p === "/api/shows") return ok({ shows: listShows() });
-    if (m === "GET" && p === "/api/layout") { const { layout, loco } = context(); return ok({ layout, loco: loco && { lengthIn: loco.lengthIn } }); }
+    if (m === "GET" && p === "/api/layout") { const { layout, loco } = context(true); return ok({ layout, loco: loco && { lengthIn: loco.lengthIn } }); }
     if (m === "GET" && p === "/api/show") {
       const id = url.searchParams.get("id"), show = loadById(id), c = check(show);
       return ok({ id, show, errors: c.errors, warnings: c.warnings });
@@ -186,7 +195,7 @@ export function createWebServer({ hardware = {}, sounds, dirs, layoutFile = null
     if (m === "POST" && p === "/api/sim") {
       const show = showFrom(body), settings = settingsFrom(body, show), c = check(show, settings);
       if (c.errors.length) throw new HttpError(400, "the show is not valid", { errors: c.errors, warnings: c.warnings });
-      const { layout, loco } = context();
+      const { layout, loco } = context(true);
       const r = await simulateShow(show, { layout, loco, sounds: sounds.dry, settings });
       return ok({ ...r, warnings: c.warnings, commands: r.commands.length, sounds: r.sounds.length });
     }

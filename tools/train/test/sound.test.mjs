@@ -155,3 +155,18 @@ test("a pack root can point into local/ with the local: prefix", async () => {
   writeFileSync(join(dir, "pack.json"), JSON.stringify({ format: "z-sounds/1", name: "t", root: "../elsewhere", sounds: { "a.b": { file: "x.wav" } } }));
   assert.equal(loadPack(dir).entries["a.b"].variants[0].path, join(dir, "..", "elsewhere", "x.wav"), "relative roots still resolve against the manifest");
 });
+
+test("check can skip audio files (dry runs), and missingFiles says which are absent", async () => {
+  const { mkdtempSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { SoundLibrary } = await import("../lib/sound/index.mjs");
+  const dir = mkdtempSync(join(tmpdir(), "pk-"));
+  writeFileSync(join(dir, "pack.json"), JSON.stringify({ format: "z-sounds/1", name: "t", sounds: { "a.b": { file: "gone.wav" } } }));
+  const lib = new SoundLibrary({ packs: [dir], engine: "null" });
+  assert.throws(() => lib.check(["a.b"]), /missing file/);
+  lib.check(["a.b"], { files: false });                                   // the name is known: fine for a dry run
+  assert.throws(() => lib.check(["nope"], { files: false }), /unknown sound "nope"/);
+  const miss = lib.missingFiles(["a.b", "nope"]);
+  assert.equal(miss.length, 1); assert.match(miss[0], /"a\.b".*gone\.wav/);
+});

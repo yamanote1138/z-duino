@@ -55,14 +55,20 @@ export class SoundLibrary {
     const ds = this._candidates(selector, true).flatMap((e) => e.variants.map(variantDurationMs));
     return ds.length && ds.every((d) => d != null) ? Math.round(ds.reduce((a, b) => a + b, 0) / ds.length) : null;
   }
-  /** Throws a list of everything missing (unknown ids, missing files), so a show can fail before anything moves. */
-  check(selectors) {
+  /** The audio files these selectors need that are not on this machine (messages), without failing. */
+  missingFiles(selectors) {
+    const out = [];
+    for (const s of selectors) for (const e of this._candidates(s)) for (const v of e.variants) if (!existsSync(v.path)) out.push(`"${e.id}" (${e.pack}): missing file ${v.path}`);
+    return out;
+  }
+  /**
+   * Throws a list of everything missing (unknown ids, and missing files unless `files: false`), so a show can fail before
+   * anything moves. `files: false` is for dry runs (validate, simulate), which need the names but not the audio.
+   */
+  check(selectors, { files = true } = {}) {
     const bad = [];
-    for (const s of selectors) {
-      const c = this._candidates(s);
-      if (!c.length) { bad.push(`unknown sound "${s}"`); continue; }
-      for (const e of c) for (const v of e.variants) if (!existsSync(v.path)) bad.push(`"${e.id}" (${e.pack}): missing file ${v.path}`);
-    }
+    for (const s of selectors) if (!this._candidates(s).length) bad.push(`unknown sound "${s}"`);
+    if (files) bad.push(...this.missingFiles(selectors.filter((s) => this._candidates(s).length)));
     if (bad.length) throw new Error(`sound check failed:\n  ${bad.join("\n  ")}`);
   }
 
