@@ -178,6 +178,11 @@ void test_which_commands_end_a_calibration(void) {
   TEST_ASSERT_FALSE(abortsCalibration(CMD_BEAM_CALIBRATE));
 }
 
+void test_beam_heartbeat_keeps_the_longest_state_whole(void) {
+  Command c = parse("{\"cmd\":\"beam\",\"event\":\"heartbeat\",\"state\":\"uncalibrated\",\"level\":55}");
+  TEST_ASSERT_EQUAL_STRING("uncalibrated", c.beam.state);
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
   RUN_TEST(test_speed_command);
@@ -206,5 +211,6 @@ int main(int argc, char **argv) {
   RUN_TEST(test_relay_gives_a_pass_its_direction_only);
   RUN_TEST(test_relay_of_bad_json_is_empty);
   RUN_TEST(test_which_commands_end_a_calibration);
+  RUN_TEST(test_beam_heartbeat_keeps_the_longest_state_whole);
   return UNITY_END();
 }

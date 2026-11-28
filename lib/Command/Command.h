@@ -22,7 +22,7 @@ enum CommandType {
 struct BeamMessage {
   char event[24] = "";
   int n = 0, median = 0, min = 0, max = 0; float sd = 0, mean = 0;   // measured
-  char state[12] = ""; int level = 0; bool calibrated = false;        // heartbeat
+  char state[16] = ""; int level = 0; bool calibrated = false;        // heartbeat
   char error[96] = "";                                                // calibration_failed
 };
 
