@@ -6,8 +6,27 @@
         <span class="font-medium">Beam: {{ stateLabel }}</span>
         <span v-if="beam.calibrated && beam.state !== 'lost'" class="text-neutral-400">({{ beam.level }})</span>
       </div>
+      <span v-if="beam.parked" data-test="parked" class="text-neutral-300">Parked on {{ beam.parked }}</span>
+    </div>
+
+    <div class="mt-2 flex flex-wrap items-center gap-2">
+      <template v-if="!parkBusy">
+        <UButton data-test="park-nose" size="xs" color="neutral" variant="outline" :disabled="!canPark" @click="parkLoco('nose')">
+          <UIcon name="i-mdi-arrow-collapse-right" />
+          Park on nose
+        </UButton>
+        <UButton data-test="park-tail" size="xs" color="neutral" variant="outline" :disabled="!canPark" @click="parkLoco('tail')">
+          <UIcon name="i-mdi-arrow-collapse-left" />
+          Park on tail
+        </UButton>
+      </template>
+      <UButton v-else data-test="park-stop" size="xs" color="error" @click="emergencyStop()">
+        <UIcon name="i-mdi-stop" />
+        Stop
+      </UButton>
+      <span class="grow" />
       <UButton
-        v-if="!busy && !confirming"
+        v-if="!busy && !confirming && !parkBusy"
         data-test="calibrate"
         size="xs"
         color="neutral"
@@ -32,6 +51,10 @@
       </div>
     </div>
 
+    <div v-if="parkText" data-test="park-progress" class="mt-2" :class="parking && !parking.running && !parking.ok ? 'text-red-400' : 'text-neutral-300'">
+      {{ parkText }}
+    </div>
+
     <div v-if="progressText" class="mt-2" :class="calibration?.phase === 'failed' ? 'text-red-400' : 'text-neutral-300'">
       {{ progressText }}
     </div>
@@ -42,12 +65,22 @@
 import { computed, ref } from 'vue'
 import { useTrainController } from '../composables/useTrainController'
 
-const { connected, hasSensor, beam, calibration, calibrateSensor, emergencyStop } = useTrainController()
+const { connected, hasSensor, beam, calibration, calibrateSensor, emergencyStop, parking, parkLoco, currentSpeed } = useTrainController()
 
 const confirming = ref(false)
 
 const RUNNING = ['starting', 'measuring', 'creeping', 'measuring_second']
 const busy = computed(() => beam.value?.calibrating || RUNNING.includes(calibration.value?.phase ?? ''))
+
+const parkBusy = computed(() => parking.value?.running === true)
+const canPark = computed(() => connected.value && !!beam.value?.calibrated && beam.value.state !== 'lost' && !busy.value && currentSpeed.value === 0)
+
+const parkText = computed(() => {
+  const p = parking.value
+  if (!p) return ''
+  if (p.running) return p.step ? `${p.step}...` : 'Starting...'
+  return p.ok ? p.detail : `Parking failed: ${p.detail}`
+})
 
 const stateLabel = computed(() => {
   if (!beam.value) return ''

@@ -382,3 +382,67 @@ describe('beam sensor add-on', () => {
   })
 })
 
+
+describe('parking', () => {
+  const status = (extra: object) => ({ type: 'status', speed: 0, direction: true, connected: true, ...extra })
+  const sensorStatus = (beam: object = {}) => status({ features: { sensor: true }, beam: { state: 'clear', level: 748, calibrated: true, calibrating: false, parked: null, ...beam } })
+  const creeps = (socket: FakeWebSocket) => socket.sent.map(m => JSON.parse(m)).filter(m => m.cmd === 'creep')
+
+  it('sends creeps with rising ids and resolves on the matching end', async () => {
+    const socket = FakeWebSocket.instances[0]
+    socket.simulateMessage(sensorStatus())
+    const done = tc.parkLoco('nose')
+    await vi.advanceTimersByTimeAsync(0)
+    const first = creeps(socket)[0]
+    expect(first).toMatchObject({ cmd: 'creep', forward: true, until: ['break'], maxMs: 5000, afterMs: 0 })
+    expect(tc.parking.value).toMatchObject({ target: 'nose', running: true, step: 'Just short? Creeping forward' })
+    socket.simulateMessage({ type: 'creep', id: first.id, phase: 'running' })
+    socket.simulateMessage({ type: 'creep', id: first.id + 99, phase: 'ended', result: 'event', detail: '', parked: 'nose' })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(tc.parking.value?.running).toBe(true)
+    socket.simulateMessage({ type: 'creep', id: first.id, phase: 'ended', result: 'event', detail: '', parked: 'nose' })
+    await done
+    expect(tc.parking.value).toMatchObject({ running: false, ok: true, detail: 'Parked on nose' })
+  })
+
+  it('a refusal ends the search with its reason', async () => {
+    const socket = FakeWebSocket.instances[0]
+    socket.simulateMessage(sensorStatus())
+    const done = tc.parkLoco('nose')
+    await vi.advanceTimersByTimeAsync(0)
+    socket.simulateMessage({ type: 'creep', id: creeps(socket)[0].id, phase: 'refused', detail: 'stop the train first' })
+    await done
+    expect(tc.parking.value).toMatchObject({ running: false, ok: false, detail: 'stop the train first' })
+  })
+
+  it('a dropped connection ends the search', async () => {
+    const socket = FakeWebSocket.instances[0]
+    socket.simulateMessage(sensorStatus())
+    const done = tc.parkLoco('nose')
+    await vi.advanceTimersByTimeAsync(0)
+    socket.simulateClose()
+    await done
+    expect(tc.parking.value).toMatchObject({ running: false, ok: false, detail: 'connection lost' })
+  })
+
+  it('emergency stop cancels the search and sends no more creeps', async () => {
+    const socket = FakeWebSocket.instances[0]
+    socket.simulateMessage(sensorStatus())
+    const done = tc.parkLoco('nose')
+    await vi.advanceTimersByTimeAsync(0)
+    const id = creeps(socket)[0].id
+    tc.emergencyStop()
+    expect(socket.lastSent()).toEqual({ cmd: 'stop' })
+    socket.simulateMessage({ type: 'creep', id, phase: 'ended', result: 'timeout', detail: '', parked: null })
+    await vi.advanceTimersByTimeAsync(2000)
+    await done
+    expect(creeps(socket).length).toBe(1)
+    expect(tc.parking.value).toMatchObject({ running: false, ok: false, detail: 'stopped' })
+  })
+
+  it('status carries where the loco is parked', () => {
+    const socket = FakeWebSocket.instances[0]
+    socket.simulateMessage(sensorStatus({ state: 'blocked', parked: 'tail' }))
+    expect(tc.beam.value?.parked).toBe('tail')
+  })
+})

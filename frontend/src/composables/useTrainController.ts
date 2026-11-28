@@ -1,3 +1,4 @@
+import { park, type CreepResult, type CreepUntil, type ParkTarget } from './parkSearch'
 import { computed, ref } from 'vue'
 import { createPartyBeat } from './partyBeat'
 
@@ -20,6 +21,9 @@ type OutgoingMessage =
   | OutgoingLed
   | OutgoingLedAuto
   | OutgoingBeamCalibrate
+  | OutgoingCreep
+
+interface OutgoingCreep { cmd: 'creep'; forward: boolean; until: CreepUntil[]; maxMs: number; afterMs: number; id: number }
 
 interface StatusMessage {
   type: 'status'
@@ -38,6 +42,24 @@ export interface BeamStatus {
   level: number
   calibrated: boolean
   calibrating: boolean
+  parked?: ParkTarget | null
+}
+
+export interface ParkingProgress {
+  target: ParkTarget
+  step: string
+  running: boolean
+  ok?: boolean
+  detail?: string
+}
+
+interface CreepMessage {
+  type: 'creep'
+  id: number
+  phase: 'running' | 'ended' | 'refused'
+  result?: 'event' | 'timeout' | 'aborted'
+  detail?: string
+  parked?: ParkTarget | null
 }
 
 export interface CalibrationProgress {
@@ -110,6 +132,7 @@ const partyMode = ref(false)
 const hasSensor = ref(false)
 const beam = ref<BeamStatus | null>(null)
 const calibration = ref<CalibrationProgress | null>(null)
+const parking = ref<ParkingProgress | null>(null)
 const hasLed = ref(true) // the status LED is optional hardware; the controller says whether it is fitted
 
 const trackVoltage = computed(() => SUPPLY_VOLTAGE * currentSpeed.value)
@@ -175,6 +198,7 @@ function connect() {
 
   socket.value.onclose = () => {
     connected.value = false
+    endPendingCreeps('connection lost')
     stopPing()
     scheduleReconnect()
   }
@@ -207,6 +231,7 @@ function connect() {
         }
       }
       if (msg.type === 'beam') handleBeam(msg)
+      if (msg.type === 'creep') handleCreep(msg)
     } catch (e) {
       // ignore malformed messages
     }
@@ -243,6 +268,49 @@ function calibrateSensor() {
     calibrationRequestTimer = null
     if (calibration.value?.phase === 'starting') calibration.value = null
   }, CALIBRATION_ANSWER_MS)
+}
+
+// ── Parking: guarded creeps strung together by parkSearch ──
+
+let creepId = 0
+let parkCancelled = false
+const pendingCreeps = new Map<number, (r: CreepResult) => void>()
+
+function handleCreep(msg: CreepMessage) {
+  if (msg.phase === 'running') return
+  const resolve = pendingCreeps.get(msg.id)
+  if (!resolve) return
+  pendingCreeps.delete(msg.id)
+  resolve({ result: msg.phase === 'refused' ? 'refused' : (msg.result ?? 'aborted'), detail: msg.detail ?? '', parked: msg.parked ?? null })
+}
+
+function endPendingCreeps(detail: string) {
+  for (const resolve of pendingCreeps.values()) resolve({ result: 'aborted', detail, parked: null })
+  pendingCreeps.clear()
+}
+
+function creep(forward: boolean, until: CreepUntil[], maxMs: number, afterMs = 0): Promise<CreepResult> {
+  if (!connected.value) return Promise.resolve({ result: 'aborted', detail: 'connection lost', parked: null })
+  const id = ++creepId
+  return new Promise((resolve) => {
+    pendingCreeps.set(id, resolve)
+    send({ cmd: 'creep', forward, until, maxMs, afterMs, id })
+  })
+}
+
+async function parkLoco(target: ParkTarget): Promise<void> {
+  if (parking.value?.running) return
+  parkCancelled = false
+  parking.value = { target, step: '', running: true }
+  const r = await park(target, {
+    creep,
+    pause: (ms) => new Promise((res) => setTimeout(res, ms)),
+    beamState: () => beam.value?.state ?? '',
+    parked: () => beam.value?.parked ?? null,
+    cancelled: () => parkCancelled,
+    onStep: (step) => { if (parking.value) parking.value = { ...parking.value, step } },
+  })
+  parking.value = { target, step: '', running: false, ok: r.ok, detail: r.detail }
 }
 
 // ── Speed control ──
@@ -335,6 +403,7 @@ function brake() {
 
 function emergencyStop() {
   stopFlag.value = true
+  parkCancelled = true
   if (rampTimer) {
     clearInterval(rampTimer)
     rampTimer = null
@@ -496,6 +565,8 @@ export function useTrainController() {
     beam,
     calibration,
     calibrateSensor,
+    parking,
+    parkLoco,
 
     getSegmentClass,
     setSpeed,

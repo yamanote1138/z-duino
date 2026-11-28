@@ -58,4 +58,35 @@ describe('BeamPanel', () => {
     await nextTick()
     expect(wrapper.text()).toContain('the beam never changed')
   })
+
+  it('shows park buttons with a calibrated sensor, and disables them when it is not', async () => {
+    const { wrapper } = await mountPanel(sensor({}))
+    expect(wrapper.find('[data-test="park-nose"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.find('[data-test="park-tail"]').exists()).toBe(true)
+    const un = await mountPanel(sensor({ calibrated: false, state: 'uncalibrated' }))
+    expect(un.wrapper.find('[data-test="park-nose"]').attributes('disabled')).toBeDefined()
+  })
+
+  it('disables parking while the train moves', async () => {
+    const { wrapper, socket } = await mountPanel(sensor({}))
+    socket.simulateMessage({ type: 'status', speed: 0.3, direction: true, connected: true, ...sensor({}) })
+    await nextTick()
+    expect(wrapper.find('[data-test="park-tail"]').attributes('disabled')).toBeDefined()
+  })
+
+  it('park sends a creep, shows the step and a Stop', async () => {
+    const { wrapper, socket } = await mountPanel(sensor({ state: 'blocked' }))
+    await wrapper.find('[data-test="park-nose"]').trigger('click')
+    await nextTick()
+    expect(socket.lastSent()).toMatchObject({ cmd: 'creep', forward: false, until: ['restore'] })
+    expect(wrapper.text()).toContain('Backing off the beam')
+    await wrapper.find('[data-test="park-stop"]').trigger('click')
+    expect(socket.lastSent()).toEqual({ cmd: 'stop' })
+  })
+
+  it('says where the loco is parked', async () => {
+    const { wrapper } = await mountPanel(sensor({ state: 'blocked', parked: 'nose' }))
+    expect(wrapper.find('[data-test="parked"]').text()).toBe('Parked on nose')
+  })
 })
+
