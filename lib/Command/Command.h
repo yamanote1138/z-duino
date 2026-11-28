@@ -12,7 +12,18 @@ enum CommandType {
   CMD_INVERT,
   CMD_LED,
   CMD_LED_AUTO,
-  CMD_PING
+  CMD_PING,
+  CMD_HELLO,
+  CMD_BEAM,
+  CMD_BEAM_CALIBRATE
+};
+
+// A message from the beam sensor: only the fields the controller acts on.
+struct BeamMessage {
+  char event[24] = "";
+  int n = 0, median = 0, min = 0, max = 0; float sd = 0, mean = 0;   // measured
+  char state[12] = ""; int level = 0; bool calibrated = false;        // heartbeat
+  char error[96] = "";                                                // calibration_failed
 };
 
 struct Command {
@@ -22,6 +33,8 @@ struct Command {
   int ledR = 0;              // CMD_LED
   int ledG = 0;
   int ledB = 0;
+  bool isSensor = false;      // CMD_HELLO with role "sensor"
+  BeamMessage beam;          // CMD_BEAM
 };
 
 // Pure parsing/dispatch decision: given a raw WebSocket text payload,
@@ -29,5 +42,8 @@ struct Command {
 // parameters. Does not touch the motor, LED, or network — the caller
 // applies whatever side effects the returned Command implies.
 Command parseCommand(const char* payload, size_t length);
+
+// Turn a sensor's beam message into the one sent to clients, labeled with direction while the motor runs. Returns bytes written, 0 on bad input.
+size_t relayBeam(const char* payload, size_t length, bool moving, bool forward, char* out, size_t cap);
 
 #endif

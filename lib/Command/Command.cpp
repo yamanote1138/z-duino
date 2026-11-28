@@ -1,6 +1,7 @@
 #include "Command.h"
 #include <ArduinoJson.h>
 #include <string.h>
+#include <stdio.h>
 
 Command parseCommand(const char* payload, size_t length) {
   Command result;
@@ -48,9 +49,43 @@ Command parseCommand(const char* payload, size_t length) {
   else if (strcmp(cmd, "ping") == 0) {
     result.type = CMD_PING;
   }
+  else if (strcmp(cmd, "hello") == 0) {
+    result.type = CMD_HELLO;
+    const char* role = doc["role"] | "";
+    result.isSensor = strcmp(role, "sensor") == 0;
+  }
+  else if (strcmp(cmd, "beam_calibrate") == 0) {
+    result.type = CMD_BEAM_CALIBRATE;
+  }
+  else if (strcmp(cmd, "beam") == 0) {
+    result.type = CMD_BEAM;
+    BeamMessage& b = result.beam;
+    snprintf(b.event, sizeof(b.event), "%s", (const char*)(doc["event"] | ""));
+    b.n = doc["n"] | 0; b.median = doc["median"] | 0; b.min = doc["min"] | 0; b.max = doc["max"] | 0;
+    b.sd = doc["sd"] | 0.0f; b.mean = doc["mean"] | 0.0f;
+    snprintf(b.state, sizeof(b.state), "%s", (const char*)(doc["state"] | ""));
+    b.level = doc["level"] | 0; b.calibrated = doc["calibrated"] | false;
+    snprintf(b.error, sizeof(b.error), "%s", (const char*)(doc["error"] | ""));
+  }
   else {
     result.type = CMD_UNKNOWN;
   }
 
   return result;
+}
+
+size_t relayBeam(const char* payload, size_t length, bool moving, bool forward, char* out, size_t cap) {
+  JsonDocument doc;
+  if (deserializeJson(doc, payload, length)) return 0;
+  doc.remove("cmd");
+  doc["type"] = "beam";
+  const char* ev = doc["event"] | "";
+  bool brk = strcmp(ev, "break") == 0, rst = strcmp(ev, "restore") == 0;
+  if (moving && (brk || rst || strcmp(ev, "pass") == 0)) {
+    doc["direction"] = forward ? "forward" : "reverse";
+    if (brk) doc["edge"] = forward ? "nose" : "tail";        // the leading end arrives first
+    if (rst) doc["edge"] = forward ? "tail" : "nose";
+  }
+  size_t n = serializeJson(doc, out, cap);
+  return n < cap ? n : 0;
 }
