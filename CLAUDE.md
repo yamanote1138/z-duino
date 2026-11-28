@@ -19,7 +19,7 @@ Network-controlled Z-scale model train controller. ESP8266 (Wemos D1 Mini) firmw
 - Pins: D1=PWMA, D2=AIN2, D3=AIN1, D4=STBY, D5=LED-R, D6=LED-G, D7=LED-B (D5-D7 only with the LED)
 
 ## WebSocket Protocol (port 81)
-Client sends JSON: `{"cmd": "speed", "value": 0.0-1.0}`, `{"cmd": "direction", "value": true/false}`, `{"cmd": "stop"}`, `{"cmd": "ping"}`, `{"cmd": "invert", "value": true/false}` (motor direction invert), `{"cmd": "led", "r": 0-1000, "g": 0-1000, "b": 0-1000}` (LED test mode / party mode), `{"cmd": "led_auto"}` (resume status LED), `{"cmd": "beam_calibrate"}` (controller-driven sensor calibration). The beam sensor connects as a client too: `{"cmd": "hello", "role": "sensor"}`, then `{"cmd": "beam", "event": ...}` messages; see `docs/PROTOCOL.md`.
+Client sends JSON: `{"cmd": "speed", "value": 0.0-1.0}`, `{"cmd": "direction", "value": true/false}`, `{"cmd": "stop"}`, `{"cmd": "ping"}`, `{"cmd": "invert", "value": true/false}` (motor direction invert), `{"cmd": "led", "r": 0-1000, "g": 0-1000, "b": 0-1000}` (LED test mode / party mode), `{"cmd": "led_auto"}` (resume status LED), `{"cmd": "beam_calibrate"}` (controller-driven sensor calibration), `{"cmd": "creep", "forward": true, "until": ["break"], "maxMs": 8000}` (guarded creep the controller stops on a beam event; the app's Park on nose/tail buttons chain these). The beam sensor connects as a client too: `{"cmd": "hello", "role": "sensor"}`, then `{"cmd": "beam", "event": ...}` messages; see `docs/PROTOCOL.md`.
 Server responds: `{"type": "status", "name": "...", "speed": 0.0, "direction": true, "connected": true, "features": {"led": true}}` (`features` = hardware fitted; absent on older firmware, which clients treat as "everything present"), `{"type": "pong"}`, and with a sensor `features.sensor`, a `beam` object in status, and relayed `{"type": "beam", ...}` events. Without an LED, `led` and `led_auto` are accepted and ignored.
 
 ## Development
@@ -36,7 +36,7 @@ npm run dev:all    # Vite dev server + mock WebSocket server
 
 ## Testing
 ```bash
-pio test -e native   # Firmware: hardware-free unit tests for lib/ (MotorLogic, LedTiming, Command, Clients, BeamCalibration, BeamDetector)
+pio test -e native   # Firmware: hardware-free unit tests for lib/ (MotorLogic, LedTiming, Command, Clients, BeamCalibration, BeamDetector, GuardedCreep)
 cd frontend && npm test   # Frontend: Vitest — useTrainController.ts + component smoke tests
 ```
 Both run in CI. Code touching real hardware I/O (pins, WiFi/sockets) isn't unit-tested this way — verify manually against real hardware.
@@ -44,13 +44,14 @@ Both run in CI. Code touching real hardware I/O (pins, WiFi/sockets) isn't unit-
 ## Key Files
 - `platformio.ini` — PlatformIO project config (board, ldscript, lib_deps, secrets, native test env)
 - `secrets.ini` — WiFi creds & build-time config (not committed, copy from `secrets.ini.example`)
-- `lib/MotorLogic/`, `lib/LedTiming/`, `lib/Command/`, `lib/Clients/`, `lib/BeamCalibration/`, `lib/BeamDetector/` — hardware-independent logic, unit-tested via `pio test -e native`
+- `lib/MotorLogic/`, `lib/LedTiming/`, `lib/Command/`, `lib/Clients/`, `lib/BeamCalibration/`, `lib/BeamDetector/`, `lib/GuardedCreep/` — hardware-independent logic, unit-tested via `pio test -e native`
 - `firmware/beam-sensor/` — beam sensor sketch (`pio run -d firmware/beam-sensor`), reads the root `secrets.ini` and `lib/`
 - `firmware/z-duino/z-duino.ino` — Main sketch
 - `firmware/z-duino/Motor.h/.cpp` — Motor abstraction
 - `firmware/z-duino/StatusLED.h/.cpp` — Status LED abstraction (no-op stand-in when `HAS_STATUS_LED=0`)
 - `frontend/src/App.vue` — Root Vue component
 - `frontend/src/composables/useTrainController.ts` — Core controller logic (WebSocket, ramping, state)
+- `frontend/src/composables/parkSearch.ts` — Park on nose/tail search over guarded creeps, unit-tested
 - `frontend/src/composables/partyBeat.ts` — Pure party-mode beat engine (BPM → RGB frames), unit-tested
 - `frontend/src/components/` — Vue SFCs (SpeedController, LedTestPanel, DebugModal, etc.)
 - `frontend/mock-server.ts` — Mock WebSocket for local dev

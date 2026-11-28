@@ -62,4 +62,27 @@ A beam sensor (`firmware/beam-sensor/`) is just another WebSocket client. It fin
 
 **Calibration**, step by step: the sensor measures where the loco is (A); the controller creeps forward at `CAL_SPEED` (default 0.1, capped at 0.15) for up to 10 s until the sensor reports `changed`, then carries on 0.3 s (so the loco is well past the beam's edge) and stops; with no change it pauses 0.5 s and creeps in reverse for up to 20 s; after 0.5 s settled the sensor measures again (B); the higher of A and B is clear. It's refused with no sensor, while the train is moving, or while one is already running. Any `stop`, `speed`, `direction` or `invert` from a client, the sensor disconnecting or reconnecting, or a quiet sensor (1.5 s without a message while the loco moves, 3 s otherwise) ends it with the motor stopped. A refusal goes only to the client that asked. The loco is left where it stopped.
 
-The mock server (`frontend/mock-server.ts`) implements the same protocol for local development without hardware, including a pretend beam sensor (`MOCK_SENSOR=0` turns it off).
+## Guarded creep and parking
+
+A person's client can ask the controller to creep the loco and stop it on the board the moment the beam does something:
+
+```json
+{"cmd": "creep", "forward": true, "until": ["break"], "maxMs": 8000, "afterMs": 0, "id": 7}
+```
+- `until`: `["break"]`, `["restore"]` or `["break", "restore"]`, in that order.
+- `afterMs` (0–1000): keep creeping that long after the last event. `maxMs` (1–120000): the time limit. A creep never runs longer than `maxMs` + 1 s.
+- `id`: echoed back. Speed is always `CAL_SPEED` (default 0.1, capped at 0.15).
+
+Replies (to every person's client, except refusals, which go only to the one who asked):
+```json
+{"type": "creep", "id": 7, "phase": "running"}
+{"type": "creep", "id": 7, "phase": "ended", "result": "event", "detail": "", "parked": "nose"}   // result: event | timeout | aborted
+{"type": "creep", "id": 7, "phase": "refused", "detail": "calibrate the sensor first"}
+```
+Refusals: `no sensor connected`, `bad creep arguments`, `calibrate the sensor first`, `calibration is running`, `a creep is already running`, `stop the train first`. A creep is aborted (motor stopped) by a person's `stop` ("stopped"), `speed`, `direction` or `invert` ("throttle used"), `beam_calibrate` ("calibration started"), the sensor disconnecting, reconnecting or going quiet for 1.5 s, and the 30 s safety timeout ("safety timeout"). Unlike calibration, a creep does not pause the safety timeout: the client that asked for it keeps pinging.
+
+**Parked.** `status.beam.parked` is `"nose"`, `"tail"` or `null`. A creep that ends on its events with `afterMs` 0 sets it: a break while forward or a restore while reversing is the nose at the beam; a break while reversing or a restore while forward is the tail. Any other creep, a person's speed above 0, `invert`, calibration, the beam changing with nothing moving, the sensor dropping, or a reboot clears it.
+
+The throttle app's **Park on nose** and **Park on tail** buttons string creeps together (`frontend/src/composables/parkSearch.ts`): if the beam is blocked, back off and come forward onto it; otherwise try just short (5 s), then just past (back over the beam, then forward), then round the loop (80 s). Park on tail finds the nose first, then goes forward until the tail clears and backs it onto the beam.
+
+The mock server (`frontend/mock-server.ts`) implements the same protocol for local development without hardware, including a pretend beam sensor and a loco on a 134 in loop that creeps and parks (`MOCK_SENSOR=0` turns the sensor off).
