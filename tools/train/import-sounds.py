@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pull real train sounds out of two sibling projects into local/sounds (git-ignored; TRAIN_LOCAL moves it), under the file names the sound pack manifests (packs/jr-east/pack.json) refer to.
 
-  ../e235-sounds/data/*.ssdx   BVE sound archive (a zip; filenames are Shift-JIS)
+  ../jr-esu-sound-profiles/src/*.ssdx (was ../e235-sounds/data)   BVE sound archive (a zip; filenames are Shift-JIS)
   ../eki-pi/sounds/            station melodies and JP/EN announcements
 
 Usage: python3 -I import-sounds.py [name ...]     (no names = everything defined below)
@@ -11,7 +11,7 @@ import io, os, sys, wave, zipfile, glob, shutil, array, math
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(os.environ.get("TRAIN_LOCAL") or os.path.join(HERE, "local"), "sounds")
-SSDX = glob.glob(os.path.join(HERE, "..", "..", "..", "e235-sounds", "data", "*.ssdx"))
+SSDX = glob.glob(os.path.join(HERE, "..", "..", "..", "jr-esu-sound-profiles", "src", "*.ssdx")) or glob.glob(os.path.join(HERE, "..", "..", "..", "e235-sounds", "data", "*.ssdx"))
 EKI = os.path.join(HERE, "..", "..", "..", "eki-pi", "sounds")
 os.makedirs(OUT, exist_ok=True)
 
