@@ -28,3 +28,6 @@ Thumbs.db
 # Audio inside sound packs (manifests are committed, audio is generated or imported)
 tools/train/packs/*/*.wav
 tools/train/packs/*/*.mp3
+
+# imported show sounds (frontend/scripts/import-sounds.sh)
+frontend/public/sounds/jr/
