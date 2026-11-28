@@ -304,3 +304,47 @@ describe('optional status LED', () => {
     expect(socket.sent.length).toBe(after)
   })
 })
+
+describe('beam sensor add-on', () => {
+  const status = (extra: object) => ({ type: 'status', speed: 0, direction: true, connected: true, ...extra })
+
+  it('has no sensor until the controller reports one', () => {
+    const socket = FakeWebSocket.instances[0]
+    expect(tc.hasSensor.value).toBe(false)
+    socket.simulateMessage(status({ features: { led: true, sensor: true }, beam: { state: 'clear', level: 748, calibrated: true, calibrating: false } }))
+    expect(tc.hasSensor.value).toBe(true)
+    expect(tc.beam.value?.state).toBe('clear')
+    socket.simulateMessage(status({ features: { led: true, sensor: false }, beam: null }))
+    expect(tc.hasSensor.value).toBe(false)
+    expect(tc.beam.value).toBeNull()
+  })
+
+  it('keeps the level live from heartbeats and marks a lost sensor', () => {
+    const socket = FakeWebSocket.instances[0]
+    socket.simulateMessage(status({ features: { sensor: true }, beam: { state: 'clear', level: 748, calibrated: true, calibrating: false } }))
+    socket.simulateMessage({ type: 'beam', event: 'heartbeat', state: 'blocked', level: 231, calibrated: true })
+    expect(tc.beam.value?.level).toBe(231)
+    expect(tc.beam.value?.state).toBe('blocked')
+    socket.simulateMessage({ type: 'beam', event: 'lost' })
+    expect(tc.beam.value?.state).toBe('lost')
+  })
+
+  it('sends beam_calibrate and follows the calibration phases', () => {
+    const socket = FakeWebSocket.instances[0]
+    socket.simulateMessage(status({ features: { sensor: true }, beam: { state: 'clear', level: 748, calibrated: false, calibrating: false } }))
+    tc.calibrateSensor()
+    expect(socket.lastSent()).toEqual({ cmd: 'beam_calibrate' })
+    socket.simulateMessage({ type: 'beam', event: 'calibration', phase: 'creeping', detail: '' })
+    expect(tc.calibration.value).toEqual({ phase: 'creeping', detail: '' })
+    socket.simulateMessage({ type: 'beam', event: 'calibration', phase: 'done', detail: 'clear 747, blocked 235' })
+    expect(tc.calibration.value?.phase).toBe('done')
+  })
+
+  it('a calibration status from the controller does not trigger the throttle ramp', async () => {
+    const socket = FakeWebSocket.instances[0]
+    const before = socket.sent.length
+    socket.simulateMessage(status({ speed: 0.1, features: { sensor: true }, beam: { state: 'clear', level: 748, calibrated: true, calibrating: true } }))
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(socket.sent.slice(before).map(m => JSON.parse(m)).filter(m => m.cmd === 'speed')).toEqual([])
+  })
+})

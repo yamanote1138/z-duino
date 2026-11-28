@@ -7,6 +7,7 @@
         </template>
 
         <SpeedController v-if="!(hasLed && ledTestMode)" />
+        <BeamPanel v-if="!(hasLed && ledTestMode)" />
         <LedTestPanel v-if="hasLed && ledTestMode" />
 
         <template #footer>
@@ -22,6 +23,7 @@ import { useTrainController } from './composables/useTrainController'
 import TrainHeader from './components/TrainHeader.vue'
 import SpeedController from './components/SpeedController.vue'
 import LedTestPanel from './components/LedTestPanel.vue'
+import BeamPanel from './components/BeamPanel.vue'
 import TrainFooter from './components/TrainFooter.vue'
 
 const { ledTestMode, hasLed } = useTrainController()

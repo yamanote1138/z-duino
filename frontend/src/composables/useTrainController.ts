@@ -9,6 +9,7 @@ interface OutgoingPing { cmd: 'ping' }
 interface OutgoingInvert { cmd: 'invert'; value: boolean }
 interface OutgoingLed { cmd: 'led'; r: number; g: number; b: number }
 interface OutgoingLedAuto { cmd: 'led_auto' }
+interface OutgoingBeamCalibrate { cmd: 'beam_calibrate' }
 
 type OutgoingMessage =
   | OutgoingSpeed
@@ -18,6 +19,7 @@ type OutgoingMessage =
   | OutgoingInvert
   | OutgoingLed
   | OutgoingLedAuto
+  | OutgoingBeamCalibrate
 
 interface StatusMessage {
   type: 'status'
@@ -26,14 +28,38 @@ interface StatusMessage {
   direction: boolean
   connected: boolean
   // Hardware this controller has fitted. Older firmware sends no "features": treat that as everything present.
-  features?: { led?: boolean }
+  features?: { led?: boolean; sensor?: boolean }
+  // The beam sensor add-on's latest state; null or absent when no sensor is connected
+  beam?: BeamStatus | null
+}
+
+export interface BeamStatus {
+  state: string        // clear | blocked | uncalibrated | lost
+  level: number
+  calibrated: boolean
+  calibrating: boolean
+}
+
+export interface CalibrationProgress {
+  phase: string        // measuring | creeping | measuring_second | done | failed
+  detail: string
+}
+
+interface BeamMessage {
+  type: 'beam'
+  event: string
+  state?: string
+  level?: number
+  calibrated?: boolean
+  phase?: string
+  detail?: string
 }
 
 interface PongMessage {
   type: 'pong'
 }
 
-type IncomingMessage = StatusMessage | PongMessage
+type IncomingMessage = StatusMessage | PongMessage | BeamMessage
 
 export interface LedColor {
   name: string
@@ -81,6 +107,9 @@ const ledTestMode = ref(false)
 const ledBright = ref(true)
 const activeLedColor = ref<string | null>(null)
 const partyMode = ref(false)
+const hasSensor = ref(false)
+const beam = ref<BeamStatus | null>(null)
+const calibration = ref<CalibrationProgress | null>(null)
 const hasLed = ref(true) // the status LED is optional hardware; the controller says whether it is fitted
 
 const trackVoltage = computed(() => SUPPLY_VOLTAGE * currentSpeed.value)
@@ -165,6 +194,8 @@ function connect() {
         currentSpeed.value = msg.speed
         currentDirection.value = msg.direction
         hasLed.value = msg.features?.led !== false
+        hasSensor.value = msg.features?.sensor === true
+        beam.value = hasSensor.value && msg.beam ? { ...msg.beam } : null
         if (!hasLed.value && (ledTestMode.value || partyMode.value)) {
           // The LED vanished under us (re-flashed without one): drop out of LED test and party mode
           stopParty()
@@ -172,10 +203,33 @@ function connect() {
           activeLedColor.value = null
         }
       }
+      if (msg.type === 'beam') handleBeam(msg)
     } catch (e) {
       // ignore malformed messages
     }
   }
+}
+
+// ── Beam sensor ──
+
+function handleBeam(msg: BeamMessage) {
+  if (msg.event === 'calibration') {
+    calibration.value = { phase: msg.phase ?? '', detail: msg.detail ?? '' }
+    return
+  }
+  if (!beam.value) return
+  if (msg.event === 'heartbeat') {
+    beam.value = { ...beam.value, state: msg.state ?? beam.value.state, level: msg.level ?? beam.value.level, calibrated: msg.calibrated ?? beam.value.calibrated }
+  } else if (msg.event === 'lost') {
+    beam.value = { ...beam.value, state: 'lost' }
+  } else if (msg.event === 'break' || msg.event === 'restore') {
+    beam.value = { ...beam.value, state: msg.event === 'break' ? 'blocked' : 'clear' }
+  }
+}
+
+function calibrateSensor() {
+  calibration.value = { phase: 'starting', detail: '' }
+  send({ cmd: 'beam_calibrate' })
 }
 
 // ── Speed control ──
@@ -424,6 +478,11 @@ export function useTrainController() {
     ledBright,
     activeLedColor,
     hasLed,
+
+    hasSensor,
+    beam,
+    calibration,
+    calibrateSensor,
 
     getSegmentClass,
     setSpeed,
