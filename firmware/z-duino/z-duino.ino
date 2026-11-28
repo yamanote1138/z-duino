@@ -16,7 +16,7 @@
 #define VERSION "2.7.0"
 
 #ifndef CAL_SPEED
-#define CAL_SPEED 0.1
+#define CAL_SPEED 0.15   // 0.1 stalls the long test loco from a standstill
 #endif
 
 // analogWrite on ESP8266 is software PWM sharing one hardware timer across

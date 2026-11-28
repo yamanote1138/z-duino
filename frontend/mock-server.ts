@@ -66,7 +66,7 @@ function startCalibration(ws: WebSocket) {
 }
 
 // A pretend loco on a loop: the nose at `nose` inches, the body trailing behind it, the beam at 0
-const LOOP_IN = 134, LOCO_IN = 3, IN_PER_S_AT_FULL = 23.5, CREEP_SPEED = 0.1
+const LOOP_IN = 134, LOCO_IN = 3, IN_PER_S_AT_FULL = 23.5, CREEP_SPEED = 0.15
 let nose = LOOP_IN - 20   // 20 in short of the beam
 const wrap = (x: number) => ((x % LOOP_IN) + LOOP_IN) % LOOP_IN
 const inBeam = () => wrap(nose) < LOCO_IN   // the body covers the 3 in behind the nose

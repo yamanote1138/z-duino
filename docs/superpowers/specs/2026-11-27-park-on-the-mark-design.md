@@ -46,7 +46,7 @@ The Mac is out of the picture: the controller and a browser run everything. The 
 ## Constraints
 
 - ESP8266 controller (4 KB stack, no big locals). Pure logic goes in a root `lib/` module and is unit-tested with `pio test -e native`; the sketch only wires it.
-- Creep speed is the existing `CAL_SPEED` (default 0.1, capped at 0.15). The client can't choose a speed.
+- Creep speed is the existing `CAL_SPEED` (default 0.15, the cap). The client can't choose a speed.
 - The app is Vue 3 + Nuxt UI + Vitest, the existing `useTrainController.ts` and `BeamPanel.vue`.
 - One-line code comments, one-line commit messages, American English, plain docs. Commit and push straight to `feature/train-beam-sensor`.
 - Hardware: the beam is at truck height and the test loco has 3 trucks. Levels on the sensor: clear 716, blocked 0. At creep speed 0.1 the loco moves about 2.35 in/s; the loop is about 134 in.

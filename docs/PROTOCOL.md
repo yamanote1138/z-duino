@@ -60,7 +60,7 @@ A beam sensor (`firmware/beam-sensor/`) is just another WebSocket client. It fin
 ```
 `status` gains `features.sensor` (a sensor is connected) and `beam`: `{"state": "clear"|"blocked"|"uncalibrated"|"lost", "level": 748, "calibrated": true, "calibrating": false}`, or `null` with no sensor.
 
-**Calibration**, step by step: the sensor measures where the loco is (A); the controller creeps forward at `CAL_SPEED` (default 0.1, capped at 0.15) for up to 10 s until the sensor reports `changed`, then carries on 0.3 s (so the loco is well past the beam's edge) and stops; with no change it pauses 0.5 s and creeps in reverse for up to 20 s; after 0.5 s settled the sensor measures again (B); the higher of A and B is clear. It's refused with no sensor, while the train is moving, or while one is already running. Any `stop`, `speed`, `direction` or `invert` from a client, the sensor disconnecting or reconnecting, or a quiet sensor (1.5 s without a message while the loco moves, 3 s otherwise) ends it with the motor stopped. A refusal goes only to the client that asked. The loco is left where it stopped.
+**Calibration**, step by step: the sensor measures where the loco is (A); the controller creeps forward at `CAL_SPEED` (default 0.15, the cap) for up to 10 s until the sensor reports `changed`, then carries on 0.3 s (so the loco is well past the beam's edge) and stops; with no change it pauses 0.5 s and creeps in reverse for up to 20 s; after 0.5 s settled the sensor measures again (B); the higher of A and B is clear. It's refused with no sensor, while the train is moving, or while one is already running. Any `stop`, `speed`, `direction` or `invert` from a client, the sensor disconnecting or reconnecting, or a quiet sensor (1.5 s without a message while the loco moves, 3 s otherwise) ends it with the motor stopped. A refusal goes only to the client that asked. The loco is left where it stopped.
 
 ## Guarded creep and parking
 
@@ -71,7 +71,7 @@ A person's client can ask the controller to creep the loco and stop it on the bo
 ```
 - `until`: `["break"]`, `["restore"]` or `["break", "restore"]`, in that order.
 - `afterMs` (0–1000): keep creeping that long after the last event. `maxMs` (1–120000): the time limit. A creep never runs longer than `maxMs` + 1 s.
-- `id`: echoed back. Speed is always `CAL_SPEED` (default 0.1, capped at 0.15).
+- `id`: echoed back. Speed is always `CAL_SPEED` (default 0.15, the cap).
 
 Replies (to every person's client, except refusals, which go only to the one who asked):
 ```json

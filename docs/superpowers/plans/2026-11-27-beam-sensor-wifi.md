@@ -17,7 +17,7 @@
 - Never flash either board without the user present and the port confirmed (sensor streams `reading,micros` on serial; the controller is silent). Pass the port explicitly.
 - Detector defaults copied from `tools/train/lib/sensor/detector.mjs`: breakFrac 0.7, restoreFrac 0.8, breakSamples 2, restoreSamples 3, estimateWindowMs 2000, driftFrac 0.2, driftAfterMs 4000, partialFrac 0.3, noisyFrac 0.1, maxPassSamples 4000 (on the board, cap the pass buffer at 512 samples; a longer pass reports no summary).
 - deriveLevels: minSpan 60, maxNoiseFrac 0.05, wander warning when clear max−min > 0.3 × span.
-- Calibration: measure 3000 ms; change = |v − A| ≥ 0.4 × A and ≥ 150 counts for 2 consecutive samples; forward up to 10000 ms, then reverse up to 20000 ms; settle 500 ms; `CAL_SPEED` default 0.1, capped at 0.15; heartbeat lost after 3000 ms.
+- Calibration: measure 3000 ms; change = |v − A| ≥ 0.4 × A and ≥ 150 counts for 2 consecutive samples; forward up to 10000 ms, then reverse up to 20000 ms; settle 500 ms; `CAL_SPEED` default 0.15, the cap; heartbeat lost after 3000 ms.
 - Sensor messages never touch `lastMessageTime`; the sensor never counts in `connectedClients`; a new connection counts only once it sends a non-hello message.
 - tools/train gets no WiFi support. The existing serial bench path keeps working.
 
