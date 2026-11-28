@@ -2,7 +2,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { localPath, localFile } from "../paths.mjs";
 
-export const SHOW_FORMAT = "z-show/1";
+export { SHOW_FORMAT } from "./schema.mjs";
 export const LAYOUT_FORMAT = "z-layout/1";
 
 const readJson = (file, what) => {

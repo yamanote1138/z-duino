@@ -22,11 +22,11 @@
 //   repeat      times*, steps*            parallel   branches*: [[steps], [steps]]        log   message*
 // Any number may be "$name", a value from the show's "settings" (overridable when the show is run).
 
-import { SHOW_FORMAT } from "./io.mjs";
+export const SHOW_FORMAT = "z-show/1";   // here, not in io.mjs, so the browser can load the schema without node:fs
 
 export const EVENTS = ["break", "restore", "nose", "tail", "pass"];
 export const COLORS = { off: [0, 0, 0], red: [1000, 0, 0], yellow: [1000, 600, 0], green: [0, 1000, 0], blue: [0, 0, 1000], purple: [600, 0, 1000], magenta: [1000, 0, 1000], white: [1000, 1000, 1000] };
-const CREEP_MAX = 0.10;
+const CREEP_MAX = 0.15;   // the firmware's creep speed cap
 const BLIND = () => `ramps above creep speed (${CREEP_MAX}) and slows down again with no beam wait (wait-for, creep, wait-zone, wait-approach) in between: a blind run. Wait for a beam event while it runs`;
 
 const num = (name, opts = {}) => ({ name, kind: "num", ...opts });

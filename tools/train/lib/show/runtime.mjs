@@ -116,7 +116,7 @@ export async function runShow(show, { controller: ctl, sensor, sound, layout = n
         const already = (s.until === "break" && sensor.state === "blocked") || (s.until === "restore" && sensor.state === "clear");
         if (already) { say(`beam already ${sensor.state}: not moving (creep until ${s.until})`, path); break; }
         say(`creep ${s.forward ? "forward" : "reverse"} until ${s.until}`, path);
-        const r = await race(ctl.guardedMove({ forward: s.forward, speed: n(s.speed), maxMs: n(s.maxMs), afterMs: n(s.afterMs ?? 0), until: () => sensor.waitFor(s.until, { timeoutMs: n(s.maxMs) + 1000 }), abort: lostSignal }));
+        const r = await race(ctl.guardedMove({ event: s.until, forward: s.forward, speed: n(s.speed), maxMs: n(s.maxMs), afterMs: n(s.afterMs ?? 0), until: () => sensor.waitFor(s.until, { timeoutMs: n(s.maxMs) + 1000 }), abort: lostSignal }));
         if (r.result !== "guard") throw new Error(`creep ended without the beam event (${r.result})`);
         say(`creep done after ${r.elapsedMs} ms`, path); break;
       }
