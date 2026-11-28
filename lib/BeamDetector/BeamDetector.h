@@ -49,6 +49,7 @@ class BeamDetector {
   static const int CLEAR_CAP = 128, BLOCK_CAP = 128, PASS_CAP = 512;
   explicit BeamDetector(BeamLevels lv, BeamConfig cfg = BeamConfig());
   void setLevels(BeamLevels lv);
+  void restart(BeamLevels lv) { _lv = lv; reset(); }   // new levels and a fresh start, without a big temporary
   int push(double t, int v, BeamEvent* out, int max);
   const char* state() const;
   int clearEstimate() const;
