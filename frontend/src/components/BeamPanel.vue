@@ -10,7 +10,7 @@
     </div>
 
     <div class="mt-2 flex flex-wrap items-center gap-2">
-      <template v-if="!parkBusy">
+      <template v-if="!parkBusy && !showBusy">
         <UButton data-test="park-nose" size="xs" color="neutral" variant="outline" :disabled="!canPark" @click="parkLoco('nose')">
           <UIcon name="i-mdi-arrow-collapse-right" />
           Park on nose
@@ -19,6 +19,10 @@
           <UIcon name="i-mdi-arrow-collapse-left" />
           Park on tail
         </UButton>
+        <UButton data-test="run-show" size="xs" color="primary" variant="outline" :disabled="!canPark" @click="startShow()">
+          <UIcon name="i-mdi-play" />
+          Show
+        </UButton>
       </template>
       <UButton v-else data-test="park-stop" size="xs" color="error" @click="emergencyStop()">
         <UIcon name="i-mdi-stop" />
@@ -26,7 +30,7 @@
       </UButton>
       <span class="grow" />
       <UButton
-        v-if="!busy && !confirming && !parkBusy"
+        v-if="!busy && !confirming && !parkBusy && !showBusy"
         data-test="calibrate"
         size="xs"
         color="neutral"
@@ -51,6 +55,10 @@
       </div>
     </div>
 
+    <div v-if="showText" data-test="show-progress" class="mt-2" :class="show && !show.running && !show.ok ? 'text-red-400' : 'text-neutral-300'">
+      {{ showText }}
+    </div>
+
     <div v-if="parkText" data-test="park-progress" class="mt-2" :class="parking && !parking.running && !parking.ok ? 'text-red-400' : 'text-neutral-300'">
       {{ parkText }}
     </div>
@@ -65,7 +73,7 @@
 import { computed, ref } from 'vue'
 import { useTrainController } from '../composables/useTrainController'
 
-const { connected, hasSensor, beam, calibration, calibrateSensor, emergencyStop, parking, parkLoco, currentSpeed } = useTrainController()
+const { connected, hasSensor, beam, calibration, calibrateSensor, emergencyStop, parking, parkLoco, currentSpeed, show, startShow } = useTrainController()
 
 const confirming = ref(false)
 
@@ -74,6 +82,15 @@ const busy = computed(() => beam.value?.calibrating || RUNNING.includes(calibrat
 
 const parkBusy = computed(() => parking.value?.running === true)
 const canPark = computed(() => connected.value && !!beam.value?.calibrated && beam.value.state !== 'lost' && !busy.value && currentSpeed.value === 0)
+
+const showBusy = computed(() => show.value?.running === true)
+
+const showText = computed(() => {
+  const s = show.value
+  if (!s) return ''
+  if (s.running) return `Show: ${s.step || 'Starting'}...`
+  return s.ok ? s.detail : `Show stopped: ${s.detail}`
+})
 
 const parkText = computed(() => {
   const p = parking.value

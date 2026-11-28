@@ -88,5 +88,15 @@ describe('BeamPanel', () => {
     const { wrapper } = await mountPanel(sensor({ state: 'blocked', parked: 'nose' }))
     expect(wrapper.find('[data-test="parked"]').text()).toBe('Parked on nose')
   })
+
+  it('Show starts by parking, shows its step, and offers Stop', async () => {
+    const { wrapper, socket } = await mountPanel(sensor({ state: 'blocked' }))
+    await wrapper.find('[data-test="run-show"]').trigger('click')
+    await nextTick()
+    expect(socket.lastSent()).toMatchObject({ cmd: 'creep', forward: false, until: ['restore'] })
+    expect(wrapper.text()).toContain('Show: Backing off the beam')
+    await wrapper.find('[data-test="park-stop"]').trigger('click')
+    expect(socket.lastSent()).toEqual({ cmd: 'stop' })
+  })
 })
 

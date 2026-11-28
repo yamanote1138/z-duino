@@ -1,4 +1,5 @@
-import { park, type CreepResult, type CreepUntil, type ParkTarget } from './parkSearch'
+import { park, type CreepResult, type CreepUntil, type ParkDeps, type ParkTarget } from './parkSearch'
+import { runShow } from './show'
 import { computed, ref } from 'vue'
 import { createPartyBeat } from './partyBeat'
 
@@ -133,6 +134,7 @@ const hasSensor = ref(false)
 const beam = ref<BeamStatus | null>(null)
 const calibration = ref<CalibrationProgress | null>(null)
 const parking = ref<ParkingProgress | null>(null)
+const show = ref<{ step: string; running: boolean; ok?: boolean; detail?: string } | null>(null)
 const hasLed = ref(true) // the status LED is optional hardware; the controller says whether it is fitted
 
 const trackVoltage = computed(() => SUPPLY_VOLTAGE * currentSpeed.value)
@@ -199,6 +201,7 @@ function connect() {
   socket.value.onclose = () => {
     connected.value = false
     endPendingCreeps('connection lost')
+    endBeamWaits()
     stopPing()
     scheduleReconnect()
   }
@@ -257,6 +260,7 @@ function handleBeam(msg: BeamMessage) {
     beam.value = { ...beam.value, state: 'lost' }
   } else if (msg.event === 'break' || msg.event === 'restore') {
     beam.value = { ...beam.value, state: msg.event === 'break' ? 'blocked' : 'clear' }
+    for (const w of [...beamWaits]) if (w.event === msg.event) w.done(true)
   }
 }
 
@@ -298,19 +302,70 @@ function creep(forward: boolean, until: CreepUntil[], maxMs: number, afterMs = 0
   })
 }
 
-async function parkLoco(target: ParkTarget): Promise<void> {
-  if (parking.value?.running) return
-  parkCancelled = false
-  parking.value = { target, step: '', running: true }
-  const r = await park(target, {
+function parkDeps(onStep: (step: string) => void): ParkDeps {
+  return {
     creep,
     pause: (ms) => new Promise((res) => setTimeout(res, ms)),
     beamState: () => beam.value?.state ?? '',
     parked: () => beam.value?.parked ?? null,
     cancelled: () => parkCancelled,
-    onStep: (step) => { if (parking.value) parking.value = { ...parking.value, step } },
-  })
+    onStep,
+  }
+}
+
+async function parkLoco(target: ParkTarget): Promise<void> {
+  if (parking.value?.running || show.value?.running) return
+  parkCancelled = false
+  parking.value = { target, step: '', running: true }
+  const r = await park(target, parkDeps((step) => { if (parking.value) parking.value = { ...parking.value, step } }))
   parking.value = { target, step: '', running: false, ok: r.ok, detail: r.detail }
+}
+
+// ── Shows: beam waits and sound ──
+
+const beamWaits = new Set<{ event: string; done: (hit: boolean) => void }>()
+
+function waitBeam(event: 'break' | 'restore', maxMs: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const w = { event, done: (hit: boolean) => { clearTimeout(timer); beamWaits.delete(w); resolve(hit) } }
+    const timer = setTimeout(() => w.done(false), maxMs)
+    beamWaits.add(w)
+  })
+}
+
+function endBeamWaits() {
+  for (const w of [...beamWaits]) w.done(false)
+}
+
+function playSound(url: string, capMs = 5000): Promise<void> {
+  return new Promise((resolve) => {
+    const done = () => { clearTimeout(timer); resolve() }
+    const timer = setTimeout(done, capMs)
+    try {
+      const a = new Audio(url)
+      a.onended = done; a.onerror = done
+      a.play()?.catch(done)
+    } catch { done() }
+  })
+}
+
+async function startShow(): Promise<void> {
+  if (parking.value?.running || show.value?.running) return
+  parkCancelled = false
+  parking.value = null
+  show.value = { step: '', running: true }
+  const onStep = (step: string) => { if (show.value) show.value = { ...show.value, step } }
+  const r = await runShow({
+    park: (t, o) => park(t, parkDeps(onStep), o),
+    horn: () => playSound('/sounds/horn.wav'),
+    rampTo,
+    setDirection: (forward) => { currentDirection.value = forward; send({ cmd: 'direction', value: forward }) },
+    waitBeam,
+    pause: (ms) => new Promise((res) => setTimeout(res, ms)),
+    cancelled: () => parkCancelled,
+    onStep,
+  })
+  show.value = { step: '', running: false, ok: r.ok, detail: r.detail }
 }
 
 // ── Speed control ──
@@ -404,6 +459,7 @@ function brake() {
 function emergencyStop() {
   stopFlag.value = true
   parkCancelled = true
+  endBeamWaits()
   if (rampTimer) {
     clearInterval(rampTimer)
     rampTimer = null
@@ -567,6 +623,8 @@ export function useTrainController() {
     calibrateSensor,
     parking,
     parkLoco,
+    show,
+    startShow,
 
     getSegmentClass,
     setSpeed,

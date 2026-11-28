@@ -432,6 +432,7 @@ void setup() {
       else if (path.endsWith(".css")) contentType = "text/css";
       else if (path.endsWith(".js")) contentType = "application/javascript";
       else if (path.endsWith(".woff2")) contentType = "font/woff2";
+      else if (path.endsWith(".wav")) contentType = "audio/wav";
       server.streamFile(f, contentType);
       f.close();
     } else {

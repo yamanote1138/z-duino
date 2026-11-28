@@ -129,3 +129,12 @@ describe('park', () => {
     expect(calls.filter((c) => c[0] === 'pause').length).toBe(1)
   })
 })
+
+describe('park from past', () => {
+  it('skips the just-short creep when told the loco is just past', async () => {
+    const { deps, calls } = rig('clear', [ev(), ev('nose')])
+    const r = await park('nose', deps, { from: 'past' })
+    expect(calls).toEqual([[false, ['break', 'restore'], 12500, 450], ['pause', 500], [true, ['break'], 8000, 0]])
+    expect(r.ok).toBe(true)
+  })
+})

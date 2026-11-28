@@ -11,6 +11,7 @@ export interface ParkDeps {
   cancelled(): boolean
   onStep(text: string): void
 }
+export interface ParkOptions { from?: 'past' }   // 'past': the loco just ran over the beam, so skip the just-short creep
 export interface ParkResult { ok: boolean; parked: ParkTarget | null; detail: string }
 
 export const PARK = {
@@ -25,7 +26,7 @@ export const PARK = {
 
 class Ended extends Error { constructor(public detail: string) { super(detail) } }
 
-export async function park(target: ParkTarget, deps: ParkDeps): Promise<ParkResult> {
+export async function park(target: ParkTarget, deps: ParkDeps, opts: ParkOptions = {}): Promise<ParkResult> {
   if (deps.parked() === target) return { ok: true, parked: target, detail: `Already parked on ${target}` }
   let lastForward: boolean | null = null
 
@@ -52,7 +53,7 @@ export async function park(target: ParkTarget, deps: ParkDeps): Promise<ParkResu
       if (!await approach()) throw new Ended('backed off the beam but could not find it again')
       return
     }
-    if (await leg('Just short? Creeping forward', true, ['break'], PARK.nearMs)) return
+    if (opts.from !== 'past' && await leg('Just short? Creeping forward', true, ['break'], PARK.nearMs)) return
     if (await leg('Just past? Backing over the beam', false, ['break', 'restore'], PARK.past.maxMs, PARK.past.afterMs)) {
       if (await approach()) return
     }
