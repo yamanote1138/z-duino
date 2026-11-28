@@ -114,6 +114,7 @@ export async function runShow(show, { controller: ctl, sensor, sound, layout = n
       case "creep": {
         label();
         const already = (s.until === "break" && sensor.state === "blocked") || (s.until === "restore" && sensor.state === "clear");
+        if (already && ctl.speed > 0) { ctl.setSpeed(0); say(`beam already ${sensor.state}: stopped (it got there while slowing)`, path); break; }   // at creep speed a straight stop is fine
         if (already) { say(`beam already ${sensor.state}: not moving (creep until ${s.until})`, path); break; }
         say(`creep ${s.forward ? "forward" : "reverse"} until ${s.until}`, path);
         const r = await race(ctl.guardedMove({ event: s.until, forward: s.forward, speed: n(s.speed), maxMs: n(s.maxMs), afterMs: n(s.afterMs ?? 0), until: () => sensor.waitFor(s.until, { timeoutMs: n(s.maxMs) + 1000 }), abort: lostSignal }));

@@ -102,7 +102,7 @@ const measureBusy = computed(() => measuring.value?.running === true)
 
 const locoText = computed(() => {
   const p = locoProfile.value
-  if (!p) return 'Loco not measured on this device: Measure loco takes about 4 minutes of laps'
+  if (!p) return 'Loco not measured on this device: Measure loco takes about 3 minutes of laps'
   return `Loco: ${p.lengthIn} in long, ${p.points.map((x) => `${x.v} in/s at ${x.thr}`).join(', ')}`
 })
 

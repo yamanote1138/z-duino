@@ -1,11 +1,14 @@
 #!/bin/sh
-# Convert the show sounds to AAC for the app: jr-esu-sound-profiles' curated set, the JR horn and the synth chime.
+# Convert the show sounds to AAC for the app: jr-esu-sound-profiles, the E235 clips in tools/train/local/sounds, the synth chime.
 set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$HERE/../.."
 ESU="${ESU_READY:-$ROOT/../jr-esu-sound-profiles/work/e235-0/esu_ready}"
 OUT="$HERE/../public/sounds/jr"
+LOK="${LOKSOUND:-$ROOT/../jr-esu-sound-profiles/work/loksound-sounds}"
+LOCAL="$ROOT/tools/train/local/sounds"
 [ -d "$ESU" ] || { echo "no sounds at $ESU (set ESU_READY)"; exit 1; }
+[ -d "$LOK" ] || { echo "no sounds at $LOK (set LOKSOUND)"; exit 1; }
 [ -f "$ROOT/tools/train/local/sounds/horn.wav" ] || { echo "no JR horn: run python3 tools/train/import-sounds.py first"; exit 1; }
 mkdir -p "$OUT"
 pack='{'
@@ -16,16 +19,20 @@ add() {   # id, source file
   pack="$pack$sep\"$1\":{\"file\":\"$name\"}"; sep=','
   echo "  $1 <- $(basename "$2") ($(wc -c < "$OUT/$name" | tr -d ' ') bytes)"
 }
-add idle.compressor "$ESU/compressor_loop.wav"
+rm -f "$OUT"/*.m4a
+add startup.siv "$LOK/F02-power/siv_start.wav"
+add startup.compressor "$LOK/F02-power/compressor_start.wav"
+add idle.compressor "$LOK/F02-power/compressor_loop.wav"
 add melody.seseragi "$ESU/melo_seseragi.wav"
-add door.close "$ESU/door_close.wav"
-add door.open "$ESU/door_open.wav"
-add brake.release "$ESU/brake_release.wav"
-add brake.squeal "$ESU/brake_squeal.wav"
-add motion.accelerate "$ESU/vvvf_acceleration.wav"
-add motion.coast "$ESU/vvvf_coast.wav"
-add motion.decelerate "$ESU/vvvf_deceleration.wav"
-add horn.depart "$ROOT/tools/train/local/sounds/horn.wav"
 add chime.station "$ROOT/tools/train/packs/synth/chime.wav"
+add brake.departure "$LOCAL/brake_departure.wav"
+add air.hiss "$LOK/auto-driving/standing_air_hiss.wav"
+add horn.depart "$LOCAL/horn.wav"
+add motion.accelerate "$LOCAL/accel_e235.wav"
+add motion.run "$LOCAL/run_siv.wav"
+add motion.decelerate "$LOCAL/decel_e235.wav"
+add brake.squeal "$LOCAL/brake_squeal.wav"
+add brake.release "$LOCAL/brake_release.wav"
+add brake.loosen "$LOCAL/brake_yurume.wav"
 echo "$pack}" > "$OUT/pack.json"
 echo "wrote $OUT ($(du -sk "$OUT" | cut -f1) KB)"

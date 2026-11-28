@@ -221,6 +221,17 @@ test("creep until break does not move when the beam is already broken", async ()
   assert.equal(speeds(r2).length, 0);
 });
 
+test("creep until break stops a loco already creeping when the beam is already broken", async () => {
+  const r = await rig({ sensor: { state: "clear" } });
+  const res = r.run(show([{ do: "direction", forward: true }, { do: "ramp", to: 0.1, secondsPer01: 0.1 }, { do: "log", message: "slowed" }, { do: "creep", forward: true, speed: 0.1, until: "break", maxMs: 5000 }, { do: "log", message: "after" }]));
+  r.gs.state = "blocked";   // the nose reached the beam while the ramp ran
+  const out = await res;
+  assert.ok(out.log.some((e) => /beam already blocked: stopped /.test(e.text)));
+  const afterAt = out.log.findIndex((e) => e.text === "after");
+  assert.ok(afterAt > 0);
+  assert.equal(speeds(r).at(-1), 0, "the loco was stopped");
+});
+
 // ---------- failures stop the loco properly ----------
 test("a sensor that goes quiet mid-run stops the show and ramps the loco down from speed (motor care)", async () => {
   const r = await rig({ onSetup: ({ clock, gs }) => { clock.sleep(2500).then(() => gs.emit("lost")); } });

@@ -142,7 +142,7 @@ const show = ref<{ name: string; step: string; running: boolean; ok?: boolean; d
 const measuring = ref<{ step: string; running: boolean; ok?: boolean; detail?: string } | null>(null)
 const LOCO_KEY = 'z-duino.loco'
 function loadProfile(): LocoProfile | null {
-  try { const s = localStorage.getItem(LOCO_KEY); return s ? JSON.parse(s) : null } catch { return null }
+  try { const p = JSON.parse(localStorage.getItem(LOCO_KEY) ?? 'null'); return p?.method === 'laps' ? p : null } catch { return null }   // older pass-timed profiles were unreliable
 }
 const locoProfile = ref<LocoProfile | null>(loadProfile())
 const hasLed = ref(true) // the status LED is optional hardware; the controller says whether it is fitted

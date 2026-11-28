@@ -1,10 +1,11 @@
-// Learn the loco from the beam: laps at two speeds give in/s and the length, single passes give the slower speeds.
+// Learn the loco from the beam: a lap per speed gives in/s, the pass at the first speed gives the length.
 
 export interface LocoProfile {
   lengthIn: number
   points: { thr: number; v: number }[]
   fit: { inPerSecPerUnitThrottle: number; offsetInS: number }
   measuredAt: string
+  method: 'laps'
 }
 export interface MeasureDeps {
   rampTo(speed: number): Promise<void>
@@ -14,7 +15,7 @@ export interface MeasureDeps {
 }
 export interface MeasureResult { ok: boolean; profile?: LocoProfile; detail: string }
 
-export const MEASURE = { loopIn: 134, lapSpeeds: [0.45, 0.35], passSpeeds: [0.25, 0.15], waitMs: 150000 }
+export const MEASURE = { loopIn: 134, speeds: [0.45, 0.35, 0.25, 0.15], waitMs: 150000 }
 
 export function fitLine(points: { thr: number; v: number }[]) {
   const n = points.length
@@ -27,39 +28,38 @@ export function fitLine(points: { thr: number; v: number }[]) {
 class Ended extends Error {}
 
 export async function measureLoco(deps: MeasureDeps): Promise<MeasureResult> {
-  let blocked = true   // it starts parked on the nose
   const at = async (event: 'break' | 'restore'): Promise<number> => {
     const m = await deps.waitBeam(event, MEASURE.waitMs)
     if (deps.cancelled()) throw new Ended('stopped')
     if (!m) throw new Ended(`did not see the beam ${event} within ${MEASURE.waitMs / 1000} s`)
-    blocked = event === 'break'
     return m.t ?? performance.now()
   }
   const points: { thr: number; v: number }[] = []
-  const lengths: number[] = []
+  const lapSpeed = (from: number, to: number) => MEASURE.loopIn / ((to - from) / 1000)
   try {
-    for (const thr of MEASURE.lapSpeeds) {
-      deps.onStep(`Laps at ${thr}`)
-      await deps.rampTo(thr)
-      if (blocked) await at('restore')
-      const b1 = await at('break'), r1 = await at('restore'), b2 = await at('break')
-      const v = MEASURE.loopIn / ((b2 - b1) / 1000)
+    const [first, ...rest] = MEASURE.speeds
+    deps.onStep(`Lap at ${first}`)
+    await deps.rampTo(first)
+    await at('restore')   // off the mark
+    let b = await at('break')
+    const r = await at('restore')
+    let next = await at('break')
+    let v = lapSpeed(b, next)
+    points.push({ thr: first, v: Math.round(v * 100) / 100 })
+    const lengthIn = v * ((r - b) / 1000)
+    for (const thr of rest) {
+      deps.onStep(`Lap at ${thr}`)
+      await deps.rampTo(thr)   // at the beam, so the lap from here is at the new speed
+      b = next
+      next = await at('break')
+      v = lapSpeed(b, next)
       points.push({ thr, v: Math.round(v * 100) / 100 })
-      lengths.push(v * ((r1 - b1) / 1000))
-    }
-    const lengthIn = lengths.reduce((a, b) => a + b, 0) / lengths.length
-    for (const thr of MEASURE.passSpeeds) {
-      deps.onStep(`One pass at ${thr}`)
-      await deps.rampTo(thr)
-      if (blocked) await at('restore')
-      const b = await at('break'), r = await at('restore')
-      points.push({ thr, v: Math.round((lengthIn / ((r - b) / 1000)) * 100) / 100 })
     }
     deps.onStep('Stopping')
     await deps.rampTo(0)
     points.sort((a, b) => a.thr - b.thr)
     if (points.some((p) => !(p.v > 0))) return { ok: false, detail: 'a speed came out at zero: did the loco stall?' }
-    const profile = { lengthIn: Math.round(lengthIn * 10) / 10, points, fit: fitLine(points), measuredAt: new Date().toISOString() }
+    const profile: LocoProfile = { lengthIn: Math.round(lengthIn * 10) / 10, points, fit: fitLine(points), measuredAt: new Date().toISOString(), method: 'laps' }
     return { ok: true, profile, detail: `Loco ${profile.lengthIn} in long; ${points.map((p) => `${p.thr}: ${p.v} in/s`).join(', ')}` }
   } catch (e) {
     if (!(e instanceof Ended)) throw e

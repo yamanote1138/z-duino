@@ -1,40 +1,44 @@
 {
   "format": "z-show/1",
   "name": "JR lap",
-  "description": "Nose on the mark. Red signal and the compressor; Seseragi, doors close, yellow, brake release, green, horn; accelerate to cruise for one lap; slow in the approach and creep onto the nose; brake squeal and air, red, doors open, blue chime.",
+  "description": "Nose on the mark. Red: SIV and compressor start, Seseragi. Chime, yellow, brake release and an air hiss; green, horn, E235 start-up and one lap; slow before the beam, then decelerate and squeal while creeping onto the nose; air release, red, blue chime.",
   "start": "blocked",
-  "settings": { "cruise": 0.35, "creep": 0.15, "coastAfterMs": 6500 },
+  "settings": { "cruise": 0.35, "creep": 0.15, "runStartMs": 6800 },
   "steps": [
     { "do": "led", "color": "red" },
-    { "do": "loop", "slot": "idle", "id": "idle.compressor", "gain": 0.5 },
+    { "do": "sound", "id": "startup.siv" },
+    { "do": "sound", "id": "startup.compressor", "gain": 0.6 },
+    { "do": "loop", "slot": "idle", "id": "idle.compressor", "gain": 0.4 },
     { "do": "wait", "ms": 1500 },
     { "do": "sound", "id": "melody.seseragi", "gain": 0.8 },
-    { "do": "sound", "id": "door.close" },
+    { "do": "sound", "id": "chime.station" },
     { "do": "led", "color": "yellow" },
-    { "do": "sound", "id": "brake.release" },
+    { "do": "sound", "id": "brake.departure" },
+    { "do": "sound", "id": "air.hiss", "gain": 0.7, "seconds": 3 },
     { "do": "direction", "forward": true },
     { "do": "led", "color": "green" },
     { "do": "stop-loop", "slot": "idle" },
     { "do": "sound", "id": "horn.depart", "wait": false },
-    { "do": "sound", "id": "motion.accelerate", "seconds": 8, "wait": false },
+    { "do": "sound", "id": "motion.accelerate", "wait": false },
     { "do": "parallel", "branches": [
       [ { "do": "ramp", "to": "$cruise" } ],
-      [ { "do": "loop", "slot": "motion", "id": "motion.coast", "gain": 0.8, "afterMs": "$coastAfterMs" } ],
+      [ { "do": "loop", "slot": "motion", "id": "motion.run", "afterMs": "$runStartMs" } ],
       [
         { "do": "wait-for", "event": "restore", "timeoutMs": 30000 },
         { "do": "wait-approach", "from": "$cruise", "to": "$creep" },
         { "do": "led", "color": "yellow" },
+        { "do": "ramp", "to": "$creep" },
         { "do": "parallel", "branches": [
-          [ { "do": "stop-loop", "slot": "motion" }, { "do": "sound", "id": "motion.decelerate", "seconds": 7, "wait": false } ],
-          [ { "do": "ramp", "to": "$creep" }, { "do": "sound", "id": "brake.squeal", "gain": 0.7, "wait": false }, { "do": "creep", "forward": true, "speed": "$creep", "until": "break", "maxMs": 30000 } ]
+          [ { "do": "stop-loop", "slot": "motion" }, { "do": "sound", "id": "motion.decelerate", "seconds": 5, "wait": false }, { "do": "sound", "id": "brake.squeal", "gain": 0.7, "wait": false } ],
+          [ { "do": "creep", "forward": true, "speed": "$creep", "until": "break", "maxMs": 30000 } ]
         ] }
       ]
     ] },
+    { "do": "stop-loop", "slot": "motion" },
     { "do": "sound", "id": "brake.release", "gain": 0.8, "wait": false },
+    { "do": "sound", "id": "brake.loosen", "gain": 0.8, "wait": false },
     { "do": "led", "color": "red" },
-    { "do": "wait", "ms": 1500 },
-    { "do": "sound", "id": "door.open" },
-    { "do": "wait", "ms": 1500 },
+    { "do": "wait", "ms": 4000 },
     { "do": "led", "color": "blue" },
     { "do": "sound", "id": "chime.station" },
     { "do": "led-auto" }

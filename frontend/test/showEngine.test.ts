@@ -21,7 +21,7 @@ describe('the Mac kit show engine in the browser build', () => {
 import jrLap from '../src/shows/jr-lap.json'
 
 describe('the JR lap show', () => {
-  const ids = ['idle.compressor', 'melody.seseragi', 'door.close', 'door.open', 'brake.release', 'brake.squeal', 'motion.accelerate', 'motion.coast', 'motion.decelerate', 'horn.depart', 'chime.station']
+  const ids = ['startup.siv', 'startup.compressor', 'idle.compressor', 'melody.seseragi', 'chime.station', 'brake.departure', 'air.hiss', 'horn.depart', 'motion.accelerate', 'motion.run', 'motion.decelerate', 'brake.squeal', 'brake.release', 'brake.loosen']
   const sounds = { check(want: string[]) { const bad = want.filter(i => !ids.includes(i)); if (bad.length) throw new Error(`unknown ${bad}`) } }
   const loco = { lengthIn: 15, points: [{ thr: 0.15, v: 1.8 }, { thr: 0.45, v: 7 }], fit: { inPerSecPerUnitThrottle: 17.3, offsetInS: -0.8 } }
 

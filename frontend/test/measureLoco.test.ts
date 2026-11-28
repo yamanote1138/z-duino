@@ -33,10 +33,20 @@ describe('measureLoco', () => {
     expect(r.ok).toBe(true)
     expect(r.profile!.lengthIn).toBeCloseTo(15, 1)
     expect(r.profile!.points.map(p => p.thr)).toEqual([0.15, 0.25, 0.35, 0.45])
+    expect(r.profile!.method).toBe('laps')
     for (const p of r.profile!.points) expect(p.v).toBeCloseTo(20 * p.thr - 1, 1)
     expect(r.profile!.fit.inPerSecPerUnitThrottle).toBeCloseTo(20, 1)
     expect(r.profile!.fit.offsetInS).toBeCloseTo(-1, 1)
     expect(ramps).toEqual([0.45, 0.35, 0.25, 0.15, 0])
+  })
+
+  it('times each speed over a lap, so a stutter at the beam cannot spoil it', async () => {
+    const waits: string[] = []
+    const { deps } = rig()
+    const wait = deps.waitBeam
+    deps.waitBeam = (e, ms) => { waits.push(e); return wait(e, ms) }
+    await measureLoco(deps)
+    expect(waits).toEqual(['restore', 'break', 'restore', 'break', 'break', 'break', 'break'])
   })
 
   it('stops the loco and saves nothing when the beam goes quiet', async () => {
