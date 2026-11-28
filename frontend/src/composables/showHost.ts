@@ -108,9 +108,11 @@ export function makeSoundPlayer(ctx: AudioContext, pack: Record<string, { file: 
       if (seconds) fadeOut(n, ctx.currentTime + Math.max(0, seconds - 0.3))
       return { done, stop: () => fadeOut(n) }
     },
-    loop(slot: string, id: string, { gain = 1 }: { gain?: number } = {}) {
+    loop(slot: string, id: string, { gain = 1, fadeMs }: { gain?: number; fadeMs?: number } = {}) {
       const old = slots.get(slot); if (old) fadeOut(old)
-      slots.set(slot, start(id, gain, true))
+      const n = start(id, gain, true)
+      if (fadeMs) { n.gain.gain.setValueAtTime(0, ctx.currentTime); n.gain.gain.linearRampToValueAtTime(gain, ctx.currentTime + fadeMs / 1000) }
+      slots.set(slot, n)
     },
     stop(slot: string) { const n = slots.get(slot); if (n) { fadeOut(n); slots.delete(slot) } },
     stopAll() { for (const n of slots.values()) fadeOut(n); slots.clear(); for (const n of playing) fadeOut(n); playing.clear() },

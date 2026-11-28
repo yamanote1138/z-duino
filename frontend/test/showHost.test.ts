@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { BeamFeed, makeController } from '../src/composables/showHost'
+import { BeamFeed, makeController, makeSoundPlayer } from '../src/composables/showHost'
 
 describe('BeamFeed', () => {
   it('waitFor resolves with the event, and rejects on timeout', async () => {
@@ -61,5 +61,20 @@ describe('makeController', () => {
     d.hasLed = () => false
     expect(makeController(d).led(1000, 0, 0)).toBe(false)
     expect(sent).toEqual([])
+  })
+})
+
+describe('makeSoundPlayer', () => {
+  it('a loop with fadeMs starts silent and ramps up to its gain', async () => {
+    const calls: string[] = []
+    const param = { value: 1, setValueAtTime: (v: number, t: number) => calls.push(`set ${v}@${t}`), linearRampToValueAtTime: (v: number, t: number) => calls.push(`ramp ${v}@${t}`), setTargetAtTime: () => {} }
+    const node = () => ({ connect: (x: unknown) => x, start: () => {}, stop: () => {}, buffer: null, loop: false, onended: null })
+    const ctx = { currentTime: 10, destination: {}, createGain: () => ({ gain: param, connect: (x: unknown) => x }), createBufferSource: node, decodeAudioData: async () => ({}) } as unknown as AudioContext
+    vi.stubGlobal('fetch', async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(0) }))
+    const p = makeSoundPlayer(ctx, { hum: { file: 'hum.m4a' } }, '/')
+    await p.load(['hum'])
+    p.loop('idle', 'hum', { gain: 0.4, fadeMs: 2000 })
+    expect(calls).toEqual(['set 0@10', 'ramp 0.4@12'])
+    vi.unstubAllGlobals()
   })
 })

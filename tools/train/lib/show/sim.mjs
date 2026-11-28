@@ -55,7 +55,7 @@ export class SimSound {
     return { done: this.clock.sleep(ms), stop() {} };
   }
   fill(id, { ms }) { this._rec({ kind: "fill", id, ms }); return { done: this.clock.sleep(ms), stop() {} }; }
-  loop(slot, id) { this._rec({ kind: "loop", slot, id }); }
+  loop(slot, id, opts = {}) { this._rec({ kind: "loop", slot, id, ...(opts.fadeMs ? { fadeMs: opts.fadeMs } : {}) }); }
   stop(slot) { this._rec({ kind: "stop-loop", slot }); }
   stopAll() { this._rec({ kind: "stop-all" }); }
 }

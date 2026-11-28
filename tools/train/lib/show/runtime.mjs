@@ -139,12 +139,12 @@ export async function runShow(show, { controller: ctl, sensor, sound, layout = n
       }
       case "loop": {
         cancelLoop(s.slot);
-        const gain = s.gain != null ? n(s.gain) : 1, after = n(s.afterMs ?? 0);
-        if (!(after > 0)) { sound.loop(s.slot, s.id, { gain }); say(`loop ${s.slot}: ${s.id}`, path); break; }
+        const gain = s.gain != null ? n(s.gain) : 1, after = n(s.afterMs ?? 0), fadeMs = s.fadeMs != null ? n(s.fadeMs) : undefined;
+        if (!(after > 0)) { sound.loop(s.slot, s.id, { gain, fadeMs }); say(`loop ${s.slot}: ${s.id}`, path); break; }
         // later, without holding anything up: a stop-loop for the slot (or the end of the show) cancels it, so the show never has to
         // sit in a branch waiting for it
         const token = {}; pendingLoops.set(s.slot, token);
-        clock.sleep(after).then(() => { if (pendingLoops.get(s.slot) !== token) return; pendingLoops.delete(s.slot); sound.loop(s.slot, s.id, { gain }); say(`loop ${s.slot}: ${s.id}`, path); }).catch(() => {});
+        clock.sleep(after).then(() => { if (pendingLoops.get(s.slot) !== token) return; pendingLoops.delete(s.slot); sound.loop(s.slot, s.id, { gain, fadeMs }); say(`loop ${s.slot}: ${s.id}`, path); }).catch(() => {});
         say(`loop ${s.slot}: ${s.id} in ${after} ms`, path); break;
       }
       case "stop-loop": cancelLoop(s.slot); sound.stop(s.slot); say(`stop loop ${s.slot}`, path); break;

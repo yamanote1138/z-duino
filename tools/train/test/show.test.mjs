@@ -232,6 +232,12 @@ test("creep until break stops a loco already creeping when the beam is already b
   assert.equal(speeds(r).at(-1), 0, "the loco was stopped");
 });
 
+test("a loop's fadeMs reaches the sound player", async () => {
+  const r = await rig();
+  await r.run(show([{ do: "loop", slot: "idle", id: "idle.hum", gain: 0.4, fadeMs: 2000 }, { do: "stop-loop", slot: "idle" }]));
+  assert.ok(r.snd.calls.some((e) => e.kind === "loop" && e.fadeMs === 2000), JSON.stringify(r.snd.calls));
+});
+
 // ---------- failures stop the loco properly ----------
 test("a sensor that goes quiet mid-run stops the show and ramps the loco down from speed (motor care)", async () => {
   const r = await rig({ onSetup: ({ clock, gs }) => { clock.sleep(2500).then(() => gs.emit("lost")); } });

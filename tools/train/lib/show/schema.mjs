@@ -16,7 +16,7 @@
 //               estimate. Knows which end leads (nose forward, tail in reverse). Needs layout.loopIn and a loco profile.
 //   sound       id*, gain, seconds, wait               (wait defaults to true: the step ends when the sound does)
 //   fill        id*, ms or zone, cutMs, overlapMs, gain, wait
-//   loop        slot*, id*, gain, afterMs  (afterMs starts it later without holding the show up; stop-loop on the slot cancels it)
+//   loop        slot*, id*, gain, afterMs, fadeMs  (fadeMs fades it in; afterMs starts it later without holding the show up; stop-loop on the slot cancels it)
 //   stop-loop   slot*          stop-sounds
 //   led         color or r, g, b          led-auto
 //   repeat      times*, steps*            parallel   branches*: [[steps], [steps]]        log   message*
@@ -41,7 +41,7 @@ const STEPS = {
   "wait-approach": { req: { from: num("from", { min: 0.01, max: 1 }) }, opt: { creepIn: num("creepIn", { min: 0 }), marginIn: num("marginIn", { min: 0 }), to: num("to", { min: 0.01, max: CREEP_MAX }), secondsPer01: num("secondsPer01", { min: 0.1 }), timeoutMs: num("timeoutMs", { min: 1 }) } },
   sound: { req: { id: "string" }, opt: { gain: num("gain", { min: 0 }), seconds: num("seconds", { min: 0 }), wait: "bool" } },
   fill: { req: { id: "string" }, opt: { ms: num("ms", { min: 1 }), zone: "string", cutMs: num("cutMs", { min: 0 }), overlapMs: num("overlapMs", { min: 0 }), gain: num("gain", { min: 0 }), wait: "bool" } },
-  loop: { req: { slot: "string", id: "string" }, opt: { gain: num("gain", { min: 0 }), afterMs: num("afterMs", { min: 0 }) } },
+  loop: { req: { slot: "string", id: "string" }, opt: { gain: num("gain", { min: 0 }), afterMs: num("afterMs", { min: 0 }), fadeMs: num("fadeMs", { min: 0 }) } },
   "stop-loop": { req: { slot: "string" } },
   "stop-sounds": {},
   led: { opt: { color: "color", r: num("r", { min: 0, max: 1000 }), g: num("g", { min: 0, max: 1000 }), b: num("b", { min: 0, max: 1000 }) } },
