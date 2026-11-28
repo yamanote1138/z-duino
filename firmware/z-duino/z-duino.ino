@@ -10,8 +10,14 @@
 #include "StatusLED.h"
 #include <MotorLogic.h>
 #include <Command.h>
+#include <Clients.h>
+#include <BeamCalibration.h>
 
-#define VERSION "2.5.1"
+#define VERSION "2.6.0"
+
+#ifndef CAL_SPEED
+#define CAL_SPEED 0.1
+#endif
 
 // analogWrite on ESP8266 is software PWM sharing one hardware timer across
 // all active channels (the motor, plus R/G/B if a status LED is fitted: 4 at most). Above ~40kHz the
@@ -45,7 +51,16 @@ float currentSpeed = 0.0;
 bool currentDirection = true; // true = forward
 unsigned long lastMessageTime = 0;
 const unsigned long SAFETY_TIMEOUT = 30000; // 30 seconds
-int connectedClients = 0;
+Clients clients;   // people count for the LED and the safety timer; the beam sensor never does
+
+// Beam sensor add-on: its latest heartbeat, and the calibration it lets the controller run
+BeamCalibration calibration(CAL_SPEED);
+const unsigned long SENSOR_QUIET_MS = 3000;
+unsigned long sensorHeardAt = 0;
+bool sensorLost = false;
+char beamState[16] = "";
+int beamLevel = 0;
+bool beamCalibrated = false;
 bool invertDirection = false;
 
 // Servers
@@ -63,7 +78,7 @@ StatusLED led;
 #endif
 
 void applyLedStatus() {
-  if (connectedClients > 0) {
+  if (clients.people() > 0) {
     led.setState(currentDirection ? ACTIVE_FORWARD : ACTIVE_REVERSE);
   } else {
     led.setState(IDLE);
@@ -96,6 +111,17 @@ String buildStatusJson() {
   // Clients treat a missing "features" (older firmware) as "everything present".
   JsonObject features = doc["features"].to<JsonObject>();
   features["led"] = (bool)HAS_STATUS_LED;
+  bool hasSensor = clients.sensor() >= 0;
+  features["sensor"] = hasSensor;
+  if (hasSensor) {
+    JsonObject beam = doc["beam"].to<JsonObject>();
+    beam["state"] = sensorLost ? "lost" : beamState;
+    beam["level"] = beamLevel;
+    beam["calibrated"] = beamCalibrated;
+    beam["calibrating"] = calibration.running();
+  } else {
+    doc["beam"] = nullptr;
+  }
 
   String json;
   serializeJson(doc, json);
@@ -107,12 +133,115 @@ void broadcastStatus() {
   socket.broadcastTXT(json);
 }
 
-void handleWebSocketMessage(uint8_t num, uint8_t *payload, size_t length) {
-  lastMessageTime = millis();
+// Send to every connection except the beam sensor.
+void broadcastPeople(const char* json, size_t len) {
+  int s = clients.sensor();
+  for (uint8_t i = 0; i < WEBSOCKETS_SERVER_CLIENT_MAX; i++) if (i != s && socket.clientIsConnected(i)) socket.sendTXT(i, json, len);
+}
 
+void sendSensor(JsonDocument& doc) {
+  int s = clients.sensor();
+  if (s < 0) return;
+  String json; serializeJson(doc, json);
+  socket.sendTXT((uint8_t)s, json);
+}
+
+void sendStatsTo(JsonObject o, Stats st) {
+  o["n"] = st.n; o["median"] = st.median; o["mean"] = st.mean; o["sd"] = st.sd; o["min"] = st.min; o["max"] = st.max;
+}
+
+// Carry out what a calibration step asks for: the motor, messages to the sensor, progress to people.
+void applyCalibration(CalOutput o) {
+  if (o.motor) {
+    currentSpeed = o.speed;
+    if (o.speed > 0) currentDirection = o.forward;
+    applyMotorState();
+    broadcastStatus();
+    applyLedStatus();
+  }
+  if (o.sendMeasure) { JsonDocument d; d["type"] = "beam_measure"; sendSensor(d); }
+  if (o.sendWatch) { JsonDocument d; d["type"] = "beam_watch"; d["from"] = o.watchFrom; sendSensor(d); }
+  if (o.sendWatchOff) { JsonDocument d; d["type"] = "beam_watch_off"; sendSensor(d); }
+  if (o.sendLevels) {
+    JsonDocument d; d["type"] = "beam_levels";
+    sendStatsTo(d["a"].to<JsonObject>(), calibration.a());
+    sendStatsTo(d["b"].to<JsonObject>(), calibration.b());
+    sendSensor(d);
+  }
+  if (o.phaseChanged) {
+    JsonDocument d; d["type"] = "beam"; d["event"] = "calibration";
+    d["phase"] = calibration.phaseName(); d["detail"] = calibration.detail();
+    String json; serializeJson(d, json);
+    broadcastPeople(json.c_str(), json.length());
+    Serial.printf("Calibration: %s %s\n", calibration.phaseName(), calibration.detail());
+    broadcastStatus();
+  }
+}
+
+void calibrationRefused(const char* why) {
+  JsonDocument d; d["type"] = "beam"; d["event"] = "calibration"; d["phase"] = "failed"; d["detail"] = why;
+  String json; serializeJson(d, json);
+  broadcastPeople(json.c_str(), json.length());
+}
+
+void sensorGone(const char* why) {
+  sensorLost = true;
+  applyCalibration(calibration.abort(why));
+  const char* lost = "{\"type\":\"beam\",\"event\":\"lost\"}";
+  broadcastPeople(lost, strlen(lost));
+  broadcastStatus();
+}
+
+void handleSensorMessage(uint8_t *payload, size_t length, Command& cmd) {
+  if (cmd.type == CMD_HELLO) { sensorHeardAt = millis(); sensorLost = false; Serial.println("Beam sensor connected"); broadcastStatus(); return; }
+  if (cmd.type != CMD_BEAM) return;
+  sensorHeardAt = millis();
+  const BeamMessage& b = cmd.beam;
+  if (!strcmp(b.event, "heartbeat")) {
+    bool changed = sensorLost || strcmp(beamState, b.state) != 0 || beamCalibrated != b.calibrated;
+    sensorLost = false;
+    snprintf(beamState, sizeof(beamState), "%s", b.state);
+    beamLevel = b.level; beamCalibrated = b.calibrated;
+    if (changed) broadcastStatus();
+  } else if (!strcmp(b.event, "measured")) {
+    Stats st; st.n = b.n; st.median = b.median; st.mean = b.mean; st.sd = b.sd; st.min = b.min; st.max = b.max;
+    applyCalibration(calibration.onMeasured(millis(), st));
+  } else if (!strcmp(b.event, "changed")) {
+    applyCalibration(calibration.onChanged(millis()));
+  } else if (!strcmp(b.event, "calibrated")) {
+    beamCalibrated = true;
+    applyCalibration(calibration.onResult(true, nullptr));
+  } else if (!strcmp(b.event, "calibration_failed")) {
+    applyCalibration(calibration.onResult(false, b.error));
+  } else if (!strcmp(b.event, "break") || !strcmp(b.event, "restore")) {
+    snprintf(beamState, sizeof(beamState), "%s", !strcmp(b.event, "break") ? "blocked" : "clear");
+    broadcastStatus();
+  }
+  char out[384];
+  size_t n = relayBeam((const char*)payload, length, currentSpeed > 0, currentDirection, out, sizeof(out));
+  if (n) broadcastPeople(out, n);
+}
+
+void handleWebSocketMessage(uint8_t num, uint8_t *payload, size_t length) {
   Command cmd = parseCommand((const char*)payload, length);
+  clients.message(num, cmd.type == CMD_HELLO && cmd.isSensor);
+  if (clients.isSensor(num)) { handleSensorMessage(payload, length, cmd); return; }
+  if (clients.feedsSafety(num)) lastMessageTime = millis();
+  applyLedStatus();
+
+  // A person taking the throttle during calibration ends it first
+  if (calibration.running() && (cmd.type == CMD_SPEED || cmd.type == CMD_DIRECTION || cmd.type == CMD_STOP)) {
+    applyCalibration(calibration.abort("stopped"));
+  }
 
   switch (cmd.type) {
+    case CMD_BEAM_CALIBRATE: {
+      CalOutput o = calibration.start(millis(), clients.sensor() >= 0 && !sensorLost, currentSpeed > 0);
+      if (o.error) calibrationRefused(o.error);
+      else applyCalibration(o);
+      break;
+    }
+
     case CMD_SPEED:
       currentSpeed = cmd.speed;
       applyMotorState();
@@ -173,20 +302,18 @@ void handleWebSocketMessage(uint8_t num, uint8_t *payload, size_t length) {
 
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length) {
   switch (type) {
-    case WStype_DISCONNECTED:
+    case WStype_DISCONNECTED: {
       Serial.printf("[%u] Disconnected\n", num);
-      connectedClients--;
-      if (connectedClients <= 0) {
-        connectedClients = 0;
-      }
+      bool wasSensor = clients.isSensor(num);
+      clients.disconnected(num);
+      if (wasSensor) sensorGone("the sensor disconnected");
       applyLedStatus();
       break;
+    }
 
     case WStype_CONNECTED:
       Serial.printf("[%u] Connected\n", num);
-      lastMessageTime = millis();
-      connectedClients++;
-      applyLedStatus();
+      clients.connected(num);   // counts as a person only once it says something
       {
         String json = buildStatusJson();
         socket.sendTXT(num, json);
@@ -236,6 +363,8 @@ void setup() {
   // Start mDNS
   if (MDNS.begin(mdns_hostname)) {
     Serial.printf("mDNS: http://%s.local\n", mdns_hostname);
+    MDNS.addService("http", "tcp", 80);
+    MDNS.addService("ws", "tcp", 81);   // the beam sensor finds the controller by this
   }
 
   // HTTP server: serve frontend from LittleFS
@@ -280,8 +409,12 @@ void loop() {
   MDNS.update();
   led.update();
 
-  // Safety timeout: stop motor if no messages received
-  if (currentSpeed > 0.0 && (millis() - lastMessageTime > SAFETY_TIMEOUT)) {
+  // Calibration's own clock, and a sensor that has gone quiet
+  if (calibration.running()) applyCalibration(calibration.tick(millis()));
+  if (clients.sensor() >= 0 && !sensorLost && millis() - sensorHeardAt > SENSOR_QUIET_MS) sensorGone("the sensor went quiet");
+
+  // Safety timeout: stop motor if no person has sent anything (calibration's own creep has its own limits)
+  if (currentSpeed > 0.0 && !calibration.moving() && (millis() - lastMessageTime > SAFETY_TIMEOUT)) {
     Serial.println("Safety timeout - stopping motor");
     currentSpeed = 0.0;
     applyMotorState();

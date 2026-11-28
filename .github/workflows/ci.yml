@@ -53,5 +53,7 @@ jobs:
         run: pio run
       - name: Compile without the optional status LED
         run: PLATFORMIO_BUILD_FLAGS="-D HAS_STATUS_LED=0" pio run
+      - name: Compile the beam sensor
+        run: pio run -d firmware/beam-sensor -e d1_mini -e d1_mini_selftest
       - name: Run native unit tests
         run: pio test -e native
