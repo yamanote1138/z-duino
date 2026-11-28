@@ -17,3 +17,16 @@ describe('the Mac kit show engine in the browser build', () => {
     expect(validateShow(show, { soundFiles: false }).errors).toEqual([])
   })
 })
+
+import jrLap from '../src/shows/jr-lap.json'
+
+describe('the JR lap show', () => {
+  const ids = ['idle.compressor', 'melody.seseragi', 'door.close', 'door.open', 'brake.release', 'brake.squeal', 'motion.accelerate', 'motion.coast', 'motion.decelerate', 'horn.depart', 'chime.station']
+  const sounds = { check(want: string[]) { const bad = want.filter(i => !ids.includes(i)); if (bad.length) throw new Error(`unknown ${bad}`) } }
+  const loco = { lengthIn: 15, points: [{ thr: 0.15, v: 1.8 }, { thr: 0.45, v: 7 }], fit: { inPerSecPerUnitThrottle: 17.3, offsetInS: -0.8 } }
+
+  it('is valid with the import script\'s sounds and a measured loco', () => {
+    const r = validateShow(jrLap, { sounds, layout: { loopIn: 134, zones: {} }, loco, soundFiles: false })
+    expect(r.errors).toEqual([])
+  })
+})

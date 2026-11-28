@@ -1,0 +1,42 @@
+{
+  "format": "z-show/1",
+  "name": "JR lap",
+  "description": "Nose on the mark. Red signal and the compressor; Seseragi, doors close, yellow, brake release, green, horn; accelerate to cruise for one lap; slow in the approach and creep onto the nose; brake squeal and air, red, doors open, blue chime.",
+  "start": "blocked",
+  "settings": { "cruise": 0.35, "creep": 0.15, "coastAfterMs": 6500 },
+  "steps": [
+    { "do": "led", "color": "red" },
+    { "do": "loop", "slot": "idle", "id": "idle.compressor", "gain": 0.5 },
+    { "do": "wait", "ms": 1500 },
+    { "do": "sound", "id": "melody.seseragi", "gain": 0.8 },
+    { "do": "sound", "id": "door.close" },
+    { "do": "led", "color": "yellow" },
+    { "do": "sound", "id": "brake.release" },
+    { "do": "direction", "forward": true },
+    { "do": "led", "color": "green" },
+    { "do": "stop-loop", "slot": "idle" },
+    { "do": "sound", "id": "horn.depart", "wait": false },
+    { "do": "sound", "id": "motion.accelerate", "seconds": 8, "wait": false },
+    { "do": "parallel", "branches": [
+      [ { "do": "ramp", "to": "$cruise" } ],
+      [ { "do": "loop", "slot": "motion", "id": "motion.coast", "gain": 0.8, "afterMs": "$coastAfterMs" } ],
+      [
+        { "do": "wait-for", "event": "restore", "timeoutMs": 30000 },
+        { "do": "wait-approach", "from": "$cruise", "to": "$creep" },
+        { "do": "led", "color": "yellow" },
+        { "do": "parallel", "branches": [
+          [ { "do": "stop-loop", "slot": "motion" }, { "do": "sound", "id": "motion.decelerate", "seconds": 7, "wait": false } ],
+          [ { "do": "ramp", "to": "$creep" }, { "do": "sound", "id": "brake.squeal", "gain": 0.7, "wait": false }, { "do": "creep", "forward": true, "speed": "$creep", "until": "break", "maxMs": 30000 } ]
+        ] }
+      ]
+    ] },
+    { "do": "sound", "id": "brake.release", "gain": 0.8, "wait": false },
+    { "do": "led", "color": "red" },
+    { "do": "wait", "ms": 1500 },
+    { "do": "sound", "id": "door.open" },
+    { "do": "wait", "ms": 1500 },
+    { "do": "led", "color": "blue" },
+    { "do": "sound", "id": "chime.station" },
+    { "do": "led-auto" }
+  ]
+}

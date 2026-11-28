@@ -1,5 +1,9 @@
 import { park, type CreepResult, type CreepUntil, type ParkDeps, type ParkTarget } from './parkSearch'
 import { runShow } from './show'
+import { BeamFeed, makeController, makeSoundPlayer, type BeamMsg } from './showHost'
+import { measureLoco, type LocoProfile } from './measureLoco'
+import { runShowEngine, soundsUsed } from './macShow'
+import jrLap from '../shows/jr-lap.json'
 import { computed, ref } from 'vue'
 import { createPartyBeat } from './partyBeat'
 
@@ -134,7 +138,13 @@ const hasSensor = ref(false)
 const beam = ref<BeamStatus | null>(null)
 const calibration = ref<CalibrationProgress | null>(null)
 const parking = ref<ParkingProgress | null>(null)
-const show = ref<{ step: string; running: boolean; ok?: boolean; detail?: string } | null>(null)
+const show = ref<{ name: string; step: string; running: boolean; ok?: boolean; detail?: string } | null>(null)
+const measuring = ref<{ step: string; running: boolean; ok?: boolean; detail?: string } | null>(null)
+const LOCO_KEY = 'z-duino.loco'
+function loadProfile(): LocoProfile | null {
+  try { const s = localStorage.getItem(LOCO_KEY); return s ? JSON.parse(s) : null } catch { return null }
+}
+const locoProfile = ref<LocoProfile | null>(loadProfile())
 const hasLed = ref(true) // the status LED is optional hardware; the controller says whether it is fitted
 
 const trackVoltage = computed(() => SUPPLY_VOLTAGE * currentSpeed.value)
@@ -202,6 +212,7 @@ function connect() {
     connected.value = false
     endPendingCreeps('connection lost')
     endBeamWaits()
+    showAbort?.abort()
     stopPing()
     scheduleReconnect()
   }
@@ -257,10 +268,14 @@ function handleBeam(msg: BeamMessage) {
   if (msg.event === 'heartbeat') {
     beam.value = { ...beam.value, state: msg.state ?? beam.value.state, level: msg.level ?? beam.value.level, calibrated: msg.calibrated ?? beam.value.calibrated }
   } else if (msg.event === 'lost') {
+    beamFeed.emit(msg as BeamMsg)
     beam.value = { ...beam.value, state: 'lost' }
   } else if (msg.event === 'break' || msg.event === 'restore') {
     beam.value = { ...beam.value, state: msg.event === 'break' ? 'blocked' : 'clear' }
-    for (const w of [...beamWaits]) if (w.event === msg.event) w.done(true)
+    for (const w of [...beamWaits]) if (w.event === msg.event) w.done(msg as BeamMsg)
+  }
+  if (msg.event === 'break' || msg.event === 'restore' || msg.event === 'pass') {
+    beamFeed.emit(msg as BeamMsg)
   }
 }
 
@@ -314,7 +329,7 @@ function parkDeps(onStep: (step: string) => void): ParkDeps {
 }
 
 async function parkLoco(target: ParkTarget): Promise<void> {
-  if (parking.value?.running || show.value?.running) return
+  if (anyRunning()) return
   parkCancelled = false
   parking.value = { target, step: '', running: true }
   const r = await park(target, parkDeps((step) => { if (parking.value) parking.value = { ...parking.value, step } }))
@@ -323,18 +338,97 @@ async function parkLoco(target: ParkTarget): Promise<void> {
 
 // ── Shows: beam waits and sound ──
 
-const beamWaits = new Set<{ event: string; done: (hit: boolean) => void }>()
+const beamWaits = new Set<{ event: string; done: (m: BeamMsg | null) => void }>()
 
-function waitBeam(event: 'break' | 'restore', maxMs: number): Promise<boolean> {
+// The next beam event of this kind, or null on timeout, Stop or a dropped connection
+function waitBeamEvent(event: 'break' | 'restore', maxMs: number): Promise<BeamMsg | null> {
   return new Promise((resolve) => {
-    const w = { event, done: (hit: boolean) => { clearTimeout(timer); beamWaits.delete(w); resolve(hit) } }
-    const timer = setTimeout(() => w.done(false), maxMs)
+    const w = { event, done: (m: BeamMsg | null) => { clearTimeout(timer); beamWaits.delete(w); resolve(m) } }
+    const timer = setTimeout(() => w.done(null), maxMs)
     beamWaits.add(w)
   })
 }
 
+async function waitBeam(event: 'break' | 'restore', maxMs: number): Promise<boolean> {
+  return (await waitBeamEvent(event, maxMs)) !== null
+}
+
 function endBeamWaits() {
-  for (const w of [...beamWaits]) w.done(false)
+  for (const w of [...beamWaits]) w.done(null)
+}
+
+const beamFeed = new BeamFeed({ state: () => beam.value?.state ?? '', level: () => beam.value?.level ?? 0 })
+let showAbort: AbortController | null = null
+const LAYOUT = { loopIn: 134, zones: {} }
+const anyRunning = () => !!(parking.value?.running || show.value?.running || measuring.value?.running)
+
+function controllerDeps() {
+  return {
+    speed: () => currentSpeed.value,
+    forward: () => currentDirection.value,
+    connected: () => connected.value,
+    hasLed: () => hasLed.value,
+    send: (m: object) => send(m as OutgoingMessage),
+    setDirection: (forward: boolean) => { currentDirection.value = forward; send({ cmd: 'direction', value: forward }) },
+    rampTo,
+    setSpeedNow: (v: number) => {
+      if (rampTimer) { clearInterval(rampTimer); rampTimer = null }
+      currentSpeed.value = v; send({ cmd: 'speed', value: v })
+    },
+    emergencyStop,
+    creep,
+  }
+}
+
+async function startJrLap(): Promise<void> {
+  if (anyRunning()) return
+  const name = 'JR lap'
+  const loco = locoProfile.value
+  if (!loco) { show.value = { name, step: '', running: false, ok: false, detail: 'measure the loco first' }; return }
+  parkCancelled = false
+  parking.value = null
+  const ctx = new AudioContext()   // made inside the click so the browser lets it play
+  show.value = { name, step: 'Loading sounds', running: true }
+  const onStep = (step: string) => { if (show.value) show.value = { ...show.value, step } }
+  try {
+    const res = await fetch('/sounds/jr/pack.json')
+    if (!res.ok) throw new Error('no show sounds on the controller: run frontend/scripts/import-sounds.sh and flash the app')
+    const sound = makeSoundPlayer(ctx, await res.json(), '/sounds/jr/')
+    await sound.load(soundsUsed(jrLap))
+    if (parkCancelled) throw new Error('stopped')
+    const p = await park('nose', parkDeps(onStep))
+    if (!p.ok) throw new Error(p.detail)
+    if (parkCancelled) throw new Error('stopped')
+    showAbort = new AbortController()
+    await runShowEngine(jrLap, { controller: makeController(controllerDeps()), sensor: beamFeed, sound, layout: LAYOUT, loco, signal: showAbort.signal, onLog: (e: { text: string }) => onStep(e.text) })
+    show.value = { name, step: '', running: false, ok: true, detail: 'Show done' }
+  } catch (e) {
+    show.value = { name, step: '', running: false, ok: false, detail: parkCancelled ? 'stopped' : (e as Error).message }
+  } finally {
+    showAbort = null
+    ctx.close().catch(() => {})
+  }
+}
+
+async function startMeasure(): Promise<void> {
+  if (anyRunning()) return
+  parkCancelled = false
+  parking.value = null
+  measuring.value = { step: 'Parking on nose', running: true }
+  const onStep = (step: string) => { if (measuring.value) measuring.value = { ...measuring.value, step } }
+  const p = await park('nose', parkDeps(onStep))
+  if (!p.ok || parkCancelled) { measuring.value = { step: '', running: false, ok: false, detail: parkCancelled ? 'stopped' : p.detail }; return }
+  const r = await measureLoco({
+    rampTo: (s) => { const ramp = rampTo(s); return s === 0 ? ramp : Promise.resolve() },   // listen for the beam while it ramps
+    waitBeam: waitBeamEvent,
+    cancelled: () => parkCancelled,
+    onStep,
+  })
+  if (r.ok && r.profile) {
+    locoProfile.value = r.profile
+    try { localStorage.setItem(LOCO_KEY, JSON.stringify(r.profile)) } catch { /* kept for this visit only */ }
+  }
+  measuring.value = { step: '', running: false, ok: r.ok, detail: r.detail }
 }
 
 function playSound(url: string, capMs = 5000): Promise<void> {
@@ -350,10 +444,10 @@ function playSound(url: string, capMs = 5000): Promise<void> {
 }
 
 async function startShow(): Promise<void> {
-  if (parking.value?.running || show.value?.running) return
+  if (anyRunning()) return
   parkCancelled = false
   parking.value = null
-  show.value = { step: '', running: true }
+  show.value = { name: 'Horn show', step: '', running: true }
   const onStep = (step: string) => { if (show.value) show.value = { ...show.value, step } }
   const r = await runShow({
     park: (t, o) => park(t, parkDeps(onStep), o),
@@ -365,7 +459,7 @@ async function startShow(): Promise<void> {
     cancelled: () => parkCancelled,
     onStep,
   })
-  show.value = { step: '', running: false, ok: r.ok, detail: r.detail }
+  show.value = { name: 'Horn show', step: '', running: false, ok: r.ok, detail: r.detail }
 }
 
 // ── Speed control ──
@@ -459,6 +553,7 @@ function brake() {
 function emergencyStop() {
   stopFlag.value = true
   parkCancelled = true
+  showAbort?.abort()
   endBeamWaits()
   if (rampTimer) {
     clearInterval(rampTimer)
@@ -625,6 +720,10 @@ export function useTrainController() {
     parkLoco,
     show,
     startShow,
+    startJrLap,
+    measuring,
+    startMeasure,
+    locoProfile,
 
     getSegmentClass,
     setSpeed,

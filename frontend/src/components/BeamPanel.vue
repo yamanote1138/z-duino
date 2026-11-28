@@ -10,7 +10,7 @@
     </div>
 
     <div class="mt-2 flex flex-wrap items-center gap-2">
-      <template v-if="!parkBusy && !showBusy">
+      <template v-if="!parkBusy && !showBusy && !measureBusy">
         <UButton data-test="park-nose" size="xs" color="neutral" variant="outline" :disabled="!canPark" @click="parkLoco('nose')">
           <UIcon name="i-mdi-arrow-collapse-right" />
           Park on nose
@@ -23,6 +23,14 @@
           <UIcon name="i-mdi-play" />
           Show
         </UButton>
+        <UButton data-test="run-jr-lap" size="xs" color="primary" variant="outline" :disabled="!canPark || !locoProfile" @click="startJrLap()">
+          <UIcon name="i-mdi-train" />
+          JR lap
+        </UButton>
+        <UButton data-test="measure" size="xs" color="neutral" variant="outline" :disabled="!canPark" @click="startMeasure()">
+          <UIcon name="i-mdi-tape-measure" />
+          Measure loco
+        </UButton>
       </template>
       <UButton v-else data-test="park-stop" size="xs" color="error" @click="emergencyStop()">
         <UIcon name="i-mdi-stop" />
@@ -30,7 +38,7 @@
       </UButton>
       <span class="grow" />
       <UButton
-        v-if="!busy && !confirming && !parkBusy && !showBusy"
+        v-if="!busy && !confirming && !parkBusy && !showBusy && !measureBusy"
         data-test="calibrate"
         size="xs"
         color="neutral"
@@ -55,6 +63,12 @@
       </div>
     </div>
 
+    <div data-test="loco" class="mt-2 text-neutral-400">{{ locoText }}</div>
+
+    <div v-if="measureText" data-test="measure-progress" class="mt-2" :class="measuring && !measuring.running && !measuring.ok ? 'text-red-400' : 'text-neutral-300'">
+      {{ measureText }}
+    </div>
+
     <div v-if="showText" data-test="show-progress" class="mt-2" :class="show && !show.running && !show.ok ? 'text-red-400' : 'text-neutral-300'">
       {{ showText }}
     </div>
@@ -73,7 +87,7 @@
 import { computed, ref } from 'vue'
 import { useTrainController } from '../composables/useTrainController'
 
-const { connected, hasSensor, beam, calibration, calibrateSensor, emergencyStop, parking, parkLoco, currentSpeed, show, startShow } = useTrainController()
+const { connected, hasSensor, beam, calibration, calibrateSensor, emergencyStop, parking, parkLoco, currentSpeed, show, startShow, startJrLap, measuring, startMeasure, locoProfile } = useTrainController()
 
 const confirming = ref(false)
 
@@ -84,12 +98,26 @@ const parkBusy = computed(() => parking.value?.running === true)
 const canPark = computed(() => connected.value && !!beam.value?.calibrated && beam.value.state !== 'lost' && !busy.value && currentSpeed.value === 0)
 
 const showBusy = computed(() => show.value?.running === true)
+const measureBusy = computed(() => measuring.value?.running === true)
+
+const locoText = computed(() => {
+  const p = locoProfile.value
+  if (!p) return 'Loco not measured on this device: Measure loco takes about 4 minutes of laps'
+  return `Loco: ${p.lengthIn} in long, ${p.points.map((x) => `${x.v} in/s at ${x.thr}`).join(', ')}`
+})
+
+const measureText = computed(() => {
+  const m = measuring.value
+  if (!m) return ''
+  if (m.running) return `Measuring: ${m.step || 'Starting'}...`
+  return m.ok ? `Measured. ${m.detail}` : `Measuring stopped: ${m.detail}`
+})
 
 const showText = computed(() => {
   const s = show.value
   if (!s) return ''
-  if (s.running) return `Show: ${s.step || 'Starting'}...`
-  return s.ok ? s.detail : `Show stopped: ${s.detail}`
+  if (s.running) return `${s.name}: ${s.step || 'Starting'}...`
+  return s.ok ? `${s.name}: ${s.detail}` : `${s.name} stopped: ${s.detail}`
 })
 
 const parkText = computed(() => {

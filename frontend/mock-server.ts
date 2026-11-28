@@ -91,7 +91,7 @@ function startCreep(ws: WebSocket, m: CreepCommand) {
   const valid = typeof m.forward === 'boolean' && Array.isArray(m.until) && m.until.length >= 1 && m.until.length <= 2 &&
     m.until.every(e => e === 'break' || e === 'restore') && m.maxMs >= 1 && m.maxMs <= 120000 && (m.afterMs ?? 0) >= 0 && (m.afterMs ?? 0) <= 1000
   const refuse = !HAS_SENSOR ? 'no sensor connected' : !valid ? 'bad creep arguments' : !beam.calibrated ? 'calibrate the sensor first'
-    : beam.calibrating ? 'calibration is running' : creep ? 'a creep is already running' : state.speed > 0 ? 'stop the train first' : ''
+    : beam.calibrating ? 'calibration is running' : creep ? 'a creep is already running' : state.speed > CREEP_SPEED + 0.001 || (state.speed > 0 && state.direction !== m.forward) ? 'stop the train first' : ''
   if (refuse) { ws.send(JSON.stringify({ type: 'creep', id, phase: 'refused', detail: refuse })); return }
   beam.parked = null
   creep = { id, forward: m.forward, until: m.until, seen: 0, maxMs: m.maxMs, afterMs: m.afterMs ?? 0, start: Date.now(), doneAt: null }

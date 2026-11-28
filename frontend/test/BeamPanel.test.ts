@@ -94,9 +94,20 @@ describe('BeamPanel', () => {
     await wrapper.find('[data-test="run-show"]').trigger('click')
     await nextTick()
     expect(socket.lastSent()).toMatchObject({ cmd: 'creep', forward: false, until: ['restore'] })
-    expect(wrapper.text()).toContain('Show: Backing off the beam')
+    expect(wrapper.text()).toContain('Horn show: Backing off the beam')
     await wrapper.find('[data-test="park-stop"]').trigger('click')
     expect(socket.lastSent()).toEqual({ cmd: 'stop' })
+  })
+
+  it('JR lap waits for a measured loco; Measure loco starts by parking', async () => {
+    localStorage.clear()
+    const { wrapper, socket } = await mountPanel(sensor({ state: 'blocked' }))
+    expect(wrapper.find('[data-test="run-jr-lap"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-test="loco"]').text()).toContain('not measured')
+    await wrapper.find('[data-test="measure"]').trigger('click')
+    await nextTick()
+    expect(socket.lastSent()).toMatchObject({ cmd: 'creep', forward: false, until: ['restore'] })
+    expect(wrapper.text()).toContain('Measuring: Backing off the beam')
   })
 })
 

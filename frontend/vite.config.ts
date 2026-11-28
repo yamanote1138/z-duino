@@ -19,6 +19,7 @@ export default defineConfig({
     emptyOutDir: true
   },
   server: {
-    port: 3000
+    port: 3000,
+    fs: { allow: ['..'] }   // the show engine lives in tools/train
   }
 })
