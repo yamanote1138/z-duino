@@ -183,6 +183,35 @@ void test_beam_heartbeat_keeps_the_longest_state_whole(void) {
   TEST_ASSERT_EQUAL_STRING("uncalibrated", c.beam.state);
 }
 
+void test_parses_creep(void) {
+  Command c = parse("{\"cmd\":\"creep\",\"forward\":false,\"until\":[\"restore\"],\"maxMs\":8000,\"afterMs\":450,\"id\":3}");
+  TEST_ASSERT_EQUAL(CMD_CREEP, c.type);
+  TEST_ASSERT_TRUE(c.creep.valid); TEST_ASSERT_FALSE(c.creep.forward);
+  TEST_ASSERT_EQUAL(1, c.creep.nUntil); TEST_ASSERT_EQUAL(CREEP_EV_RESTORE, c.creep.until[0]);
+  TEST_ASSERT_EQUAL(8000, c.creep.maxMs); TEST_ASSERT_EQUAL(450, c.creep.afterMs); TEST_ASSERT_EQUAL(3, c.creep.id);
+}
+
+void test_creep_two_events(void) {
+  Command c = parse("{\"cmd\":\"creep\",\"forward\":true,\"until\":[\"break\",\"restore\"],\"maxMs\":12500}");
+  TEST_ASSERT_TRUE(c.creep.valid); TEST_ASSERT_TRUE(c.creep.forward);
+  TEST_ASSERT_EQUAL(2, c.creep.nUntil);
+  TEST_ASSERT_EQUAL(CREEP_EV_BREAK, c.creep.until[0]); TEST_ASSERT_EQUAL(CREEP_EV_RESTORE, c.creep.until[1]);
+  TEST_ASSERT_EQUAL(0, c.creep.afterMs); TEST_ASSERT_EQUAL(0, c.creep.id);
+}
+
+void test_creep_rejects_bad_arguments(void) {
+  const char* bad[] = {
+    "{\"cmd\":\"creep\",\"forward\":true,\"until\":[\"break\"],\"maxMs\":0}",
+    "{\"cmd\":\"creep\",\"forward\":true,\"until\":[\"break\"],\"maxMs\":120001}",
+    "{\"cmd\":\"creep\",\"forward\":true,\"until\":[\"break\"],\"maxMs\":8000,\"afterMs\":1001}",
+    "{\"cmd\":\"creep\",\"forward\":true,\"until\":[],\"maxMs\":8000}",
+    "{\"cmd\":\"creep\",\"forward\":true,\"until\":[\"pass\"],\"maxMs\":8000}",
+    "{\"cmd\":\"creep\",\"forward\":true,\"until\":[\"break\",\"restore\",\"break\"],\"maxMs\":8000}",
+    "{\"cmd\":\"creep\",\"until\":[\"break\"],\"maxMs\":8000}",
+  };
+  for (auto j : bad) { Command c = parse(j); TEST_ASSERT_EQUAL(CMD_CREEP, c.type); TEST_ASSERT_FALSE(c.creep.valid); }
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
   RUN_TEST(test_speed_command);
@@ -212,5 +241,8 @@ int main(int argc, char **argv) {
   RUN_TEST(test_relay_of_bad_json_is_empty);
   RUN_TEST(test_which_commands_end_a_calibration);
   RUN_TEST(test_beam_heartbeat_keeps_the_longest_state_whole);
+  RUN_TEST(test_parses_creep);
+  RUN_TEST(test_creep_two_events);
+  RUN_TEST(test_creep_rejects_bad_arguments);
   return UNITY_END();
 }

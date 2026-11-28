@@ -54,6 +54,22 @@ Command parseCommand(const char* payload, size_t length) {
     const char* role = doc["role"] | "";
     result.isSensor = strcmp(role, "sensor") == 0;
   }
+  else if (strcmp(cmd, "creep") == 0) {
+    result.type = CMD_CREEP;
+    CreepRequest& r = result.creep;
+    JsonArrayConst until = doc["until"].as<JsonArrayConst>();
+    long maxMs = doc["maxMs"] | 0L, afterMs = doc["afterMs"] | 0L;
+    bool ok = doc["forward"].is<bool>() && !until.isNull() && until.size() >= 1 && until.size() <= 2
+              && maxMs >= 1 && maxMs <= 120000 && afterMs >= 0 && afterMs <= 1000;
+    if (ok) for (JsonVariantConst e : until) {
+      const char* name = e.as<const char*>();
+      uint8_t ev = name && strcmp(name, "break") == 0 ? CREEP_EV_BREAK : name && strcmp(name, "restore") == 0 ? CREEP_EV_RESTORE : 0;
+      if (!ev) { ok = false; break; }
+      r.until[r.nUntil++] = ev;
+    }
+    r.valid = ok; r.forward = doc["forward"] | true;
+    r.maxMs = (unsigned long)maxMs; r.afterMs = (unsigned long)afterMs; r.id = doc["id"] | 0;
+  }
   else if (strcmp(cmd, "beam_calibrate") == 0) {
     result.type = CMD_BEAM_CALIBRATE;
   }

@@ -2,6 +2,7 @@
 #define COMMAND_H
 
 #include <stddef.h>
+#include <GuardedCreep.h>
 
 enum CommandType {
   CMD_UNKNOWN,
@@ -15,7 +16,8 @@ enum CommandType {
   CMD_PING,
   CMD_HELLO,
   CMD_BEAM,
-  CMD_BEAM_CALIBRATE
+  CMD_BEAM_CALIBRATE,
+  CMD_CREEP
 };
 
 // A message from the beam sensor: only the fields the controller acts on.
@@ -35,6 +37,7 @@ struct Command {
   int ledB = 0;
   bool isSensor = false;      // CMD_HELLO with role "sensor"
   BeamMessage beam;          // CMD_BEAM
+  CreepRequest creep;        // CMD_CREEP; valid is false for out-of-range arguments
 };
 
 // Pure parsing/dispatch decision: given a raw WebSocket text payload,
