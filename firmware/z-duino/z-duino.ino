@@ -13,7 +13,7 @@
 #include <Clients.h>
 #include <BeamCalibration.h>
 
-#define VERSION "2.6.0"
+#define VERSION "2.7.0"
 
 #ifndef CAL_SPEED
 #define CAL_SPEED 0.1
@@ -55,6 +55,7 @@ Clients clients;   // people count for the LED and the safety timer; the beam se
 
 // Beam sensor add-on: its latest heartbeat, and the calibration it lets the controller run
 BeamCalibration calibration(CAL_SPEED);
+GuardedCreep creep(CAL_SPEED);
 unsigned long sensorHeardAt = 0;
 bool sensorLost = false;
 char beamState[16] = "";
@@ -118,6 +119,8 @@ String buildStatusJson() {
     beam["level"] = beamLevel;
     beam["calibrated"] = beamCalibrated;
     beam["calibrating"] = calibration.running();
+    const char* parked = GuardedCreep::parkedName(creep.parked());
+    if (parked) beam["parked"] = parked; else beam["parked"] = nullptr;
   } else {
     doc["beam"] = nullptr;
   }
@@ -177,6 +180,34 @@ void applyCalibration(CalOutput o) {
   }
 }
 
+// Carry out a guarded creep's step: the motor, and what people hear about it.
+void applyCreep(CreepOutput o) {
+  if (o.motor) {
+    currentSpeed = o.speed;
+    if (o.speed > 0) currentDirection = o.forward;
+    applyMotorState();
+    applyLedStatus();
+  }
+  if (o.started || o.ended) {
+    JsonDocument d; d["type"] = "creep"; d["id"] = creep.id(); d["phase"] = o.started ? "running" : "ended";
+    if (o.ended) {
+      d["result"] = GuardedCreep::resultName(o.result); d["detail"] = o.detail;
+      const char* parked = GuardedCreep::parkedName(creep.parked());
+      if (parked) d["parked"] = parked; else d["parked"] = nullptr;
+      Serial.printf("Creep %d: %s %s\n", creep.id(), GuardedCreep::resultName(o.result), o.detail);
+    }
+    String json; serializeJson(d, json);
+    broadcastPeople(json.c_str(), json.length());
+  }
+  if (o.motor || o.ended) broadcastStatus();
+}
+
+void creepRefused(uint8_t num, int id, const char* why) {
+  JsonDocument d; d["type"] = "creep"; d["id"] = id; d["phase"] = "refused"; d["detail"] = why;
+  String json; serializeJson(d, json);
+  socket.sendTXT(num, json);
+}
+
 void calibrationRefused(uint8_t num, const char* why) {
   JsonDocument d; d["type"] = "beam"; d["event"] = "calibration"; d["phase"] = "failed"; d["detail"] = why;
   String json; serializeJson(d, json);
@@ -186,15 +217,17 @@ void calibrationRefused(uint8_t num, const char* why) {
 void sensorGone(const char* why) {
   sensorLost = true;
   applyCalibration(calibration.abort(why));
+  applyCreep(creep.abort(why)); creep.clearParked();
   const char* lost = "{\"type\":\"beam\",\"event\":\"lost\"}";
   broadcastPeople(lost, strlen(lost));
   broadcastStatus();
 }
 
 void handleSensorMessage(uint8_t *payload, size_t length, Command& cmd) {
-  if (cmd.type == CMD_HELLO) { applyCalibration(calibration.onSensorHello()); sensorHeardAt = millis(); sensorLost = false; Serial.println("Beam sensor connected"); broadcastStatus(); return; }
+  if (cmd.type == CMD_HELLO) { applyCalibration(calibration.onSensorHello()); applyCreep(creep.abort("the sensor reconnected")); creep.clearParked(); sensorHeardAt = millis(); sensorLost = false; Serial.println("Beam sensor connected"); broadcastStatus(); return; }
   if (cmd.type != CMD_BEAM) return;
   sensorHeardAt = millis();
+  bool wasMoving = currentSpeed > 0, wasForward = currentDirection;   // label the relay with the motion that caused the event
   const BeamMessage& b = cmd.beam;
   if (!strcmp(b.event, "heartbeat")) {
     bool changed = sensorLost || strcmp(beamState, b.state) != 0 || beamCalibrated != b.calibrated;
@@ -213,11 +246,13 @@ void handleSensorMessage(uint8_t *payload, size_t length, Command& cmd) {
   } else if (!strcmp(b.event, "calibration_failed")) {
     applyCalibration(calibration.onResult(false, b.error));
   } else if (!strcmp(b.event, "break") || !strcmp(b.event, "restore")) {
-    snprintf(beamState, sizeof(beamState), "%s", !strcmp(b.event, "break") ? "blocked" : "clear");
+    bool isBreak = !strcmp(b.event, "break");
+    snprintf(beamState, sizeof(beamState), "%s", isBreak ? "blocked" : "clear");
+    applyCreep(creep.onBeam(millis(), isBreak ? CREEP_EV_BREAK : CREEP_EV_RESTORE));   // stop first, tell people after
     broadcastStatus();
   }
   char out[384];
-  size_t n = relayBeam((const char*)payload, length, currentSpeed > 0, currentDirection, out, sizeof(out));
+  size_t n = relayBeam((const char*)payload, length, wasMoving, wasForward, out, sizeof(out));
   if (n) broadcastPeople(out, n);
 }
 
@@ -232,12 +267,24 @@ void handleWebSocketMessage(uint8_t num, uint8_t *payload, size_t length) {
   if (calibration.running() && abortsCalibration(cmd.type)) {
     applyCalibration(calibration.abort("stopped"));
   }
+  // ...and so does anything that moves the motor during a guarded creep
+  if (creep.running() && (abortsCalibration(cmd.type) || cmd.type == CMD_BEAM_CALIBRATE)) {
+    applyCreep(creep.abort(cmd.type == CMD_STOP ? "stopped" : cmd.type == CMD_BEAM_CALIBRATE ? "calibration started" : "throttle used"));
+  }
+  if ((cmd.type == CMD_SPEED && cmd.speed > 0) || cmd.type == CMD_INVERT) creep.clearParked();
 
   switch (cmd.type) {
     case CMD_BEAM_CALIBRATE: {
       CalOutput o = calibration.start(millis(), clients.sensor() >= 0 && !sensorLost, currentSpeed > 0);
       if (o.error) calibrationRefused(num, o.error);
-      else applyCalibration(o);
+      else { creep.clearParked(); applyCalibration(o); }
+      break;
+    }
+
+    case CMD_CREEP: {
+      CreepOutput o = creep.start(millis(), cmd.creep, clients.sensor() >= 0 && !sensorLost, beamCalibrated, calibration.running(), currentSpeed > 0);
+      if (o.error) creepRefused(num, cmd.creep.id, o.error);
+      else applyCreep(o);
       break;
     }
 
@@ -410,11 +457,14 @@ void loop() {
 
   // Calibration's own clock, and a sensor that has gone quiet
   if (calibration.running()) applyCalibration(calibration.tick(millis()));
-  if (clients.sensor() >= 0 && !sensorLost && millis() - sensorHeardAt > calibration.quietLimitMs()) sensorGone("the sensor went quiet");
+  if (creep.running()) applyCreep(creep.tick(millis()));
+  unsigned long quietMs = creep.running() ? BeamCalibration::QUIET_MOVING_MS : calibration.quietLimitMs();
+  if (clients.sensor() >= 0 && !sensorLost && millis() - sensorHeardAt > quietMs) sensorGone("the sensor went quiet");
 
   // Safety timeout: stop motor if no person has sent anything (calibration's own creep has its own limits)
   if (currentSpeed > 0.0 && !calibration.moving() && (millis() - lastMessageTime > SAFETY_TIMEOUT)) {
     Serial.println("Safety timeout - stopping motor");
+    applyCreep(creep.abort("safety timeout"));
     currentSpeed = 0.0;
     applyMotorState();
     broadcastStatus();
