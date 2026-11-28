@@ -44,6 +44,9 @@ struct Command {
 Command parseCommand(const char* payload, size_t length);
 
 // Turn a sensor's beam message into the one sent to clients, labeled with direction while the motor runs. Returns bytes written, 0 on bad input.
+// Does a person's command end a running calibration? Anything that moves or reverses the motor does.
+bool abortsCalibration(CommandType t);
+
 size_t relayBeam(const char* payload, size_t length, bool moving, bool forward, char* out, size_t cap);
 
 #endif

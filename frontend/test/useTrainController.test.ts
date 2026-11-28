@@ -347,4 +347,38 @@ describe('beam sensor add-on', () => {
     await vi.advanceTimersByTimeAsync(2000)
     expect(socket.sent.slice(before).map(m => JSON.parse(m)).filter(m => m.cmd === 'speed')).toEqual([])
   })
+
+  it('drops a running phase the browser missed the end of, once status says nothing is running', () => {
+    const socket = FakeWebSocket.instances[0]
+    socket.simulateMessage(status({ features: { sensor: true }, beam: { state: 'clear', level: 748, calibrated: true, calibrating: true } }))
+    socket.simulateMessage({ type: 'beam', event: 'calibration', phase: 'creeping', detail: '' })
+    socket.simulateMessage(status({ features: { sensor: true }, beam: { state: 'clear', level: 748, calibrated: true, calibrating: false } }))
+    expect(tc.calibration.value).toBeNull()
+  })
+
+  it('keeps a finished result when the status catches up', () => {
+    const socket = FakeWebSocket.instances[0]
+    socket.simulateMessage({ type: 'beam', event: 'calibration', phase: 'done', detail: 'clear 747, blocked 235' })
+    socket.simulateMessage(status({ features: { sensor: true }, beam: { state: 'clear', level: 748, calibrated: true, calibrating: false } }))
+    expect(tc.calibration.value?.phase).toBe('done')
+  })
+
+  it('gives up on a request nobody answered', async () => {
+    const socket = FakeWebSocket.instances[0]
+    socket.simulateMessage(status({ features: { sensor: true }, beam: { state: 'clear', level: 748, calibrated: true, calibrating: false } }))
+    tc.calibrateSensor()
+    expect(tc.calibration.value?.phase).toBe('starting')
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(tc.calibration.value).toBeNull()
+  })
+
+  it('forgets calibration progress across a reconnect', async () => {
+    const socket = FakeWebSocket.instances[0]
+    socket.simulateMessage({ type: 'beam', event: 'calibration', phase: 'creeping', detail: '' })
+    socket.simulateClose()
+    await vi.advanceTimersByTimeAsync(10000)
+    FakeWebSocket.instances[FakeWebSocket.instances.length - 1].simulateOpen()
+    expect(tc.calibration.value).toBeNull()
+  })
 })
+

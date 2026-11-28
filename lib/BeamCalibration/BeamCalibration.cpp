@@ -6,7 +6,7 @@ const char* BeamCalibration::phaseName() const {
   switch (_phase) {
     case CAL_IDLE: return "idle";
     case CAL_MEASURE_A: return "measuring";
-    case CAL_CREEP_FWD: case CAL_PAUSE: case CAL_CREEP_REV: return "creeping";
+    case CAL_CREEP_FWD: case CAL_PAUSE: case CAL_CREEP_REV: case CAL_OVERRUN: return "creeping";
     case CAL_SETTLE: case CAL_MEASURE_B: case CAL_DERIVE: return "measuring_second";
     case CAL_DONE: return "done";
     default: return "failed";
@@ -48,10 +48,16 @@ CalOutput BeamCalibration::tick(unsigned long now) {
       if (dt >= FORWARD_MS) { enter(CAL_PAUSE, now, o); o.motor = true; o.speed = 0; o.forward = true; }
       break;
     case CAL_PAUSE:
-      if (dt >= PAUSE_MS) { enter(CAL_CREEP_REV, now, o); o.motor = true; o.speed = _speed; o.forward = false; }
+      if (dt >= PAUSE_MS) {
+        enter(CAL_CREEP_REV, now, o); o.motor = true; o.speed = _speed; o.forward = false;
+        o.sendWatch = true; o.watchFrom = _a.median;   // re-arm: a change near the end of the forward creep may have used it up
+      }
       break;
     case CAL_CREEP_REV:
       if (dt >= REVERSE_MS) return fail("the beam never changed: is the emitter on, is the loco on the track?", true);
+      break;
+    case CAL_OVERRUN:
+      if (dt >= OVERRUN_MS) { enter(CAL_SETTLE, now, o); o.motor = true; o.speed = 0; o.sendWatchOff = true; }
       break;
     case CAL_SETTLE:
       if (dt >= SETTLE_MS) { enter(CAL_MEASURE_B, now, o); o.sendMeasure = true; }
@@ -78,9 +84,8 @@ CalOutput BeamCalibration::onMeasured(unsigned long now, Stats s) {
 
 CalOutput BeamCalibration::onChanged(unsigned long now) {
   CalOutput o;
-  if (!moving()) return o;
-  enter(CAL_SETTLE, now, o);
-  o.motor = true; o.speed = 0; o.sendWatchOff = true;
+  if (_phase == CAL_CREEP_FWD || _phase == CAL_CREEP_REV) enter(CAL_OVERRUN, now, o);   // carry on a moment so the loco is well past the edge
+  else if (_phase == CAL_PAUSE) { enter(CAL_SETTLE, now, o); o.sendWatchOff = true; }   // already stopped in the changed state
   return o;
 }
 

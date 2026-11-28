@@ -89,3 +89,7 @@ size_t relayBeam(const char* payload, size_t length, bool moving, bool forward, 
   size_t n = serializeJson(doc, out, cap);
   return n < cap ? n : 0;
 }
+
+bool abortsCalibration(CommandType t) {
+  return t == CMD_SPEED || t == CMD_DIRECTION || t == CMD_STOP || t == CMD_INVERT;
+}

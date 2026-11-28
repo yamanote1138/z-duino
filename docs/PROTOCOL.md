@@ -55,11 +55,11 @@ A beam sensor (`firmware/beam-sensor/`) is just another WebSocket client. It fin
 
 **Controller → clients:** every sensor `beam` message is passed on as `{"type": "beam", ...}` (without `cmd`). While the motor runs, `break`, `restore` and `pass` also get `"direction": "forward"|"reverse"`, and `break`/`restore` get `"edge": "nose"|"tail"` (forward: the nose breaks it, the tail restores it). Plus:
 ```json
-{"type": "beam", "event": "lost"}                                                  // the sensor disconnected or went 3 s without a heartbeat
+{"type": "beam", "event": "lost"}                                                  // the sensor disconnected or went quiet
 {"type": "beam", "event": "calibration", "phase": "measuring", "detail": ""}       // phases: measuring, creeping, measuring_second, done, failed
 ```
 `status` gains `features.sensor` (a sensor is connected) and `beam`: `{"state": "clear"|"blocked"|"uncalibrated"|"lost", "level": 748, "calibrated": true, "calibrating": false}`, or `null` with no sensor.
 
-**Calibration**, step by step: the sensor measures where the loco is (A); the controller creeps forward at `CAL_SPEED` (default 0.1, capped at 0.15) for up to 10 s, stopping as soon as the sensor reports `changed`; with no change it pauses 0.5 s and creeps in reverse for up to 20 s; after 0.5 s settled the sensor measures again (B); the higher of A and B is clear. It's refused with no sensor, while the train is moving, or while one is already running. Any `stop`, `speed` or `direction` from a client, the sensor disconnecting, or a quiet sensor ends it with the motor stopped. The loco is left where it stopped.
+**Calibration**, step by step: the sensor measures where the loco is (A); the controller creeps forward at `CAL_SPEED` (default 0.1, capped at 0.15) for up to 10 s until the sensor reports `changed`, then carries on 0.3 s (so the loco is well past the beam's edge) and stops; with no change it pauses 0.5 s and creeps in reverse for up to 20 s; after 0.5 s settled the sensor measures again (B); the higher of A and B is clear. It's refused with no sensor, while the train is moving, or while one is already running. Any `stop`, `speed`, `direction` or `invert` from a client, the sensor disconnecting or reconnecting, or a quiet sensor (1.5 s without a message while the loco moves, 3 s otherwise) ends it with the motor stopped. A refusal goes only to the client that asked. The loco is left where it stopped.
 
 The mock server (`frontend/mock-server.ts`) implements the same protocol for local development without hardware, including a pretend beam sensor (`MOCK_SENSOR=0` turns it off).

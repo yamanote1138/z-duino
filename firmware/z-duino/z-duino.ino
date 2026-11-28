@@ -55,7 +55,6 @@ Clients clients;   // people count for the LED and the safety timer; the beam se
 
 // Beam sensor add-on: its latest heartbeat, and the calibration it lets the controller run
 BeamCalibration calibration(CAL_SPEED);
-const unsigned long SENSOR_QUIET_MS = 3000;
 unsigned long sensorHeardAt = 0;
 bool sensorLost = false;
 char beamState[16] = "";
@@ -178,10 +177,10 @@ void applyCalibration(CalOutput o) {
   }
 }
 
-void calibrationRefused(const char* why) {
+void calibrationRefused(uint8_t num, const char* why) {
   JsonDocument d; d["type"] = "beam"; d["event"] = "calibration"; d["phase"] = "failed"; d["detail"] = why;
   String json; serializeJson(d, json);
-  broadcastPeople(json.c_str(), json.length());
+  socket.sendTXT(num, json);   // only the one who asked: a refusal says nothing about a run already going
 }
 
 void sensorGone(const char* why) {
@@ -193,7 +192,7 @@ void sensorGone(const char* why) {
 }
 
 void handleSensorMessage(uint8_t *payload, size_t length, Command& cmd) {
-  if (cmd.type == CMD_HELLO) { sensorHeardAt = millis(); sensorLost = false; Serial.println("Beam sensor connected"); broadcastStatus(); return; }
+  if (cmd.type == CMD_HELLO) { applyCalibration(calibration.onSensorHello()); sensorHeardAt = millis(); sensorLost = false; Serial.println("Beam sensor connected"); broadcastStatus(); return; }
   if (cmd.type != CMD_BEAM) return;
   sensorHeardAt = millis();
   const BeamMessage& b = cmd.beam;
@@ -230,14 +229,14 @@ void handleWebSocketMessage(uint8_t num, uint8_t *payload, size_t length) {
   applyLedStatus();
 
   // A person taking the throttle during calibration ends it first
-  if (calibration.running() && (cmd.type == CMD_SPEED || cmd.type == CMD_DIRECTION || cmd.type == CMD_STOP)) {
+  if (calibration.running() && abortsCalibration(cmd.type)) {
     applyCalibration(calibration.abort("stopped"));
   }
 
   switch (cmd.type) {
     case CMD_BEAM_CALIBRATE: {
       CalOutput o = calibration.start(millis(), clients.sensor() >= 0 && !sensorLost, currentSpeed > 0);
-      if (o.error) calibrationRefused(o.error);
+      if (o.error) calibrationRefused(num, o.error);
       else applyCalibration(o);
       break;
     }
@@ -411,7 +410,7 @@ void loop() {
 
   // Calibration's own clock, and a sensor that has gone quiet
   if (calibration.running()) applyCalibration(calibration.tick(millis()));
-  if (clients.sensor() >= 0 && !sensorLost && millis() - sensorHeardAt > SENSOR_QUIET_MS) sensorGone("the sensor went quiet");
+  if (clients.sensor() >= 0 && !sensorLost && millis() - sensorHeardAt > calibration.quietLimitMs()) sensorGone("the sensor went quiet");
 
   // Safety timeout: stop motor if no person has sent anything (calibration's own creep has its own limits)
   if (currentSpeed > 0.0 && !calibration.moving() && (millis() - lastMessageTime > SAFETY_TIMEOUT)) {

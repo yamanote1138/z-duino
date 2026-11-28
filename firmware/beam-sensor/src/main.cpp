@@ -14,7 +14,7 @@
 #define CONTROLLER_HOST ""
 #endif
 
-const unsigned long SAMPLE_MS = 20, HEARTBEAT_MS = 1000, MEASURE_MS = 3000, RESOLVE_RETRY_MS = 10000;
+const unsigned long SAMPLE_MS = 20, HEARTBEAT_MS = 1000, MEASURE_MS = 3000, RESOLVE_RETRY_MS = 10000, REFIND_AFTER_MS = 30000;
 const int MEASURE_CAP = 256;
 
 WebSocketsClient ws;
@@ -22,7 +22,7 @@ BeamDetector detector({747, 235});
 ChangeWatch watch;
 bool calibrated = false, connected = false, started = false;
 IPAddress controllerIp;
-unsigned long lastSample = 0, lastHeartbeat = 0, lastResolve = 0;
+unsigned long lastSample = 0, lastHeartbeat = 0, lastResolve = 0, disconnectedSince = 0;
 int lastLevel = 0;
 
 int measureBuf[MEASURE_CAP]; int measureN = 0; bool measuring = false; unsigned long measureStart = 0;
@@ -126,7 +126,7 @@ void onSocket(WStype_t type, uint8_t* payload, size_t len) {
     sendHeartbeat(nowMs());
     Serial.println("# connected to the controller");
   } else if (type == WStype_DISCONNECTED) {
-    if (connected) Serial.println("# controller connection lost");
+    if (connected) { Serial.println("# controller connection lost"); disconnectedSince = millis(); }
     connected = false; measuring = false; watch.stop();
   } else if (type == WStype_TEXT) onMessage(payload, len);
 }
@@ -136,7 +136,7 @@ bool resolveController() {
   int n = MDNS.queryService("ws", "tcp");
   for (int i = 0; i < n; i++) {
     String host = MDNS.answerHostname(i);
-    if (host.startsWith(MDNS_HOSTNAME)) { controllerIp = MDNS.answerIP(i); return true; }
+    if (host == MDNS_HOSTNAME || host == MDNS_HOSTNAME ".local") { controllerIp = MDNS.answerIP(i); return true; }
   }
   return strlen(CONTROLLER_HOST) && controllerIp.fromString(CONTROLLER_HOST);
 }
@@ -158,6 +158,10 @@ void setup() {
 void loop() {
   MDNS.update();
   if (started) ws.loop();
+  if (started && !connected && millis() - disconnectedSince > REFIND_AFTER_MS) {
+    Serial.println("# controller unreachable, looking for it again");   // its address may have changed
+    ws.disconnect(); started = false; lastResolve = millis() - RESOLVE_RETRY_MS;
+  }
   if (!started && WiFi.status() == WL_CONNECTED && millis() - lastResolve > RESOLVE_RETRY_MS) {
     lastResolve = millis();
     if (resolveController()) {
@@ -165,7 +169,8 @@ void loop() {
       ws.begin(controllerIp, 81, "/", "arduino");
       ws.onEvent(onSocket);
       ws.setReconnectInterval(2000);
-      started = true;
+      ws.enableHeartbeat(5000, 2000, 2);   // notice a controller that vanished without closing
+      started = true; disconnectedSince = millis();
     } else Serial.println("# looking for the controller...");
   }
 

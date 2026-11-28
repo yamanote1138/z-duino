@@ -168,6 +168,16 @@ void test_relay_of_bad_json_is_empty(void) {
   TEST_ASSERT_EQUAL(0, relay("{nope", true, true).length());
 }
 
+void test_which_commands_end_a_calibration(void) {
+  TEST_ASSERT_TRUE(abortsCalibration(CMD_SPEED));
+  TEST_ASSERT_TRUE(abortsCalibration(CMD_DIRECTION));
+  TEST_ASSERT_TRUE(abortsCalibration(CMD_STOP));
+  TEST_ASSERT_TRUE(abortsCalibration(CMD_INVERT));
+  TEST_ASSERT_FALSE(abortsCalibration(CMD_PING));
+  TEST_ASSERT_FALSE(abortsCalibration(CMD_LED));
+  TEST_ASSERT_FALSE(abortsCalibration(CMD_BEAM_CALIBRATE));
+}
+
 int main(int argc, char **argv) {
   UNITY_BEGIN();
   RUN_TEST(test_speed_command);
@@ -195,5 +205,6 @@ int main(int argc, char **argv) {
   RUN_TEST(test_relay_leaves_events_unlabeled_at_a_standstill);
   RUN_TEST(test_relay_gives_a_pass_its_direction_only);
   RUN_TEST(test_relay_of_bad_json_is_empty);
+  RUN_TEST(test_which_commands_end_a_calibration);
   return UNITY_END();
 }

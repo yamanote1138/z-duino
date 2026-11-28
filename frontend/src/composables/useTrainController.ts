@@ -165,6 +165,7 @@ function connect() {
 
   socket.value.onopen = () => {
     connected.value = true
+    calibration.value = null   // progress from before the drop is stale; status and events will say what's going on
     reconnectDelay = RECONNECT_BASE
     startPing()
     if (directionInverted.value) {
@@ -196,6 +197,8 @@ function connect() {
         hasLed.value = msg.features?.led !== false
         hasSensor.value = msg.features?.sensor === true
         beam.value = hasSensor.value && msg.beam ? { ...msg.beam } : null
+        // We may have missed the end of a run (screen locked, WiFi blip): trust the controller's word that none is going
+        if (!beam.value?.calibrating && calibration.value && CALIBRATION_RUNNING.includes(calibration.value.phase)) calibration.value = null
         if (!hasLed.value && (ledTestMode.value || partyMode.value)) {
           // The LED vanished under us (re-flashed without one): drop out of LED test and party mode
           stopParty()
@@ -212,8 +215,13 @@ function connect() {
 
 // ── Beam sensor ──
 
+const CALIBRATION_RUNNING = ['measuring', 'creeping', 'measuring_second']
+const CALIBRATION_ANSWER_MS = 5000
+let calibrationRequestTimer: ReturnType<typeof setTimeout> | null = null
+
 function handleBeam(msg: BeamMessage) {
   if (msg.event === 'calibration') {
+    if (calibrationRequestTimer) { clearTimeout(calibrationRequestTimer); calibrationRequestTimer = null }
     calibration.value = { phase: msg.phase ?? '', detail: msg.detail ?? '' }
     return
   }
@@ -230,6 +238,11 @@ function handleBeam(msg: BeamMessage) {
 function calibrateSensor() {
   calibration.value = { phase: 'starting', detail: '' }
   send({ cmd: 'beam_calibrate' })
+  if (calibrationRequestTimer) clearTimeout(calibrationRequestTimer)
+  calibrationRequestTimer = setTimeout(() => {   // no answer: older firmware, or the request was lost
+    calibrationRequestTimer = null
+    if (calibration.value?.phase === 'starting') calibration.value = null
+  }, CALIBRATION_ANSWER_MS)
 }
 
 // ── Speed control ──
