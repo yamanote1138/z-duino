@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SerialSource } from "../lib/sensor/sources/serial.mjs";
+import { SerialSource, detectPorts } from "../lib/sensor/sources/serial.mjs";
 
 const lines = (vals, us0 = 0) => "junk\n" + vals.map((v, i) => `${v},${us0 + i * 2000}`).join("\n") + "\n";
 const until = async (fn, ms = 3000) => { const t0 = Date.now(); while (!fn()) { if (Date.now() - t0 > ms) throw new Error("timeout"); await new Promise((r) => setTimeout(r, 10)); } };
@@ -41,4 +41,23 @@ test("stop cancels pending retries", async () => {
   await new Promise((r) => setTimeout(r, 35)); src.stop(); const n = opened;
   await new Promise((r) => setTimeout(r, 50));
   assert.equal(opened, n);
+});
+
+test("a reset mid-stream (micros back near 0) does not jump the clock", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ser-"));
+  const a = join(dir, "cu.usbserial-110");
+  writeFileSync(a, lines([300, 301, 302], 600000000) + "\x00garbage boot text\n" + [303, 304].map((v, i) => `${v},${100 + i * 2000}`).join("\n") + "\n");
+  const got = [];
+  const src = new SerialSource({ port: a, reconnectMs: 0, detect: () => [] });
+  src.start((s) => got.push(s), () => {});
+  await until(() => got.length >= 4);
+  src.stop();
+  const ts = got.map((s) => s.t);
+  assert.ok(ts.every((t, i) => i === 0 || (t >= ts[i - 1] && t - ts[i - 1] < 1000)), `clock jumped: ${ts}`);
+});
+
+test("finds the D1 Mini's CH340 ports as well as usbmodem", () => {
+  const dir = mkdtempSync(join(tmpdir(), "dev-"));
+  for (const f of ["cu.usbmodem1101", "cu.usbserial-110", "cu.wchusbserial110", "cu.Bluetooth-Incoming-Port", "tty.usbserial-110"]) writeFileSync(join(dir, f), "");
+  assert.deepEqual(detectPorts(dir).map((p) => p.slice(dir.length + 1)).sort(), ["cu.usbmodem1101", "cu.usbserial-110", "cu.wchusbserial110"]);
 });

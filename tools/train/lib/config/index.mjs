@@ -52,7 +52,7 @@ export const SCHEMA = {
     led: { type: "autobool", default: "auto", flag: "led", doc: "Whether the controller has the optional RGB status LED. \"auto\" asks the controller (it reports features.led; older firmware reports nothing and is assumed to have one). true or false forces it. Without an LED, led and led-auto show steps are skipped." },
   },
   sensor: {
-    port: str("The sensor Arduino's serial port, e.g. /dev/cu.usbmodem1101. Left empty, the only /dev/cu.usbmodem* present is used (and found again if macOS renames it after a replug).", { env: "SENSOR_PORT", flag: "sensor-port" }),
+    port: str("The sensor board's serial port, e.g. /dev/cu.usbserial-110. Left empty, the only /dev/cu.usbmodem* or /dev/cu.usbserial-* present is used (and found again if macOS renames it after a replug).", { env: "SENSOR_PORT", flag: "sensor-port" }),
     baud: int(115200, 300, 4000000, "Serial speed. Must match the sensor sketch."),
   },
   web: {

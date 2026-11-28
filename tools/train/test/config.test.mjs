@@ -126,7 +126,7 @@ test("connectController takes host, port, keepalive and invert from the settings
 
 test("the serial source explains why it has no port", () => {
   const none = new SerialSource({ port: null, detect: () => [] });
-  assert.equal(none.resolve(), null); assert.match(none.why(null), /no serial port: no \/dev\/cu\.usbmodem\* device is present/);
+  assert.equal(none.resolve(), null); assert.match(none.why(null), /no serial port: no \/dev\/cu\.usbmodem\* or \/dev\/cu\.usbserial-\* device is present/);
   const gone = new SerialSource({ port: "/dev/cu.usbmodem9", detect: () => [] });
   assert.match(gone.why(null), /\/dev\/cu\.usbmodem9 is not there and/);
   const two = new SerialSource({ port: null, detect: () => ["/dev/cu.usbmodem1", "/dev/cu.usbmodem2"] });

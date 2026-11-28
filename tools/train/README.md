@@ -40,12 +40,12 @@ Without one, position is dead-reckoning (speed x time), which lands within about
 
 | Part | Notes |
 |---|---|
-| Arduino Uno R4 Minima | reads the sensor, USB to the Mac (`/dev/cu.usbmodem…`) |
-| Clear 5 mm 940 nm IR LED + 220 Ω | the emitter (from the Allecin 60-piece IR kit), across 5V and GND, about 16 mA |
+| Wemos D1 Mini | reads the sensor, USB to the Mac (`/dev/cu.usbserial-…`). An Uno R4 Minima also works (`/dev/cu.usbmodem…`, `pio run -e uno_r4_minima`) |
+| Clear 5 mm 940 nm IR LED + 220 Ω | the emitter (from the Allecin 60-piece IR kit), across 5V and GND, about 17 mA |
 | Black 3 mm IR dome + 22 kΩ | the receiver, behaves as a phototransistor; the node goes to **A0** |
 | 2 mini breadboards (17 columns) | one for the emitter, one for the receiver, on opposite sides of the track |
 
-**Circuit.** Emitter: `5V → 220 Ω → clear LED (long leg to the resistor) → GND`. Receiver: `5V → black dome (long leg) → short leg → node → 22 kΩ → GND`, with `A0` on the node. A clear beam reads **high** (about 340 of 1023 at the current spacing; it once sat at 187 for a while with nothing in the way) and a blocked beam reads low (about 30 to 75 for the solid loco depending on aim, since some light gets round it; about 12 with the emitter off). The 940 nm light is invisible, and room light adds almost nothing (about 11 counts). Two wires carry 5V and GND from the receiver board, under the track, to the emitter board. The 22 kΩ replaced a 10 kΩ to raise the signal after the pair was moved apart.
+**Circuit (D1 Mini).** Emitter: `5V → 220 Ω → clear LED (long leg to the resistor) → GND`. Receiver: `3V3 → black dome (long leg) → short leg → node → 22 kΩ → GND`, with `A0` on the node. The receiver **must** run from 3V3, not 5V: the D1 Mini's A0 tops out around 3.2 V. The D1 Mini sits on the receiver board; two 28 AWG wires carry 5V and GND under the track to the emitter board. Readings come out higher than on the Uno (same light, smaller full scale), so run `node calibrate.mjs` after the swap. The numbers below are from the Uno R4, where the receiver ran from 5V: A clear beam reads **high** (about 340 of 1023 at the current spacing; it once sat at 187 for a while with nothing in the way) and a blocked beam reads low (about 30 to 75 for the solid loco depending on aim, since some light gets round it; about 12 with the emitter off). The 940 nm light is invisible, and room light adds almost nothing (about 11 counts). Two wires carry 5V and GND from the receiver board, under the track, to the emitter board. The 22 kΩ replaced a 10 kΩ to raise the signal after the pair was moved apart.
 
 **Placement.** The emitter and receiver sit just outside the rails, directly across from each other, at the **exit end of the train house**, far enough from the track that the loco does not touch them. Spacing, aim and the resistor all change the clear level, so re-measure after any move (see Beam levels). A mini breadboard's two halves are not connected across the centre channel, so check that A0, the dome's short leg and the resistor share a column.
 
@@ -70,11 +70,11 @@ cd tools/train/sensor
 pio run -t upload        # add upload_port to platformio.ini if it picks the wrong port
 ```
 
-The sensor module opens the port with `stty` (macOS syntax). The Arduino must be plugged straight into the Mac: through a hub with a USB-C to USB-A adapter it only got power and never enumerated.
+The sensor module opens the port with `stty` (macOS syntax). If the D1 Mini resets while plugged in, its boot text is skipped and the clock carries on. The board must be plugged straight into the Mac: through a hub with a USB-C to USB-A adapter it only got power and never enumerated.
 
 ## Scripts
 
-All scripts need Node 22+ (global `WebSocket`). The controller's address and the sensor's serial port are found automatically (`ztrain.local` resolved to an IP, and the only `/dev/cu.usbmodem*`); override them in `local/config.jsonc` or with `TRAIN_HOST` and `SENSOR_PORT` (see **Settings** below). Both can change (DHCP, which USB port). Most scripts take `--dry`, which checks the sensor and does not move the train. All of them send `stop` on Ctrl-C.
+All scripts need Node 22+ (global `WebSocket`). The controller's address and the sensor's serial port are found automatically (`ztrain.local` resolved to an IP, and the only `/dev/cu.usbmodem*` or `/dev/cu.usbserial-*`); override them in `local/config.jsonc` or with `TRAIN_HOST` and `SENSOR_PORT` (see **Settings** below). Both can change (DHCP, which USB port). Most scripts take `--dry`, which checks the sensor and does not move the train. All of them send `stop` on Ctrl-C.
 
 | Script | What it does |
 |---|---|

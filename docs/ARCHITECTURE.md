@@ -20,7 +20,7 @@ flowchart LR
     SND["Sound library"]
     SENS["Beam sensor module"]
   end
-  UNO["Arduino Uno R4<br/>(tools/train/sensor)"]
+  UNO["Wemos D1 Mini<br/>(tools/train/sensor)"]
   UI -- "HTTP :80 (loads the app)<br/>WebSocket :81" --> FW
   SCRIPTS -- "WebSocket :81" --> FW
   WEB -- "WebSocket :81" --> FW
@@ -37,7 +37,7 @@ flowchart LR
 |---|---|---|---|
 | `firmware/z-duino/`, `lib/` (MotorLogic, LedTiming, Command) | Wemos D1 Mini. `lib/` is also compiled natively for `pio test -e native`. | Serves HTTP :80 and WebSocket :81; mDNS name from `MDNS_HOSTNAME` (default `ztrain.local`) | Current speed and direction, the invert flag (RAM only, forgotten on reboot), the connected-client count. **The only code that drives the motor and the (optional) status LED.** Which optional hardware a controller was built with (`HAS_STATUS_LED`) is reported in its status message as `features`, and the throttle app and the Mac tools adapt to it. Persists nothing; LittleFS holds only the built frontend. |
 | `frontend/` | Built by Vite into `build/data/`, flashed to LittleFS, runs in a phone or desktop browser. `npm run dev:all` runs it on the Mac against `mock-server.ts`. | WebSocket :81 on the host it was loaded from | Client-side speed ramping; the invert choice (browser `localStorage`, re-sent on every connect); party-mode beat engine. |
-| `tools/train/sensor/` | Arduino Uno R4 Minima | USB serial to the Mac | Nothing: streams `reading,microseconds` at about 50 Hz. |
+| `tools/train/sensor/` | Wemos D1 Mini (WiFi off; Uno R4 Minima also works) | USB serial to the Mac | Nothing: streams `reading,microseconds` at about 50 Hz. |
 | `tools/train/lib/` modules and the scripts around them (`show.mjs`, `serve.mjs`, `calibrate.mjs`, `measure-zones.mjs`, ...) | Mac, Node 22+, zero dependencies | WebSocket :81 as a client of the Wemos; serial from the Uno; `afplay` for sound; HTTP on `127.0.0.1` for the web page | Show runs, sensor state, sound playback; your files in `tools/train/local/` (calibration, loco profile, layout, shows, settings). |
 | `build.sh`, `platformio.ini`, `secrets.ini` | Mac build tooling | USB flash to the Wemos | Build-time firmware configuration. |
 
@@ -75,7 +75,7 @@ Two separate worlds, on purpose:
 | Controller address | `controller.host` | `TRAIN_HOST` | `--host=` | resolves `ztrain.local` |
 | Controller port, keepalive | `controller.port`, `controller.pingMs` | | | 81, 5000 ms |
 | Motor invert on connect | `controller.invert` (from `local/orientation.json` if `node orient.mjs` has run) | | `--invert=` | not sent |
-| Sensor serial port | `sensor.port` | `SENSOR_PORT` | `--sensor-port=` | the only `/dev/cu.usbmodem*` |
+| Sensor serial port | `sensor.port` | `SENSOR_PORT` | `--sensor-port=` | the only `/dev/cu.usbmodem*` or `/dev/cu.usbserial-*` |
 | Sensor baud | `sensor.baud` | | | 115200 (match the sketch) |
 | Web page port | `web.port` | | `--port=` | 4040 |
 | Sound volume, engine, packs | `sound.volume`, `sound.engine`, `sound.packs` | | `--volume=`, `--engine=`, `--packs=` | 0.5, `afplay`, synth + jr-east |

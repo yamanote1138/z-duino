@@ -35,8 +35,9 @@
   },
 
   "sensor": {
-    // The sensor Arduino's serial port, e.g. /dev/cu.usbmodem1101. Left empty, the only
-    // /dev/cu.usbmodem* present is used (and found again if macOS renames it after a replug).
+    // The sensor board's serial port, e.g. /dev/cu.usbserial-110. Left empty, the only
+    // /dev/cu.usbmodem* or /dev/cu.usbserial-* present is used (and found again if macOS renames it
+    // after a replug).
     // Also settable by: env SENSOR_PORT, flag --sensor-port=.
     // "port": null,
 
