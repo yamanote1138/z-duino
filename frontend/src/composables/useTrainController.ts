@@ -388,7 +388,7 @@ function setSpeed(level: number) {
   rampTo(level)
 }
 
-function rampTo(targetSpeed: number): Promise<void> {
+function rampTo(targetSpeed: number, durationMs?: number): Promise<void> {
   return new Promise(resolve => {
     stopFlag.value = false
     if (rampTimer) {
@@ -399,7 +399,7 @@ function rampTo(targetSpeed: number): Promise<void> {
     const startSpeed = currentSpeed.value
     const distance = Math.abs(targetSpeed - startSpeed)
     const segmentsCrossed = Math.round(distance / 0.1)
-    const duration = Math.max(segmentsCrossed * RAMP_TIME_PER_SEGMENT, 200)
+    const duration = durationMs ?? Math.max(segmentsCrossed * RAMP_TIME_PER_SEGMENT, 200)
     const totalSteps = Math.max(Math.ceil(duration / RAMP_INTERVAL), 5)
 
     let step = 0

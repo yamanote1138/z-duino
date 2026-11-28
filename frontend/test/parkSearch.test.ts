@@ -29,7 +29,7 @@ describe('park', () => {
   it('blocked: backs off then approaches', async () => {
     const { deps, calls, steps } = rig('blocked', [ev(), ev('nose')])
     const r = await park('nose', deps)
-    expect(calls).toEqual([[false, ['restore'], 8000, 450], ['pause', 500], [true, ['break'], 8000, 0]])
+    expect(calls).toEqual([[false, ['restore'], 20000, 450], ['pause', 500], [true, ['break'], 8000, 0]])
     expect(steps).toEqual(['Backing off the beam', 'Creeping forward onto the beam'])
     expect(r).toEqual({ ok: true, parked: 'nose', detail: 'Parked on nose' })
   })

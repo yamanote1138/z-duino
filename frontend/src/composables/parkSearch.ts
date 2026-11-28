@@ -15,7 +15,7 @@ export interface ParkOptions { from?: 'past' }   // 'past': the loco just ran ov
 export interface ParkResult { ok: boolean; parked: ParkTarget | null; detail: string }
 
 export const PARK = {
-  backOff: { maxMs: 8000, afterMs: 450 },
+  backOff: { maxMs: 20000, afterMs: 450 },   // creep is slow on a long loco: give it time to clear
   approachMs: 8000,
   nearMs: 5000,
   past: { maxMs: 12500, afterMs: 450 },

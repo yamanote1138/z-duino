@@ -9,7 +9,7 @@ function rig(opts: { parks?: ParkResult[]; beam?: Record<string, boolean>; cance
   const deps: ShowDeps = {
     async park(t, o) { log.push(`park ${t}${o?.from ? ' from ' + o.from : ''}`); return parks.shift()! },
     async horn() { log.push('horn'); if (opts.cancelAt === 'horn') cancelled = true },
-    async rampTo(s) { log.push(`ramp ${s}`) },
+    async rampTo(s, ms) { log.push(`ramp ${s}${ms ? ' in ' + ms : ''}`) },
     setDirection(f) { log.push(`dir ${f}`) },
     async waitBeam(e, ms) { log.push(`wait ${e} ${ms}`); return opts.beam?.[e] ?? true },
     async pause(ms) { log.push(`pause ${ms}`) },
@@ -24,8 +24,8 @@ describe('runShow', () => {
     const { deps, log } = rig()
     expect(await runShow(deps)).toEqual({ ok: true, detail: 'Show done' })
     expect(log.filter(l => !l.startsWith('step'))).toEqual([
-      'park nose', 'horn', 'dir true', 'wait restore 15000', `ramp ${SHOW.cruise}`,
-      'wait break 90000', 'ramp 0', 'pause 500', 'park nose from past', 'horn',
+      'park nose', 'horn', 'dir true', 'wait restore 30000', `ramp ${SHOW.cruise}`,
+      'wait break 90000', 'ramp 0 in 1000', 'pause 500', 'park nose from past', 'horn',
     ])
   })
 
@@ -43,7 +43,7 @@ describe('runShow', () => {
 
   it('stops the loco when it never leaves the beam', async () => {
     const { deps, log } = rig({ beam: { restore: false } })
-    expect((await runShow(deps)).detail).toBe('the loco did not leave the beam')
+    expect((await runShow(deps)).detail).toBe('the loco did not leave the beam in 30 s')
     expect(log.at(-1)).toBe('ramp 0')
   })
 

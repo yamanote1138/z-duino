@@ -4,7 +4,7 @@ import type { ParkOptions, ParkResult, ParkTarget } from './parkSearch'
 export interface ShowDeps {
   park(target: ParkTarget, opts?: ParkOptions): Promise<ParkResult>
   horn(): Promise<void>
-  rampTo(speed: number): Promise<void>
+  rampTo(speed: number, durationMs?: number): Promise<void>
   setDirection(forward: boolean): void
   waitBeam(event: 'break' | 'restore', maxMs: number): Promise<boolean>   // false on timeout or Stop
   pause(ms: number): Promise<void>
@@ -13,7 +13,7 @@ export interface ShowDeps {
 }
 export interface ShowResult { ok: boolean; detail: string }
 
-export const SHOW = { cruise: 0.2, leaveMs: 15000, lapMs: 90000, settleMs: 500 }
+export const SHOW = { cruise: 0.35, leaveMs: 30000, lapMs: 90000, stopMs: 1000, settleMs: 500 }
 
 export async function runShow(deps: ShowDeps): Promise<ShowResult> {
   const stopped = { ok: false, detail: 'stopped' }
@@ -35,13 +35,13 @@ export async function runShow(deps: ShowDeps): Promise<ShowResult> {
   deps.setDirection(true)
   const left = deps.waitBeam('restore', SHOW.leaveMs)   // listen before moving: the tail may clear during the ramp
   await deps.rampTo(SHOW.cruise)
-  if (!await left) return halt('the loco did not leave the beam')
+  if (!await left) return halt('the loco did not leave the beam in 30 s')
 
   deps.onStep('Running a lap')
   if (!await deps.waitBeam('break', SHOW.lapMs)) return halt('the loco did not come back round in 90 s')
 
   deps.onStep('Slowing for the mark')
-  await deps.rampTo(0)
+  await deps.rampTo(0, SHOW.stopMs)   // a short stop keeps the overshoot small
   if (deps.cancelled()) return stopped
   await deps.pause(SHOW.settleMs)
 
