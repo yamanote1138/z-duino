@@ -21,7 +21,7 @@ Without your own layout or loco profile, `validate` and `sim` use the examples i
 **With a train**
 
 1. Build and flash the controller (see the repo's main README); it should answer at `ztrain.local`.
-2. Wire the break-beam sensor (**Hardware** below) and flash its sketch: `cd sensor && pio run -t upload`.
+2. Wire the break-beam sensor (**Hardware** below) and flash its sketch: `pio run -d firmware/beam-sensor -t upload --upload-port <port>` from the repo root.
 3. `node calibrate.mjs` measures the open-beam and blocked readings (interactive).
 4. Park the loco with its nose in the beam, "the mark": `node nudge.mjs to-mark` from wherever it is (see **Returning to the mark** below), or `node creep-stop.mjs` from a few inches short of the beam.
 5. `node learn-loco.mjs --in-beam` teaches the loco's length and speed table (about 8 minutes; it runs the loco around the loop at several speeds).
@@ -63,12 +63,13 @@ No script hard-codes a reading. The sensor module (`lib/sensor/detector.mjs`) sc
 
 ## Sensor firmware
 
-`sensor/` is a small PlatformIO project that prints `<A0 reading>,<microseconds>` per line at 115200 baud, about 50 per second. The timestamp is the sensor's own clock, so the scripts that want precise timing (`learn-loco.mjs`) are not at the mercy of USB arrival times. The other scripts read only the first number.
+The sensor's firmware now lives in `firmware/beam-sensor/` at the repo root. It reports beam events to the controller over WiFi (calibrate it with the throttle app's Calibrate button), and it still prints `<A0 reading>,<microseconds>` per line at 115200 baud, about 50 per second, which is what these bench tools read over USB. The timestamp is the sensor's own clock, so the scripts that want precise timing (`learn-loco.mjs`) are not at the mercy of USB arrival times. The other scripts read only the first number.
 
 ```bash
-cd tools/train/sensor
-pio run -t upload        # add upload_port to platformio.ini if it picks the wrong port
+pio run -d firmware/beam-sensor -t upload --upload-port /dev/cu.usbserial-XXXX   # from the repo root; WiFi comes from secrets.ini
 ```
+
+The bench tools keep their own calibration (`local/sensor_levels.json`); the sensor's WiFi calibration lives on the sensor.
 
 The sensor module opens the port with `stty` (macOS syntax). If the D1 Mini resets while plugged in, its boot text is skipped and the clock carries on. The board must be plugged straight into the Mac: through a hub with a USB-C to USB-A adapter it only got power and never enumerated.
 

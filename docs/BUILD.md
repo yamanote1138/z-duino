@@ -57,6 +57,12 @@ node --version  # v18+ required
    - Flash the firmware to the Wemos
    - Pack and flash the frontend filesystem (LittleFS)
 
+5. **Optional: the beam sensor.** A second Wemos with an IR beam across the track (wiring in `tools/train/README.md`, **Hardware**). It uses the same `secrets.ini` for WiFi, so flash it from the repo root, naming its port so you don't flash the controller by mistake:
+   ```bash
+   pio run -d firmware/beam-sensor -t upload --upload-port /dev/cu.usbserial-XXXX
+   ```
+   It finds the controller by mDNS; if your network blocks that, set `CONTROLLER_HOST` in `secrets.ini`. Once it's connected, the throttle app shows a **Beam** line: press **Calibrate**, and the controller creeps the loco until it finds the beam. `CAL_SPEED` in `secrets.ini` sets that creep speed (default `0.1`, capped at `0.15`).
+
 ## Build Script Options
 
 | Option | Action |

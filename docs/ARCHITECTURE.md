@@ -20,11 +20,12 @@ flowchart LR
     SND["Sound library"]
     SENS["Beam sensor module"]
   end
-  UNO["Wemos D1 Mini<br/>(tools/train/sensor)"]
+  UNO["Wemos D1 Mini beam sensor<br/>(firmware/beam-sensor)"]
   UI -- "HTTP :80 (loads the app)<br/>WebSocket :81" --> FW
   SCRIPTS -- "WebSocket :81" --> FW
   WEB -- "WebSocket :81" --> FW
-  UNO -- "USB serial 115200" --> SENS
+  UNO -- "WebSocket :81 (beam events)" --> FW
+  UNO -. "USB serial 115200 (bench only)" .-> SENS
   SCRIPTS --- SENS
   WEB --- SENS
   SCRIPTS --- SND
@@ -35,9 +36,9 @@ flowchart LR
 
 | Code | Runs on | Talks to | Owns |
 |---|---|---|---|
-| `firmware/z-duino/`, `lib/` (MotorLogic, LedTiming, Command) | Wemos D1 Mini. `lib/` is also compiled natively for `pio test -e native`. | Serves HTTP :80 and WebSocket :81; mDNS name from `MDNS_HOSTNAME` (default `ztrain.local`) | Current speed and direction, the invert flag (RAM only, forgotten on reboot), the connected-client count. **The only code that drives the motor and the (optional) status LED.** Which optional hardware a controller was built with (`HAS_STATUS_LED`) is reported in its status message as `features`, and the throttle app and the Mac tools adapt to it. Persists nothing; LittleFS holds only the built frontend. |
+| `firmware/z-duino/`, `lib/` (MotorLogic, LedTiming, Command, Clients, BeamCalibration) | Wemos D1 Mini. `lib/` is also compiled natively for `pio test -e native`. | Serves HTTP :80 and WebSocket :81; mDNS name from `MDNS_HOSTNAME` (default `ztrain.local`) | Current speed and direction, the invert flag (RAM only, forgotten on reboot), the connected-client count. **The only code that drives the motor and the (optional) status LED.** Which optional hardware a controller was built with (`HAS_STATUS_LED`), and whether a beam sensor is connected, is reported in its status message as `features`, and the throttle app and the Mac tools adapt to it. With a sensor it relays beam events to every client and runs one-button calibration. Persists nothing; LittleFS holds only the built frontend. |
 | `frontend/` | Built by Vite into `build/data/`, flashed to LittleFS, runs in a phone or desktop browser. `npm run dev:all` runs it on the Mac against `mock-server.ts`. | WebSocket :81 on the host it was loaded from | Client-side speed ramping; the invert choice (browser `localStorage`, re-sent on every connect); party-mode beat engine. |
-| `tools/train/sensor/` | Wemos D1 Mini (WiFi off; Uno R4 Minima also works) | USB serial to the Mac | Nothing: streams `reading,microseconds` at about 50 Hz. |
+| `firmware/beam-sensor/`, `lib/BeamDetector` | Wemos D1 Mini (the beam sensor add-on) | WebSocket :81 as a client of the controller, found by its mDNS `ws` service (or `CONTROLLER_HOST`); still prints `reading,microseconds` on USB serial for the bench kit | Beam detection (break, restore, pass, drift) and its calibrated levels (`/levels.json` in its own LittleFS, kept across power cycles). Only reports; never decides anything. |
 | `tools/train/lib/` modules and the scripts around them (`show.mjs`, `serve.mjs`, `calibrate.mjs`, `measure-zones.mjs`, ...) | Mac, Node 22+, zero dependencies | WebSocket :81 as a client of the Wemos; serial from the Uno; `afplay` for sound; HTTP on `127.0.0.1` for the web page | Show runs, sensor state, sound playback; your files in `tools/train/local/` (calibration, loco profile, layout, shows, settings). |
 | `build.sh`, `platformio.ini`, `secrets.ini` | Mac build tooling | USB flash to the Wemos | Build-time firmware configuration. |
 
@@ -46,7 +47,8 @@ The Wemos has no idea the Mac exists: a Mac script is just another WebSocket cli
 ## Authority and safety
 
 - **The Wemos trusts every client.** Any number of clients can connect at once and there is no ownership or lock, so a browser and a Mac show can fight over the throttle. Treat the track as one-controller-at-a-time by convention.
-- **Motor care is enforced by the clients, not the firmware.** The firmware applies whatever speed it receives; its only protection is the 30 s safety timeout (it stops the motor if no message arrives for 30 s) and the build-time PWM limits.
+- **Motor care is enforced by the clients, not the firmware**, with one exception (below). The firmware applies whatever speed it receives; its only protection is the 30 s safety timeout (it stops the motor if no person's client has sent anything for 30 s; the beam sensor's messages never count) and the build-time PWM limits.
+  - **The exception: beam calibration.** On `beam_calibrate` the controller moves the loco itself: creep forward (speed `CAL_SPEED`, default 0.1, capped at 0.15) for up to 10 s until the sensor sees the beam change, else a 0.5 s pause and reverse for up to 20 s, then stop. Any `stop`, `speed` or `direction` from a client, the sensor disconnecting, or 3 s without a sensor heartbeat ends it with the motor stopped. The 30 s timeout doesn't apply to this creep; its own limits do. The logic lives in `lib/BeamCalibration` and is unit-tested.
   - `frontend/`: ramps speed changes (about 1 s per 0.1 of throttle) and pauses on direction changes.
   - `tools/train/lib/controller`: ramps the same way, refuses abrupt stops and reversals above creep speed (`MotorCareError`), and only allows a move without a ramp when a beam event guards it (`guardedMove`). Show runs and the web page go through it.
   - Every script in `tools/train` goes through that module, so the rules apply to all of them.
@@ -60,7 +62,8 @@ The Wemos has no idea the Mac exists: a Mac script is just another WebSocket cli
 | Speed, direction | Wemos RAM | Lost on reboot; the motor is stopped at boot. |
 | Invert (motor polarity) | Wemos RAM, set by `{cmd:"invert"}` | The browser re-sends its saved choice on connect. The Mac tools send `controller.invert` from their settings, or from `local/orientation.json` if `node orient.mjs` has calibrated it. The firmware has one flag, so **whichever client connected last wins**. |
 | WiFi, hostname, railroad name, PWM limits | `secrets.ini`, compiled into the firmware | Changing them means re-flashing. |
-| Beam calibration, loco profile, layout, shows, results, traces, your settings | `tools/train/local/` (git-ignored) | Copy the folder to move a setup. `TRAIN_LOCAL` points the tools at another folder. |
+| Beam calibration for the WiFi sensor | The sensor's own LittleFS (`/levels.json`) | Set by the throttle app's Calibrate button; survives power cycles. |
+| Bench-kit beam calibration, loco profile, layout, shows, results, traces, your settings | `tools/train/local/` (git-ignored) | Copy the folder to move a setup. `TRAIN_LOCAL` points the tools at another folder. |
 | Sound packs | `tools/train/packs/` (manifests, committed) and the audio files they name (generated into `packs/synth/`, or imported by you into `tools/train/local/sounds/`; neither is committed) | The `sound.packs` setting chooses which load. |
 
 ## Configuration
