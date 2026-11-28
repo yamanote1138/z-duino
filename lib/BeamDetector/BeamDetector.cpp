@@ -35,10 +35,14 @@ Derived deriveLevels(Stats a, Stats b) {
   return d;
 }
 
+bool beamChanged(int from, int v) {
+  double need = 0.4 * from; if (need < 150) need = 150;
+  return fabs((double)v - from) >= need;
+}
+
 bool ChangeWatch::push(int v) {
   if (!_on) return false;
-  double need = 0.4 * _from; if (need < 150) need = 150;
-  if (fabs((double)v - _from) >= need) { if (++_run >= 2) return true; }
+  if (beamChanged(_from, v)) { if (++_run >= 2) return true; }
   else _run = 0;
   return false;
 }

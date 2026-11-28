@@ -47,6 +47,7 @@ class BeamCalibration {
   CalPhase _phase = CAL_IDLE;
   unsigned long _since = 0;
   Stats _a = {}, _b = {};
+  bool _creepFwd = true; unsigned long _creepUsed = 0;   // where to resume if the change didn't hold
   char _detail[96] = "";
 };
 

@@ -75,6 +75,13 @@ CalOutput BeamCalibration::onMeasured(unsigned long now, Stats s) {
     o.motor = true; o.speed = _speed; o.forward = true;
     o.sendWatch = true; o.watchFrom = s.median;
   } else if (_phase == CAL_MEASURE_B) {
+    if (!beamChanged(_a.median, s.median)) {   // a window or gap, not the beam clearing: keep creeping the same way
+      enter(_creepFwd ? CAL_CREEP_FWD : CAL_CREEP_REV, now, o);
+      _since = now - _creepUsed;
+      o.motor = true; o.speed = _speed; o.forward = _creepFwd;
+      o.sendWatch = true; o.watchFrom = _a.median;
+      return o;
+    }
     _b = s;
     enter(CAL_DERIVE, now, o);
     o.sendLevels = true;
@@ -84,8 +91,13 @@ CalOutput BeamCalibration::onMeasured(unsigned long now, Stats s) {
 
 CalOutput BeamCalibration::onChanged(unsigned long now) {
   CalOutput o;
-  if (_phase == CAL_CREEP_FWD || _phase == CAL_CREEP_REV) enter(CAL_OVERRUN, now, o);   // carry on a moment so the loco is well past the edge
-  else if (_phase == CAL_PAUSE) { enter(CAL_SETTLE, now, o); o.sendWatchOff = true; }   // already stopped in the changed state
+  if (_phase == CAL_CREEP_FWD || _phase == CAL_CREEP_REV) {
+    _creepFwd = _phase == CAL_CREEP_FWD; _creepUsed = now - _since;
+    enter(CAL_OVERRUN, now, o);   // carry on a moment so the loco is well past the edge
+  } else if (_phase == CAL_PAUSE) {
+    _creepFwd = true; _creepUsed = FORWARD_MS;
+    enter(CAL_SETTLE, now, o); o.sendWatchOff = true;   // already stopped in the changed state
+  }
   return o;
 }
 

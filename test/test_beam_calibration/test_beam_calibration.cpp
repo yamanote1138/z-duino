@@ -99,7 +99,7 @@ void test_sensor_silence_while_measuring_fails(void) {
 
 void test_a_failed_result_is_reported(void) {
   BeamCalibration c(0.1f);
-  c.start(0, true, false); c.onMeasured(3000, st(747)); c.onChanged(4000); c.tick(4300); c.tick(4800); c.onMeasured(7800, st(720));
+  c.start(0, true, false); c.onMeasured(3000, st(747)); c.onChanged(4000); c.tick(4300); c.tick(4800); c.onMeasured(7800, st(235));
   c.onResult(false, "only 27 counts apart");
   TEST_ASSERT_EQUAL_STRING("failed", c.phaseName());
   TEST_ASSERT_EQUAL_STRING("only 27 counts apart", c.detail());
@@ -188,6 +188,37 @@ void test_the_sensor_gets_less_slack_while_the_loco_moves(void) {
   TEST_ASSERT_EQUAL(1500, c.quietLimitMs());
 }
 
+void test_a_window_is_not_the_beam_clearing(void) {
+  BeamCalibration c(0.1f);
+  c.start(0, true, false); c.onMeasured(3000, st(56));      // body in the beam
+  c.onChanged(3100);                                         // light through a window
+  c.tick(3400); c.tick(3900);
+  CalOutput o = c.onMeasured(6900, st(6));                   // still blocked: keep going the same way
+  TEST_ASSERT_FALSE(o.sendLevels);
+  TEST_ASSERT_TRUE(o.motor); TEST_ASSERT_EQUAL_FLOAT(0.1f, o.speed); TEST_ASSERT_TRUE(o.forward);
+  TEST_ASSERT_TRUE(o.sendWatch); TEST_ASSERT_EQUAL(56, o.watchFrom);
+  TEST_ASSERT_EQUAL(CAL_CREEP_FWD, c.phase());
+  TEST_ASSERT_FALSE(c.tick(6900 + 9599).motor);              // the 100 ms already used counts against the 10 s
+  TEST_ASSERT_EQUAL_FLOAT(0.0f, c.tick(6900 + 9900).speed);
+}
+
+void test_a_window_on_the_way_back_resumes_in_reverse(void) {
+  BeamCalibration c(0.1f);
+  c.start(0, true, false); c.onMeasured(3000, st(56));
+  c.tick(13000); c.tick(13500);                              // reversing
+  c.onChanged(14000); c.tick(14300); c.tick(14800);
+  CalOutput o = c.onMeasured(17800, st(10));
+  TEST_ASSERT_TRUE(o.motor); TEST_ASSERT_FALSE(o.forward);
+  TEST_ASSERT_EQUAL(CAL_CREEP_REV, c.phase());
+}
+
+void test_a_change_that_held_goes_on_to_levels(void) {
+  BeamCalibration c(0.1f);
+  c.start(0, true, false); c.onMeasured(3000, st(56));
+  c.onChanged(4000); c.tick(4300); c.tick(4800);
+  TEST_ASSERT_TRUE(c.onMeasured(7800, st(747)).sendLevels);
+}
+
 int main(int argc, char** argv) {
   UNITY_BEGIN();
   RUN_TEST(test_refusals);
@@ -207,5 +238,8 @@ int main(int argc, char** argv) {
   RUN_TEST(test_abort_covers_settle_and_derive);
   RUN_TEST(test_a_sensor_reconnecting_mid_run_ends_it);
   RUN_TEST(test_the_sensor_gets_less_slack_while_the_loco_moves);
+  RUN_TEST(test_a_window_is_not_the_beam_clearing);
+  RUN_TEST(test_a_window_on_the_way_back_resumes_in_reverse);
+  RUN_TEST(test_a_change_that_held_goes_on_to_levels);
   return UNITY_END();
 }

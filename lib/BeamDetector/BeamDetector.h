@@ -34,6 +34,8 @@ Stats summarize(const int* v, int n);
 struct Derived { bool ok; BeamLevels levels; char error[96]; char warnings[3][96]; int nWarnings; };
 Derived deriveLevels(Stats a, Stats b);   // the higher median becomes clear
 
+bool beamChanged(int from, int v);   // at least 40% of `from` and 150 counts away
+
 class ChangeWatch {
  public:
   void start(int from) { _from = from; _run = 0; _on = true; }
