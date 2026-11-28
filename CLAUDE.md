@@ -52,6 +52,9 @@ Both run in CI. Code touching real hardware I/O (pins, WiFi/sockets) isn't unit-
 - `frontend/src/App.vue` — Root Vue component
 - `frontend/src/composables/useTrainController.ts` — Core controller logic (WebSocket, ramping, state)
 - `frontend/src/composables/parkSearch.ts` — Park on nose/tail search over guarded creeps, unit-tested
+- `frontend/src/composables/showHost.ts`, `macShow.ts` — run the Mac kit's show engine (`tools/train/lib/show`) in the app: throttle, beam and Web Audio glue
+- `frontend/src/composables/measureLoco.ts` — Measure loco: laps and passes give the speed model and length, saved in the browser's localStorage
+- `frontend/src/shows/jr-lap.json` — the JR lap show; its sounds come from `frontend/scripts/import-sounds.sh` (git-ignored, needs `../jr-esu-sound-profiles`)
 - `frontend/src/composables/partyBeat.ts` — Pure party-mode beat engine (BPM → RGB frames), unit-tested
 - `frontend/src/components/` — Vue SFCs (SpeedController, LedTestPanel, DebugModal, etc.)
 - `frontend/mock-server.ts` — Mock WebSocket for local dev
