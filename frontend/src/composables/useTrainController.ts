@@ -312,7 +312,11 @@ function creep(forward: boolean, until: CreepUntil[], maxMs: number, afterMs = 0
   if (!connected.value) return Promise.resolve({ result: 'aborted', detail: 'connection lost', parked: null })
   const id = ++creepId
   return new Promise((resolve) => {
-    pendingCreeps.set(id, resolve)
+    pendingCreeps.set(id, (r) => {
+      // the controller sends the end before the status, so set the state the stop proves: the last event's
+      if (r.result === 'event' && beam.value) beam.value = { ...beam.value, state: until[until.length - 1] === 'break' ? 'blocked' : 'clear', parked: r.parked }
+      resolve(r)
+    })
     send({ cmd: 'creep', forward, until, maxMs, afterMs, id })
   })
 }

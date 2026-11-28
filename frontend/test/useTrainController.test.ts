@@ -440,6 +440,16 @@ describe('parking', () => {
     expect(tc.parking.value).toMatchObject({ running: false, ok: false, detail: 'stopped' })
   })
 
+  it('a creep that ended on its event sets the beam state before any status arrives', async () => {
+    const socket = FakeWebSocket.instances[0]
+    socket.simulateMessage(sensorStatus())
+    const done = tc.parkLoco('nose')
+    await vi.advanceTimersByTimeAsync(0)
+    socket.simulateMessage({ type: 'creep', id: creeps(socket)[0].id, phase: 'ended', result: 'event', detail: '', parked: 'nose' })
+    await done
+    expect(tc.beam.value?.state).toBe('blocked')
+  })
+
   it('status carries where the loco is parked', () => {
     const socket = FakeWebSocket.instances[0]
     socket.simulateMessage(sensorStatus({ state: 'blocked', parked: 'tail' }))
