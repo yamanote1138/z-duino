@@ -8,14 +8,14 @@ const char* GuardedCreep::parkedName(Parked p) {
   return p == PARKED_NOSE ? "nose" : p == PARKED_TAIL ? "tail" : nullptr;
 }
 
-CreepOutput GuardedCreep::start(unsigned long now, const CreepRequest& r, bool sensorPresent, bool calibrated, bool calibrating, bool motorRunning) {
+CreepOutput GuardedCreep::start(unsigned long now, const CreepRequest& r, bool sensorPresent, bool calibrated, bool calibrating, float motorSpeed, bool motorForward) {
   CreepOutput o;
   if (!sensorPresent) { o.error = "no sensor connected"; return o; }
   if (!r.valid) { o.error = "bad creep arguments"; return o; }
   if (!calibrated) { o.error = "calibrate the sensor first"; return o; }
   if (calibrating) { o.error = "calibration is running"; return o; }
   if (_running) { o.error = "a creep is already running"; return o; }
-  if (motorRunning) { o.error = "stop the train first"; return o; }
+  if (motorSpeed > _speed + 0.001f || (motorSpeed > 0 && motorForward != r.forward)) { o.error = "stop the train first"; return o; }
   _req = r; _running = true; _start = now; _seen = 0; _done = false; _parked = PARKED_NONE;
   o.started = true; o.motor = true; o.speed = _speed; o.forward = r.forward;
   return o;

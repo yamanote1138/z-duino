@@ -282,7 +282,7 @@ void handleWebSocketMessage(uint8_t num, uint8_t *payload, size_t length) {
     }
 
     case CMD_CREEP: {
-      CreepOutput o = creep.start(millis(), cmd.creep, clients.sensor() >= 0 && !sensorLost, beamCalibrated, calibration.running(), currentSpeed > 0);
+      CreepOutput o = creep.start(millis(), cmd.creep, clients.sensor() >= 0 && !sensorLost, beamCalibrated, calibration.running(), currentSpeed, currentDirection);
       if (o.error) creepRefused(num, cmd.creep.id, o.error);
       else applyCreep(o);
       break;
@@ -433,6 +433,8 @@ void setup() {
       else if (path.endsWith(".js")) contentType = "application/javascript";
       else if (path.endsWith(".woff2")) contentType = "font/woff2";
       else if (path.endsWith(".wav")) contentType = "audio/wav";
+      else if (path.endsWith(".m4a")) contentType = "audio/mp4";
+      else if (path.endsWith(".json")) contentType = "application/json";
       server.streamFile(f, contentType);
       f.close();
     } else {

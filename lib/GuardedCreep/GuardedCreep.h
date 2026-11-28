@@ -29,7 +29,7 @@ class GuardedCreep {
   static const unsigned long GRACE_MS = 1000;
 
   explicit GuardedCreep(float speed) : _speed(speed > MAX_SPEED ? MAX_SPEED : speed) {}
-  CreepOutput start(unsigned long now, const CreepRequest& r, bool sensorPresent, bool calibrated, bool calibrating, bool motorRunning);
+  CreepOutput start(unsigned long now, const CreepRequest& r, bool sensorPresent, bool calibrated, bool calibrating, float motorSpeed, bool motorForward);   // may start while already creeping the same way
   CreepOutput onBeam(unsigned long now, CreepEvent e);   // also clears parked when idle
   CreepOutput tick(unsigned long now);
   CreepOutput abort(const char* why);                    // no-op when idle
